@@ -1,0 +1,83 @@
+import type { Status } from '../core/types.ts';
+
+import { planFromSubscription, withDetectedPlan } from '../core/plans.ts';
+import { fetchUsage, readCredentials } from './endpoint.ts';
+import { acquireLock } from './lock.ts';
+import { compareVersions, scanTranscripts } from './scan.ts';
+import { Store } from './store.ts';
+
+/** Used only until a transcript reveals the installed version. */
+const FALLBACK_CLAUDE_CODE_VERSION = '2.1.287';
+
+export interface CollectOptions {
+  claudeDir: string;
+  dataDir: string;
+  fetchImpl?: typeof fetch;
+  /** Call the endpoint even if the throttle has not elapsed. */
+  force?: boolean;
+  now?: number;
+}
+
+export type CollectResult = { skipped: 'locked' } | { skipped?: undefined; status: Status };
+
+/**
+ * One collector run: import transcripts, then take an endpoint snapshot if the
+ * throttle allows. Endpoint failures are recorded in the status, never thrown.
+ */
+export async function collect(options: CollectOptions): Promise<CollectResult> {
+  const now = options.now ?? Date.now();
+  const store = new Store(options.dataDir);
+  await store.ensureDir();
+  const release = await acquireLock(store.dir, now);
+  if (!release)
+    return { skipped: 'locked' };
+
+  try {
+    const [records, scanState, settings, status] = await Promise.all([
+      store.loadRecords(),
+      store.loadScanState(),
+      store.loadSettings(),
+      store.loadStatus(),
+    ]);
+
+    const scan = await scanTranscripts(options.claudeDir, records, scanState);
+    if (scan.filesRead > 0) {
+      await store.saveRecords(records, scan.changedMonths);
+      await store.saveScanState(scanState);
+    }
+    status.lastRunAt = new Date(now).toISOString();
+    status.messages = records.size;
+    status.malformedLines = scan.malformedLines;
+    if (scan.claudeCodeVersion && (!status.claudeCodeVersion || compareVersions(scan.claudeCodeVersion, status.claudeCodeVersion) > 0))
+      status.claudeCodeVersion = scan.claudeCodeVersion;
+
+    const lastAttempt = status.lastEndpointAttemptAt ? Date.parse(status.lastEndpointAttemptAt) : 0;
+    const due = options.force || now - lastAttempt >= settings.throttleMinutes * 60_000;
+    if (settings.endpointEnabled && due) {
+      status.lastEndpointAttemptAt = status.lastRunAt;
+      const credentials = await readCredentials(options.claudeDir, now);
+      const snapshot = typeof credentials === 'string'
+        ? credentials
+        : await fetchUsage(credentials, status.claudeCodeVersion ?? FALLBACK_CLAUDE_CODE_VERSION, now, options.fetchImpl);
+      if (typeof snapshot === 'string') {
+        status.endpointResult = snapshot;
+      }
+      else {
+        status.endpointResult = 'ok';
+        await store.appendSnapshot(snapshot);
+        const plan = planFromSubscription(snapshot.subscriptionType, snapshot.rateLimitTier);
+        if (plan) {
+          const planHistory = withDetectedPlan(settings.planHistory, plan, snapshot.ts);
+          if (planHistory !== settings.planHistory)
+            await store.saveSettings({ ...settings, planHistory: [...planHistory] });
+        }
+      }
+    }
+
+    await store.saveStatus(status);
+    return { status };
+  }
+  finally {
+    await release();
+  }
+}
