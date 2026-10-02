@@ -9,7 +9,7 @@ const topIdAndName = {
     {
       elementNamePattern: '^(?:id|name)$',
       groupName: 'top',
-      selector: 'property',
+      selector: 'property' as const,
     },
   ],
 };

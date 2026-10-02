@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 
 import { apiPlugin } from './src/server/api.ts';
 
-const brand = JSON.parse(readFileSync(resolve(__dirname, 'brand.json'), 'utf8')) as { name: string };
+const brand = JSON.parse(readFileSync(resolve(import.meta.dirname, 'brand.json'), 'utf8')) as { name: string };
 
 export default defineConfig({
   build: {
@@ -22,7 +22,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: [
-      { find: /^@\/(.*)$/, replacement: resolve(__dirname, 'src/$1') },
+      { find: /^@\/(.*)$/, replacement: resolve(import.meta.dirname, 'src/$1') },
     ],
   },
 });
