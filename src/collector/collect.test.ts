@@ -1,12 +1,12 @@
 // @vitest-environment node
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { collect } from './collect.ts';
 import { acquireLock } from './lock.ts';
-import { Store } from './store.ts';
+import { SCAN_FORMAT, Store } from './store.ts';
 
 const NOW = Date.parse('2026-10-02T09:00:00Z');
 
@@ -14,6 +14,7 @@ function assistantLine(id: string, output: number, version = '2.1.287') {
   return JSON.stringify({
     message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 1, output_tokens: output } },
     requestId: `req_${id}`,
+    sessionId: 's1',
     timestamp: '2026-10-02T08:00:00Z',
     type: 'assistant',
     version,
@@ -131,5 +132,91 @@ describe('collect', () => {
     expect(await collect({ claudeDir, dataDir, fetchImpl, now: NOW })).toEqual({ skipped: 'locked' });
     await release!();
     expect(await new Store(dataDir).loadRecords()).toHaveProperty('size', 0);
+  });
+
+  it('keeps the conversation titles in sessions.json', async () => {
+    await writeFile(join(claudeDir, 'projects', 'proj-a', 's2.jsonl'), `${JSON.stringify({ aiTitle: 'Plan the parser', sessionId: 's2', type: 'ai-title' })}\n`);
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+    expect(await new Store(dataDir).loadSessions()).toEqual({ s2: { title: 'Plan the parser' } });
+  });
+
+  it('reads a scan state from before formats existed', async () => {
+    const files = { [join('proj-a', 's1.jsonl')]: { malformed: 2, mtimeMs: 0, offset: 5 } };
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, 'scan-state.json'), JSON.stringify(files));
+    expect(await new Store(dataDir).loadScanState()).toEqual({ files, format: 1 });
+  });
+
+  it('drops the per-file keys a format-1 collector adds to a newer scan state', async () => {
+    const files = { [join('proj-a', 's1.jsonl')]: { mtimeMs: 0, offset: 5 } };
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, 'scan-state.json'), JSON.stringify({ files, format: 2, [join('proj-a', 's2.jsonl')]: { mtimeMs: 0, offset: 9 } }));
+    expect(await new Store(dataDir).loadScanState()).toEqual({ files, format: 2 });
+  });
+
+  describe('after a scan format bump', () => {
+    const OLD_FORMAT = SCAN_FORMAT - 1;
+    /** A record imported before the bump: token counts only. */
+    const oldRecord = (key: string, output: number) => ({ cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, input: 1, key, model: 'claude-opus-5-5', output, project: 'proj-a', ts: '2026-10-02T08:00:00Z' });
+
+    /** `m1` is still on disk; `gone`'s transcript was deleted. Every file is marked fully imported. */
+    async function seedOldDataDir() {
+      const store = new Store(dataDir);
+      await store.ensureDir();
+      await store.saveRecords(new Map([['m1|req_m1', oldRecord('m1|req_m1', 600)], ['gone|req_gone', oldRecord('gone|req_gone', 50)]]), ['2026-10']);
+      const files: Record<string, { mtimeMs: number; offset: number }> = {};
+      for (const id of [join('proj-a', 's1.jsonl'), join('proj-a', 'session', 'subagents', 'agent.jsonl')]) {
+        const info = await stat(join(claudeDir, 'projects', id));
+        files[id] = { mtimeMs: info.mtimeMs, offset: info.size };
+      }
+      await store.saveScanState({ files, format: OLD_FORMAT });
+      return store;
+    }
+
+    it('re-reads every transcript once, filling old records and keeping the rest', async () => {
+      const store = await seedOldDataDir();
+      await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+
+      const records = await store.loadRecords();
+      expect(records.get('m1|req_m1')).toMatchObject({ output: 600, sessionId: 's1' });
+      expect(records.get('gone|req_gone')).toEqual(oldRecord('gone|req_gone', 50));
+      expect(records.has('m2|req_m2')).toBe(true);
+      expect((await store.loadScanState()).format).toBe(SCAN_FORMAT);
+    });
+
+    it('backs up the message files once, before changing them', async () => {
+      const store = await seedOldDataDir();
+      const before = await readFile(join(dataDir, 'messages-2026-10.jsonl'), 'utf8');
+      await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+
+      const backup = join(dataDir, `backup-format-${OLD_FORMAT}`);
+      expect(await readdir(backup)).toEqual(['messages-2026-10.jsonl']);
+      expect(await readFile(join(backup, 'messages-2026-10.jsonl'), 'utf8')).toBe(before);
+
+      // A run that repeats the re-read keeps the first backup as it is.
+      await store.saveScanState({ files: {}, format: OLD_FORMAT });
+      await collect({ claudeDir, dataDir, fetchImpl, now: NOW + 60_000 });
+      expect(await readFile(join(backup, 'messages-2026-10.jsonl'), 'utf8')).toBe(before);
+      expect((await readdir(dataDir)).filter(name => name.endsWith('.tmp'))).toEqual([]);
+    });
+
+    it('repeats the re-read when a run fails before writing the new format', async () => {
+      const store = await seedOldDataDir();
+      const crash = vi.spyOn(Store.prototype, 'saveScanState').mockRejectedValueOnce(new Error('crash'));
+      try {
+        await expect(collect({ claudeDir, dataDir, fetchImpl, now: NOW })).rejects.toThrow('crash');
+      }
+      finally {
+        crash.mockRestore();
+      }
+      expect((await store.loadScanState()).format).toBe(OLD_FORMAT);
+      const records = await store.loadRecords();
+      expect(records.get('m1|req_m1')?.sessionId).toBe('s1');
+      expect(records.get('gone|req_gone')).toEqual(oldRecord('gone|req_gone', 50));
+
+      await collect({ claudeDir, dataDir, fetchImpl, now: NOW + 60_000 });
+      expect((await store.loadScanState()).format).toBe(SCAN_FORMAT);
+      expect(await store.loadRecords()).toEqual(records);
+    });
   });
 });

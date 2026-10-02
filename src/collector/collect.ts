@@ -4,7 +4,7 @@ import { planFromSubscription, withDetectedPlan } from '../core/plans.ts';
 import { fetchUsage, readCredentials } from './endpoint.ts';
 import { acquireLock } from './lock.ts';
 import { compareVersions, malformedLineCount, scanTranscripts } from './scan.ts';
-import { Store } from './store.ts';
+import { SCAN_FORMAT, Store } from './store.ts';
 
 /** Used only until a transcript reveals the installed version. */
 const FALLBACK_CLAUDE_CODE_VERSION = '2.1.287';
@@ -35,20 +35,33 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
   let status: Status = {};
   try {
     status = await store.loadStatus();
-    const [records, scanState, settings] = await Promise.all([
+    const [records, scanState, sessions, settings] = await Promise.all([
       store.loadRecords(),
       store.loadScanState(),
+      store.loadSessions(),
       store.loadSettings(),
     ]);
 
-    const scan = await scanTranscripts(options.claudeDir, records, scanState);
-    if (scan.filesRead > 0) {
+    // An older format re-reads every transcript still on disk once, so the
+    // records imported before it gain the new fields (`mergeRecord` fills them).
+    // Records whose transcripts are gone are kept as they are.
+    const reread = scanState.format < SCAN_FORMAT;
+    if (reread) {
+      await store.backupRecords(`backup-format-${scanState.format}`);
+      scanState.files = {};
+    }
+    const scan = await scanTranscripts(options.claudeDir, records, scanState.files, sessions);
+    if (scan.filesRead > 0 || reread) {
       await store.saveRecords(records, scan.changedMonths);
+      if (scan.sessionsChanged)
+        await store.saveSessions(sessions);
+      // Written last: a crash before it only repeats the re-read.
+      scanState.format = SCAN_FORMAT;
       await store.saveScanState(scanState);
     }
     status.lastRunAt = new Date(now).toISOString();
     status.messages = records.size;
-    status.malformedLines = malformedLineCount(scanState);
+    status.malformedLines = malformedLineCount(scanState.files);
     if (scan.claudeCodeVersion && (!status.claudeCodeVersion || compareVersions(scan.claudeCodeVersion, status.claudeCodeVersion) > 0))
       status.claudeCodeVersion = scan.claudeCodeVersion;
 

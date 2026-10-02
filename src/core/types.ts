@@ -6,6 +6,13 @@ export interface UsageRecord {
   cacheRead: number;
   cacheWrite1h: number;
   cacheWrite5m: number;
+  /** Raw working directory; its drive letter's case can vary within a session. */
+  cwd?: string;
+  /** `low`…`max`; absent on subagent messages. */
+  effort?: string;
+  /** Claude Code client: `cli`, `claude-vscode`, … */
+  entrypoint?: string;
+  gitBranch?: string;
   input: number;
   /** `message.id|requestId`; unique per API response. */
   key: string;
@@ -13,10 +20,23 @@ export interface UsageRecord {
   output: number;
   /** Transcript folder name under `~/.claude/projects`. */
   project: string;
+  sessionId?: string;
+  /** Present only on a subagent's message. */
+  sidechain?: true;
   /** Present only when the request ran in fast mode. */
   speed?: 'fast';
+  /** Output tokens spent thinking, part of `output`. */
+  thinking?: number;
   /** ISO timestamp. */
   ts: string;
+  /** Claude Code version that wrote the message. */
+  version?: string;
+}
+
+/** What is kept per conversation, in `sessions.json`, keyed by session id. */
+export interface SessionInfo {
+  /** Claude Code's AI-generated title; the latest one wins. */
+  title: string;
 }
 
 export type Plan = 'pro' | 'max5' | 'max20';

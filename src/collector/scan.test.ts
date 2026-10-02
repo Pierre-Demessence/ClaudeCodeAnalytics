@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { UsageRecord } from '../core/types.ts';
+import type { SessionInfo, UsageRecord } from '../core/types.ts';
 import type { ScanState } from './store.ts';
 
 import { compareVersions, malformedLineCount, scanTranscripts } from './scan.ts';
@@ -86,6 +86,42 @@ describe('scanTranscripts', () => {
     await scanTranscripts(claudeDir, records, state);
     expect(records.has('d|req_d')).toBe(true);
     expect(malformedLineCount(state)).toBe(0);
+  });
+});
+
+describe('scanTranscripts session titles', () => {
+  let claudeDir: string;
+  let file: string;
+
+  const title = (aiTitle: string) => `${JSON.stringify({ aiTitle, sessionId: 's1', type: 'ai-title' })}\n`;
+
+  beforeEach(async () => {
+    claudeDir = await mkdtemp(join(tmpdir(), 'cca-titles-'));
+    await mkdir(join(claudeDir, 'projects', 'proj'), { recursive: true });
+    file = join(claudeDir, 'projects', 'proj', 'session.jsonl');
+  });
+  afterEach(async () => {
+    await rm(claudeDir, { force: true, recursive: true });
+  });
+
+  it('keeps the latest title, written before or after the messages', async () => {
+    const sessions: Record<string, SessionInfo> = {};
+    const state: ScanState = {};
+    await writeFile(file, title('First') + line('a') + title('Second'));
+    expect((await scanTranscripts(claudeDir, new Map(), state, sessions)).sessionsChanged).toBe(true);
+    expect(sessions).toEqual({ s1: { title: 'Second' } });
+    expect(malformedLineCount(state)).toBe(0);
+
+    await appendFile(file, line('b') + title('Third'));
+    await scanTranscripts(claudeDir, new Map(), state, sessions);
+    expect(sessions).toEqual({ s1: { title: 'Third' } });
+  });
+
+  it('reports no change without a new title', async () => {
+    await writeFile(file, title('Same') + line('a'));
+    expect((await scanTranscripts(claudeDir, new Map(), {}, { s1: { title: 'Same' } })).sessionsChanged).toBe(false);
+    await writeFile(file, line('a'));
+    expect((await scanTranscripts(claudeDir, new Map(), {}, {})).sessionsChanged).toBe(false);
   });
 });
 

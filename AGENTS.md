@@ -71,7 +71,14 @@ Run lint, test and build before considering work done.
   the status).
 - The data dir (`~/.claude-code-analytics/`, or `CCA_DATA_DIR`) holds the
   user's history: never wipe it. Tests and manual runs use a temp
-  `CCA_DATA_DIR`. Stored messages contain token counts only, never content.
+  `CCA_DATA_DIR`. Stored messages hold token counts and session metadata
+  (`sessionId`, `cwd`, `gitBranch`, …), never content; conversation titles are
+  kept per session in `sessions.json`. `backup-format-<n>/` holds the message
+  files from before a scan-format re-read: keep it.
+- Bump `SCAN_FORMAT` (`collector/store.ts`) only when records gain fields that
+  old messages need: the next run re-reads every transcript once. Make the bump
+  the last edit, after the tests pass, since the hook runs it on the real data.
+  The dashboard runs the collector too: rebuild the container (`docker:up`).
 - The API is loopback-only: POST endpoints require `application/json` and a
   same-origin `Origin`; reads rely on Vite's default `allowedHosts`. Never set
   `server.host` or `allowedHosts: true` without adding a Host check. The Docker

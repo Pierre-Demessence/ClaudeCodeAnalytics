@@ -163,3 +163,24 @@ color (green, orange, red). A thin colored border was rejected: with
 deuteranomaly small colored areas are hard to tell apart. The verdict's icon
 shape and text carry the same meaning. A stale reading does not change the
 color; a warning icon by the number explains it.
+
+## Session metadata on every record, titles per session
+
+Each record carries `sessionId`, `sidechain`, `effort`, `thinking`,
+`entrypoint`, `gitBranch`, `cwd` and `version` (about +70 % size, some 15 MB a
+year). A per-session table would save half of that, but the branch and `cwd`
+can change within a session, and one file is simpler to keep consistent.
+Titles (`ai-title` lines, the latest wins) are AI summaries of a conversation,
+so they can name clients or topics and outlive the transcripts; accepted since
+the data dir is local, already holds paths and branch names, and the API is
+loopback-only. They live in `sessions.json`, one file to delete to drop them.
+
+## One-time re-read on a scan-format bump
+
+New record fields would leave every message imported before them empty. When
+`scan-state.json`'s `format` is older than `SCAN_FORMAT`, the collector backs up
+the message files (`backup-format-<n>/`, made once, through a temp folder),
+resets every offset and rescans; `mergeRecord` fills a record lacking
+`sessionId` from the copy with the same `output`, since earlier streamed copies
+carry a partial `thinking` count. The format is written last, so a crash only
+repeats the re-read. Records whose transcripts are gone keep their fields.

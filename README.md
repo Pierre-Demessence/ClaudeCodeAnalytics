@@ -8,7 +8,9 @@ model. Scaffolded with
 Everything stays on your machine. Data comes from two places:
 
 - **Claude Code transcripts** (`~/.claude/projects/**/*.jsonl`): token counts
-  per message, priced at public API rates as the usage unit.
+  per message, priced at public API rates as the usage unit, with the session,
+  working directory, branch, effort and Claude Code version, and each
+  conversation's AI-generated title. Message content is never stored.
 - **Plan limits**: Claude Code's undocumented usage endpoint (the numbers behind
   `/usage`), read with the OAuth token Claude Code stores locally, and/or manual
   readings you type in. The token is only ever sent to `api.anthropic.com`; it is

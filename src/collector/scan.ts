@@ -2,10 +2,10 @@ import { Buffer } from 'node:buffer';
 import { open, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 
-import type { UsageRecord } from '../core/types.ts';
+import type { SessionInfo, UsageRecord } from '../core/types.ts';
 import type { ScanState } from './store.ts';
 
-import { mergeRecord, parseTranscriptLine } from '../core/transcript.ts';
+import { mergeRecord, parseTitleLine, parseTranscriptLine } from '../core/transcript.ts';
 
 export interface ScanResult {
   /** Newest Claude Code version seen in the scanned files, if any. */
@@ -13,6 +13,8 @@ export interface ScanResult {
   /** `YYYY-MM` of every message added or updated. */
   changedMonths: Set<string>;
   filesRead: number;
+  /** Whether a session title was added or changed. */
+  sessionsChanged: boolean;
 }
 
 async function listTranscripts(dir: string): Promise<string[]> {
@@ -61,7 +63,7 @@ async function readFrom(file: string, offset: number, size: number): Promise<Buf
   }
 }
 
-/** Total malformed lines across all transcripts ever scanned. */
+/** Total malformed lines across the transcripts in the scan state (reset by a re-read). */
 export function malformedLineCount(state: ScanState): number {
   return Object.values(state).reduce((sum, entry) => sum + (entry.malformed ?? 0), 0);
 }
@@ -71,15 +73,16 @@ const NEWLINE = 0x0A;
 
 /**
  * Imports usage from every changed transcript under `<claudeDir>/projects`
- * (subagent files included) into `records`. Updates `state` in place.
+ * (subagent files included) into `records`, and conversation titles into
+ * `sessions`. Updates `state` in place.
  *
  * Transcripts are append-only, so only the bytes after the last scanned
  * offset are read. A trailing line without a newline that is not valid JSON
  * is still being written; it is left for the next run.
  */
-export async function scanTranscripts(claudeDir: string, records: Map<string, UsageRecord>, state: ScanState): Promise<ScanResult> {
+export async function scanTranscripts(claudeDir: string, records: Map<string, UsageRecord>, state: ScanState, sessions: Record<string, SessionInfo> = {}): Promise<ScanResult> {
   const projectsDir = join(claudeDir, 'projects');
-  const result: ScanResult = { changedMonths: new Set(), filesRead: 0 };
+  const result: ScanResult = { changedMonths: new Set(), filesRead: 0, sessionsChanged: false };
 
   for (const file of await listTranscripts(projectsDir)) {
     const info = await stat(file);
@@ -115,8 +118,17 @@ export async function scanTranscripts(claudeDir: string, records: Map<string, Us
         if (version && (!result.claudeCodeVersion || compareVersions(version, result.claudeCodeVersion) > 0))
           result.claudeCodeVersion = version;
       }
-      else if (!isJson(line)) {
-        malformed++;
+      else {
+        const title = parseTitleLine(line);
+        if (title) {
+          if (sessions[title.sessionId]?.title !== title.title) {
+            sessions[title.sessionId] = { title: title.title };
+            result.sessionsChanged = true;
+          }
+        }
+        else if (!isJson(line)) {
+          malformed++;
+        }
       }
     }
     state[id] = { malformed, mtimeMs: info.mtimeMs, offset };

@@ -6,15 +6,26 @@ interface RawUsage {
   cache_read_input_tokens?: number;
   input_tokens?: number;
   output_tokens?: number;
+  output_tokens_details?: { thinking_tokens?: number } | null;
   speed?: string | null;
 }
 
 interface RawEntry {
+  aiTitle?: string;
+  cwd?: string;
+  effort?: string;
+  entrypoint?: string;
+  gitBranch?: string;
+  isSidechain?: boolean;
   message?: { id?: string; model?: string; usage?: RawUsage };
   requestId?: string;
+  sessionId?: string;
   timestamp?: string;
   type?: string;
+  version?: string;
 }
+
+const METADATA_FIELDS = ['cwd', 'effort', 'entrypoint', 'gitBranch', 'sessionId', 'version'] as const;
 
 /**
  * Turns one transcript line into a usage record, or null when the line is not
@@ -52,17 +63,48 @@ export function parseTranscriptLine(line: string, project: string): UsageRecord 
   };
   if (usage.speed === 'fast')
     record.speed = 'fast';
+  for (const field of METADATA_FIELDS) {
+    const value = entry[field];
+    if (typeof value === 'string' && value)
+      record[field] = value;
+  }
+  if (entry.isSidechain === true)
+    record.sidechain = true;
+  const thinking = usage.output_tokens_details?.thinking_tokens;
+  if (typeof thinking === 'number')
+    record.thinking = thinking;
   return record;
+}
+
+/** Reads an `ai-title` line: Claude Code's title for a conversation. Null for any other line. */
+export function parseTitleLine(line: string): { sessionId: string; title: string } | null {
+  // Most lines are not titles: skip parsing them a second time.
+  if (!line.includes('"ai-title"'))
+    return null;
+  let entry: RawEntry;
+  try {
+    entry = JSON.parse(line) as RawEntry;
+  }
+  catch {
+    return null;
+  }
+  if (entry.type !== 'ai-title' || typeof entry.aiTitle !== 'string' || !entry.aiTitle || typeof entry.sessionId !== 'string' || !entry.sessionId)
+    return null;
+  return { sessionId: entry.sessionId, title: entry.aiTitle };
 }
 
 /**
  * Adds a record, deduplicating by key. Claude Code writes a message once per
  * content block while streaming; only `output` grows between copies, so the
- * highest one is final. Returns whether the map changed.
+ * highest one is final. The final copy also replaces a stored record without
+ * `sessionId` (imported before the metadata fields existed) to fill them in;
+ * earlier copies are skipped, as their `thinking` may still be partial.
+ * Returns whether the map changed.
  */
 export function mergeRecord(records: Map<string, UsageRecord>, record: UsageRecord): boolean {
   const existing = records.get(record.key);
-  if (existing && record.output <= existing.output)
+  const fills = existing && !existing.sessionId && record.sessionId && record.output === existing.output;
+  if (existing && record.output <= existing.output && !fills)
     return false;
   records.set(record.key, record);
   return true;

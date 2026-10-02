@@ -30,12 +30,11 @@ that completes it.
 - Cache efficiency: cache-read share of input and dollars saved versus uncached input, per day and per project.
 - Past 5-hour sessions: timeline of rebuilt sessions (`aggregate.ts` `sessionCosts`) with cost and the peak 5-hour % where a reading exists.
 - Cost-per-message distribution, listing outliers (date, project), e.g. a large cache write after a long-context resume.
-- Per conversation (`sessionId`, not parsed today in `transcript.ts`): cost, length, model mix, duration, most expensive this week. Titles (`ai-title` lines) would be content; decide first.
-- Main agent vs subagents (`isSidechain`, not parsed today): share of usage spent by subagents.
-- Effort and thinking (`effort`, `usage.output_tokens_details.thinking_tokens`, not parsed today): cost by effort level, thinking share of output.
-- By surface (`entrypoint`) and by `gitBranch` (not parsed today): terminal vs IDE, cost per feature branch.
-- Claude Code version timeline (`version`, not parsed today): mark upgrades on the daily chart to spot token-use changes.
-- The new transcript fields above change the stored record format: already-imported messages lack them unless transcripts are rescanned, and transcripts past `cleanupPeriodDays` are gone. Decide the rescan once for all of them.
+- Per conversation (`UsageRecord.sessionId`, titles in `sessions.json`): cost, length, model mix, duration, most expensive this week.
+- Main agent vs subagents (`UsageRecord.sidechain`): share of usage spent by subagents.
+- Effort and thinking (`UsageRecord.effort`, `thinking`): cost by effort level, thinking share of output.
+- By surface (`entrypoint`) and by `gitBranch`: terminal vs IDE, cost per feature branch.
+- Claude Code version timeline (`UsageRecord.version`): mark upgrades on the daily chart to spot token-use changes.
 - Calibration drift: plan % per dollar per week, to detect a silent limit change and test the price-scaling assumption.
 - claude.ai vs Claude Code split per week from `claudeCodeShare` (only feeds the fit today).
 - What-if simulator: final % of a week with another model mix (e.g. Opus as Sonnet) or another plan, from pricing and calibration.
