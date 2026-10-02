@@ -49,12 +49,23 @@ Collected data lives in `~/.claude-code-analytics/` (override with
 `CCA_DATA_DIR`). Raise `cleanupPeriodDays` in `~/.claude/settings.json` if you
 want older transcripts kept, although messages already imported are kept anyway.
 
+### Always-on dashboard (Docker)
+
+Requires Docker Desktop and a running Traefik attached to an external `proxy`
+network. `npm run docker:up` builds the image and starts it at
+<http://analytics.claudecode.localhost>, behind the Traefik reverse proxy on the
+external `proxy` network. The container restarts with Docker Desktop, mounts
+`~/.claude` read-only and shares `~/.claude-code-analytics` with the hook, which
+keeps running on the host. The container serves the version it was built from:
+run `npm run docker:up` again after changing the code.
+
 ## Scripts
 
 | Script                 | Description                                               |
 | ---------------------- | --------------------------------------------------------- |
 | `npm run dashboard`    | Build and open the dashboard (`vite preview`).            |
 | `npm run dev`          | Dashboard with hot reload.                                |
+| `npm run docker:up`    | Build and (re)start the always-on Docker dashboard.       |
 | `npm run collect`      | Run the collector once (`-- --force` skips the throttle). |
 | `npm run hook:install` | Print or (`-- --apply`) install the Claude Code hook.     |
 | `npm run build`        | Type-check, then build.                                   |

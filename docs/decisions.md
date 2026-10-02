@@ -105,3 +105,13 @@ the projection starts from it.
 The collector adds a plan period when Claude Code's login reports a different
 plan, unless the active period was set by hand; the dashboard then shows the
 mismatch with a one-click switch instead of overriding the user.
+
+## Always-on dashboard: a rebuilt Docker image running `vite preview`
+
+The container runs `vite preview` (the `/api` routes are a Vite plugin), so the
+image keeps dev dependencies; writing a separate production server was not worth
+it for a local tool. Updates go live only on `npm run docker:up`: mounting the
+working copy and rebuilding at start was rejected because a half-finished edit
+would go live at the next boot. The root filesystem is read-only, hence
+`--configLoader native` (the default loader bundles the config into
+`node_modules`). The collector hook stays on the host and shares the data dir.

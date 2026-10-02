@@ -7,6 +7,8 @@ transcripts and the plan-limit endpoint.
 ## Commands
 
 - Dashboard: `npm run dashboard` (build + preview) or `npm run dev`
+- Always-on dashboard: `npm run docker:up` (rebuild + restart the container
+  at `http://analytics.claudecode.localhost`, behind Traefik)
 - Collector: `npm run collect` (`-- --force` ignores the endpoint throttle)
 - Hook: `npm run hook:install` prints it; `-- --apply` edits `~/.claude/settings.json`
 - Build: `npm run build` (type-checks both tsconfigs, then `vite build`)
@@ -24,6 +26,7 @@ Run lint, test and build before considering work done.
 - `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview.
 - `src/dashboard/` — React app (`main.tsx` entry).
 - `docs/` — `backlog.md`, `decisions.md`, `plans/`.
+- `Dockerfile`, `docker-compose.yml` — the always-on dashboard behind Traefik.
 
 ## Conventions
 
@@ -64,7 +67,16 @@ Run lint, test and build before considering work done.
   `CCA_DATA_DIR`. Stored messages contain token counts only, never content.
 - The API is loopback-only: POST endpoints require `application/json` and a
   same-origin `Origin`; reads rely on Vite's default `allowedHosts`. Never set
-  `server.host` or `allowedHosts: true` without adding a Host check.
+  `server.host` or `allowedHosts: true` without adding a Host check. The Docker
+  container listens on `0.0.0.0` but publishes no port: from the host, only
+  Traefik (bound to `127.0.0.1:80`) reaches it, and `*.localhost` passes the
+  default `allowedHosts`. Other containers on the `proxy` network can still
+  call it by IP (Vite always allows IP hosts). Never publish a port.
+- The container loads `vite.config.ts` with `--configLoader native` (its root
+  filesystem is read-only), so the config and everything it imports must run
+  under Node's type stripping, like the collector.
+- The container serves the image it was built from; it mounts `~/.claude`
+  read-only and shares the data dir with the host's hook.
 - Keep the `@/*` alias in sync across `tsconfig.json`, `vite.config.ts` and
   `vitest.config.ts`.
 - The app name comes from `brand.json`; never hard-code it in `index.html`.

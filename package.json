@@ -11,6 +11,7 @@
     "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
     "preview": "vite preview",
     "dashboard": "vite build && vite preview --open",
+    "docker:up": "docker compose up -d --build",
     "collect": "node src/collector/cli.ts",
     "hook:install": "node src/collector/cli.ts install-hook",
     "lint": "eslint --cache .",

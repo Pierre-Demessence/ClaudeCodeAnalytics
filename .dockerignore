@@ -1,0 +1,12 @@
+.git
+.github
+.vscode
+.playwright-mcp
+node_modules
+dist
+coverage
+docs
+.eslintcache
+*.log
+*.local
+.env*
