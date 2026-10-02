@@ -2,8 +2,7 @@
 
 Agent operating notes for **Claude Code Analytics**: a local dashboard (Vite +
 React + TypeScript strict) estimating Claude Code plan usage from local
-transcripts and the plan-limit endpoint. Work in progress:
-[docs/plans/usage-analytics.md](docs/plans/usage-analytics.md).
+transcripts and the plan-limit endpoint.
 
 ## Commands
 
