@@ -12,7 +12,6 @@ interface Props {
   busy: boolean;
   summary: Summary;
   onAddReading: (reading: ManualReading) => Promise<void>;
-  onRefresh: () => Promise<void>;
   onSaveSettings: (settings: { endpointEnabled?: boolean; planHistory?: readonly PlanPeriod[] }) => Promise<void>;
 }
 
@@ -53,7 +52,7 @@ function EndpointStatus({ summary }: { summary: Summary }) {
   );
 }
 
-export function SettingsPanel({ busy, onAddReading, onRefresh, onSaveSettings, summary }: Props) {
+export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: Props) {
   const [newPlan, setNewPlan] = useState<Plan>(summary.plan);
   const [planFrom, setPlanFrom] = useState(today);
   const [weekly, setWeekly] = useState('');
@@ -202,14 +201,6 @@ export function SettingsPanel({ busy, onAddReading, onRefresh, onSaveSettings, s
             />
             Read limits from the undocumented usage endpoint
           </label>
-          <button
-            disabled={busy}
-            onClick={() => void onRefresh()}
-            title="Imports transcripts and calls the usage endpoint now. The endpoint is rate-limited, so avoid repeated clicks."
-            type="button"
-          >
-            Refresh now
-          </button>
         </div>
 
         <div>

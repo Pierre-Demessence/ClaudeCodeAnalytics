@@ -22,6 +22,9 @@ Everything stays on your machine. Data comes from two places:
   Max 5× and Max 20× (approximate, from the advertised multipliers).
 - Daily and weekly usage by model family, in API-equivalent dollars or tokens.
 - Plan setting with history; the plan is also detected from Claude Code's login.
+- Tabs: Overview (limits and past weeks), Usage (charts by model) and
+  Calibration (plan, readings, collection status).
+- Light and dark themes: follows the OS until you pick one in the header.
 - Colorblind-friendly: every series has a texture and a label, not just a color.
 
 Assumptions: transcripts come from this machine only, and plan limits scale

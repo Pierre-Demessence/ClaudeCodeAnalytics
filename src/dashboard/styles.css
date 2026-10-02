@@ -49,6 +49,30 @@
   }
 }
 
+/* Same values as above: a theme chosen in the header overrides the OS scheme. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --surface-0: #111110;
+  --surface-1: #1a1a19;
+  --surface-2: #232322;
+  --border: #3a3a37;
+  --grid: #2e2e2c;
+  --hover: rgb(255 255 255 / 6%);
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --accent: #3987e5;
+  --accent-soft: #184f95;
+  --estimate-fill: #104281;
+  --pattern-ink: rgb(0 0 0 / 45%);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --good-text: #4cc74c;
+  --critical-text: #f08080;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -132,10 +156,77 @@ select {
   background: var(--surface-2);
 }
 
-.page-header {
+.app-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+.app-header-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 12px 16px 0;
+}
+
+.app-header-top {
   display: flex;
-  align-items: baseline;
-  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.app-header h1 {
+  font-size: 1.3rem;
+}
+
+.app-header-spacer {
+  flex-grow: 1;
+}
+
+.plan-badge {
+  padding: 1px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.last-reading {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+/* Active tab: bold text and a thick underline, not color alone. */
+.tabs a {
+  padding: 8px 14px;
+  border-bottom: 3px solid transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tabs a:hover {
+  color: var(--text-primary);
+}
+
+.tabs a[aria-current='page'] {
+  border-bottom-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .busy,
@@ -172,9 +263,33 @@ small {
   color: var(--critical-text);
 }
 
-/* Meter: filled = used, hatched = projection to the median, bracket = likely range. */
+/* Meter: filled = used, hatched = projection, striped = past the limit, bracket = likely range. */
 .meter {
+  position: relative;
   margin-bottom: 16px;
+}
+
+.meter-labels {
+  position: relative;
+  height: 22px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.meter-outside,
+.meter-cap-label {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+
+/* Underlined in the bar's color: ties a label above the bar to its segment. */
+.meter-outside {
+  border-bottom: 2px solid var(--accent);
+}
+
+.meter-outside-over {
+  border-bottom-color: var(--critical);
 }
 
 .meter-track {
@@ -184,50 +299,46 @@ small {
   background: var(--grid);
 }
 
-.meter-fill {
+.meter-fill,
+.meter-projection,
+.meter-over {
   position: absolute;
-  inset: 0 auto 0 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.meter-fill {
   border-radius: 6px 0 0 6px;
   background: var(--accent);
   color: #fff;
 }
 
 .meter-projection {
-  position: absolute;
-  top: 0;
-  bottom: 0;
+  justify-content: center;
   background: repeating-linear-gradient(45deg, var(--accent-soft) 0 6px, transparent 6px 10px);
 }
 
-/* In-bar labels are clipped when their segment is too narrow; the ticks keep the numbers. */
-.meter-fill,
-.meter-projection {
-  display: flex;
-  align-items: center;
-  overflow: hidden;
+.meter-over {
+  justify-content: center;
+  border-radius: 0 6px 6px 0;
+  background: repeating-linear-gradient(-45deg, var(--critical) 0 3px, transparent 3px 7px);
 }
 
 .meter-label {
   margin: 0 6px;
   padding: 0 4px;
-  overflow: hidden;
   white-space: nowrap;
   font-size: 0.8rem;
   font-weight: 600;
 }
 
-.meter-projection .meter-label {
+.meter-projection .meter-label,
+.meter-over .meter-label {
   border-radius: 4px;
   background: var(--surface-1);
-}
-
-/* Tall enough to enclose the axis ticks: the range ends are labelled below its floor. */
-.meter-range {
-  position: absolute;
-  top: 36px;
-  height: 24px;
-  border: 2px solid var(--text-secondary);
-  border-top: 0;
 }
 
 .meter-cap {
@@ -235,47 +346,54 @@ small {
   top: -6px;
   bottom: -6px;
   width: 0;
+  margin-left: -3px;
   border-left: 3px solid var(--text-primary);
 }
 
-.meter-cap span {
+.meter-range-row {
+  position: relative;
+  height: 30px;
+  margin-top: 4px;
+}
+
+.meter-range {
   position: absolute;
-  top: -20px;
-  left: -12px;
-  font-size: 0.75rem;
+  top: 0;
+  height: 8px;
+  border: 2px solid var(--text-secondary);
+  border-top: 0;
+}
+
+.meter-range-row .meter-cap-label {
+  top: 10px;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
-.meter-ticks {
-  position: relative;
-  height: 1.2em;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
-.meter-ticks span {
+.meter-range-label {
   position: absolute;
+  top: 10px;
   white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
 }
 
-.meter-ticks .tick-center {
-  transform: translateX(-50%);
+/* Off-screen copies of the labels, measured to decide where each one fits. */
+/* Inline-block: a ResizeObserver reports no size for inline boxes. */
+.meter-measure .meter-label {
+  display: inline-block;
 }
 
-.meter-ticks .tick-end {
-  transform: translateX(-100%);
-}
-
-.meter-axis {
-  margin-top: 6px;
-}
-
-.meter-range-ticks {
-  margin-top: 10px;
-}
-
-.meter-range-ticks + .meter-range-ticks {
-  margin-top: 2px;
+.meter-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .verdict {

@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Summary } from '@/dashboard/api';
 
@@ -36,21 +36,63 @@ function summary(): Summary {
 }
 
 describe('app', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    location.hash = '';
   });
 
-  it('renders every section from the summary', async () => {
+  it('opens on the overview tab', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json(summary())));
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'This week' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Share of the plan per week' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Raw usage' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: /Settings/ })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Raw usage' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
     // 95 % after 4 days: the trend fallback crosses the cap before reset.
     expect(screen.getByText('Likely to hit the weekly cap')).toBeTruthy();
+    expect(screen.getByTitle(/Plan in effect now/).textContent).toBe('Pro');
+  });
+
+  it('switches tabs with the URL hash', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(summary())));
+    render(<App />);
+    await screen.findByRole('heading', { name: 'This week' });
+    act(() => {
+      location.hash = '#/usage';
+      dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(screen.getByRole('heading', { name: 'Raw usage' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'This week' })).toBeNull();
+    act(() => {
+      location.hash = '#/calibration';
+      dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(screen.getByRole('heading', { name: /Settings/ })).toBeTruthy();
     expect(screen.getByText('Current plan:', { exact: false }).textContent).toContain('Pro');
+  });
+
+  it('toggles the theme from the header', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(summary())));
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Switch to dark theme' }));
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(screen.getByRole('button', { name: 'Switch to light theme' })).toBeTruthy();
+    localStorage.clear();
+    delete document.documentElement.dataset.theme;
+  });
+
+  it('refreshes from the header', async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) => Response.json(summary()));
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    await screen.findByRole('heading', { name: 'This week' });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.startsWith('/api/collect'))).toBe(true));
   });
 
   it('shows the server error', async () => {

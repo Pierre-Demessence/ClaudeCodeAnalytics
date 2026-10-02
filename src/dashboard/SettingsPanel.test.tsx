@@ -28,7 +28,6 @@ function renderPanel(data = summary()) {
   const props = {
     busy: false,
     onAddReading: vi.fn(async (_reading: unknown) => {}),
-    onRefresh: vi.fn(async () => {}),
     onSaveSettings: vi.fn(async (_settings: unknown) => {}),
     summary: data,
   };

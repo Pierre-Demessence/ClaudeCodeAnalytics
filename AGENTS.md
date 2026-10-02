@@ -47,6 +47,11 @@ Run lint, test and build before considering work done.
   `lint:fix`. Tests must not depend on object key order.
 - `import-x/no-unresolved` checks every import, including the `@/` alias.
 - Console output and top-level `await` are only allowed in `cli.ts` files.
+- Tabs are `#/<id>` hash links (`dashboard/tabs.ts`); a new tab is one entry
+  in `TABS` plus its branch in `App.tsx`.
+- Theme: `data-theme` on `<html>`. Dark variables exist twice in `styles.css`
+  (OS media query and `[data-theme='dark']`): change both. The storage key
+  `cca-theme` is also read by the inline script in `index.html`.
 - Charts: never color alone. Each model family has a fixed color slot and an
   SVG pattern (`dashboard/models.ts`, `Patterns.tsx`); metrics carry `title`
   tooltips.

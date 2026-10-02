@@ -115,3 +115,28 @@ working copy and rebuilding at start was rejected because a half-finished edit
 would go live at the next boot. The root filesystem is read-only, hence
 `--configLoader native` (the default loader bundles the config into
 `node_modules`). The collector hook stays on the host and shares the data dir.
+
+## Tabs as hash links, no router
+
+The dashboard's tabs are `<a href="#/usage">` links read by `useTab()`: the back
+button and bookmarks work, and the dev/preview server needs no fallback route.
+A router library was rejected as a dependency for five static views.
+
+## Theme: `data-theme` on `<html>`, dark values written twice
+
+With no choice stored, the stylesheet follows `prefers-color-scheme`; a choice
+in the header is stored in `localStorage` and set as `data-theme`. CSS cannot
+share one block between a media query and an attribute selector, so the dark
+variables appear twice in `styles.css`; a preprocessor was not worth it. An
+inline script in `index.html` applies a stored theme before the first paint,
+since a React effect would paint the other theme first.
+
+## Meter labels measured, not estimated
+
+Each meter label goes inside its segment when the segment is wide enough, else
+on the row above the bar. Widths come from off-screen copies of the labels and
+the track, watched by one `ResizeObserver`, so the choice holds at phone width
+and after font loads; a character-count estimate was rejected as wrong for
+proportional fonts. "limit 100%" is placed last, in the first free spot: above
+the bar by the cap line, below it left of the line, else above with the other
+labels moved around it. A fixed spot collided with the range bracket.

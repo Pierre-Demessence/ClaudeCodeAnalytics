@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>%APP_NAME%</title>
+    <!-- Applies a theme chosen in the header before the first paint; keep the key in sync with src/dashboard/theme.ts. -->
+    <script>
+      try {
+        const theme = localStorage.getItem('cca-theme');
+        if (theme === 'dark' || theme === 'light')
+          document.documentElement.dataset.theme = theme;
+      }
+      catch {}
+    </script>
   </head>
   <body>
     <div id="app"></div>
