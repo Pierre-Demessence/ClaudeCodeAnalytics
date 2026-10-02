@@ -13,3 +13,4 @@ matches its design artboard, existing views included.
 3. **Calibration tab**: the existing settings, readings and status restyled to
    the design, plus limit drift, Claude Code vs claude.ai split, what-if
    simulator, deleting manual readings, Claude Code share in the manual form.
+4. **Typical week on each plan**: The missing card from the design on the Overview tab: "Your median week, converted with the advertised multipliers. Approximate."
