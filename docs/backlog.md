@@ -21,5 +21,5 @@ that completes it.
 - Price the 4.5-generation models (Opus 4.5, Sonnet 4.5) and long-context premiums if they show up in transcripts; they are flagged as unknown today.
 - Treat a `seven_day.resets_at` of null (if the endpoint ever returns it) as "no usage yet" rather than `bad-shape`.
 - Per-model weekly limits (`seven_day_opus` / `seven_day_sonnet` in the endpoint response) if a plan ever reports them.
-- A 5-hour window forecast, same method as the weekly one.
 - Weekday-aware daily usage (weekends differ) for the forecast.
+- 5-hour sessions are rebuilt from transcript times only (`aggregate.ts` `sessionCosts`); the real windows (e.g. 07:50 for a first message at 07:59) start earlier, likely from claude.ai use or some rounding. Readings' `fiveHourResetsAt` could anchor past sessions.

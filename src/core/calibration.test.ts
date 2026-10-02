@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Snapshot } from './types.ts';
 
-import { calibrationPoints, fitRatio } from './calibration.ts';
+import { calibrationPoints, fitRatio, fiveHourCalibrationPoints } from './calibration.ts';
 
 const DAY = 86_400_000;
 
@@ -26,6 +26,27 @@ describe('calibrationPoints', () => {
     const costBetween = () => 5;
     const points = calibrationPoints([snap('2026-10-02T00:00:00Z', 30), snap('2026-10-01T00:00:00Z', 4)], costBetween);
     expect(points.map(p => p.usage)).toEqual([30]);
+  });
+});
+
+describe('fiveHourCalibrationPoints', () => {
+  const costBetween = (from: number, to: number) => (to - from) / 3_600_000 * 4; // $4 per hour
+  const reading = (fiveHour: number | undefined, fiveHourResetsAt?: string): Snapshot =>
+    ({ fiveHour, fiveHourResetsAt, source: 'endpoint', ts: '2026-10-02T10:00:00.000Z', weekly: 50, weeklyResetsAt: '2026-10-07T20:00:00.000Z' });
+
+  it('pairs the 5-hour % with the cost since that window started', () => {
+    // The window ends at 12:00, so it opened at 07:00: 3 hours, $12, before the reading.
+    expect(fiveHourCalibrationPoints([reading(30, '2026-10-02T12:00:00.000Z')], costBetween))
+      .toEqual([{ cost: 12, ts: Date.parse('2026-10-02T10:00:00Z'), usage: 30 }]);
+  });
+
+  it('skips readings without a reset time, coarse readings and windows before the data', () => {
+    const points = fiveHourCalibrationPoints(
+      [reading(30), reading(undefined), reading(3, '2026-10-02T12:00:00.000Z'), reading(30, '2026-10-02T12:00:00.000Z')],
+      costBetween,
+      Date.parse('2026-10-02T08:00:00Z'),
+    );
+    expect(points).toEqual([]);
   });
 });
 

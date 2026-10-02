@@ -1,21 +1,20 @@
 import type { UsageRow } from './aggregate.ts';
 import type { Calibration } from './calibration.ts';
-import type { WeekForecast } from './forecast.ts';
+import type { WindowForecast } from './forecast.ts';
 import type { TypicalWeek, WeekShare } from './share.ts';
 import type { Plan, PlanPeriod, Snapshot, UsageRecord } from './types.ts';
 
-import { aggregate, createCostIndex, dailyCostSeries, dayKey } from './aggregate.ts';
-import { calibrationPoints, DAY_MS, fitRatio, WEEK_MS } from './calibration.ts';
-import { forecastWeek } from './forecast.ts';
+import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts } from './aggregate.ts';
+import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
+import { forecastWindow } from './forecast.ts';
 import { convertPercent, planAt, planFromSubscription, PLANS } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
 
-/** Days of daily cost used as "typical" for forecasts. */
+/** Days of daily cost and 5-hour sessions used as "typical" for forecasts. */
 const TYPICAL_DAYS = 28;
 /** Days shown in the daily usage chart. */
 const DAILY_CHART_DAYS = 35;
-const FIVE_HOURS_MS = 5 * 3_600_000;
 /** Readings older than this get an estimated current % from transcripts. */
 const STALE_READING_MS = 30 * 60_000;
 
@@ -32,8 +31,11 @@ export interface CurrentWeek {
   /** Weekly % now, estimated from usage since a stale reading. */
   estimatedNow?: number;
   fiveHour?: number;
+  /** 5-hour % now, estimated from usage since the reading. */
+  fiveHourEstimatedNow?: number;
+  fiveHourForecast?: WindowForecast;
   fiveHourResetsAt?: string;
-  forecast?: WeekForecast;
+  forecast?: WindowForecast;
   /** ISO time of the reading. */
   readAt: string;
   resetsAt: string;
@@ -50,6 +52,8 @@ export interface DashboardSummary {
   /** A detected plan that differs from a manual setting. */
   detectedPlan?: Plan;
   endpointEnabled: boolean;
+  /** % of the 5-hour limit per dollar. */
+  fiveHourCalibration?: Calibration;
   generatedAt: string;
   plan: Plan;
   planHistory: readonly PlanPeriod[];
@@ -111,13 +115,16 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const firstDay = dayKey(first, timeZone);
 
   // Calibrate only on readings taken under the current plan.
-  const points = calibrationPoints(snapshots.filter(s => planAt(planHistory, s.ts) === plan), costBetween, first);
-  const calibration = fitRatio(points, now);
+  const planSnapshots = snapshots.filter(s => planAt(planHistory, s.ts) === plan);
+  const calibration = fitRatio(calibrationPoints(planSnapshots, costBetween, first), now);
+  const fiveHourCalibration = fitRatio(fiveHourCalibrationPoints(planSnapshots, costBetween, first), now);
   const yesterday = dayKey(now - DAY_MS, timeZone);
   const typicalFrom = [firstDay, dayKey(now - TYPICAL_DAYS * DAY_MS, timeZone)].sort().at(-1)!;
   const dailyCosts = typicalFrom <= yesterday
     ? dailyCostSeries(records, timeZone, typicalFrom, yesterday).map(d => d.cost)
     : [];
+  // Average $/hour of each recent session, idle time included, like the zero days in `dailyCosts`.
+  const sessionPaces = sessionCosts(records, now - TYPICAL_DAYS * DAY_MS, now, FIVE_HOURS_MS).map(cost => cost / 5);
 
   let current: CurrentWeek | undefined;
   if (latest && Date.parse(latest.weeklyResetsAt) > now) {
@@ -128,12 +135,36 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     const estimatedNow = now - readAt > STALE_READING_MS && sinceReading > 0
       ? Math.min(100, latest.weekly + sinceReading)
       : undefined;
+    const week = { k: calibration?.k, paceSamples: dailyCosts, resetsAt, sampleMs: DAY_MS, windowMs: WEEK_MS };
     const forecast = estimatedNow !== undefined
-      ? forecastWeek({ asOf: now, dailyCosts, k: calibration?.k, resetsAt, weekly: estimatedNow })
-      : forecastWeek({ asOf: calibration ? now : readAt, dailyCosts, k: calibration?.k, resetsAt, weekly: latest.weekly });
+      ? forecastWindow({ ...week, asOf: now, used: estimatedNow })
+      : forecastWindow({ ...week, asOf: calibration ? now : readAt, used: latest.weekly });
+
+    const fiveHour = fiveHourStillValid(latest, now) ? latest.fiveHour : undefined;
+    let fiveHourEstimatedNow: number | undefined;
+    let fiveHourForecast: WindowForecast | undefined;
+    // Without a reset time (manual readings), the window's position is unknown.
+    if (fiveHour !== undefined && latest.fiveHourResetsAt) {
+      const k = fiveHourCalibration?.k;
+      // A 5-hour window moves fast: always add the usage since the reading when calibrated.
+      const sinceFiveHour = k !== undefined ? k * costBetween(readAt, now) : 0;
+      fiveHourEstimatedNow = sinceFiveHour > 0 ? Math.min(100, fiveHour + sinceFiveHour) : undefined;
+      fiveHourForecast = forecastWindow({
+        asOf: k !== undefined ? now : readAt,
+        k,
+        paceSamples: sessionPaces,
+        resetsAt: Date.parse(latest.fiveHourResetsAt),
+        sampleMs: HOUR_MS,
+        used: fiveHourEstimatedNow ?? fiveHour,
+        windowMs: FIVE_HOURS_MS,
+      });
+    }
+
     current = {
       estimatedNow,
-      fiveHour: fiveHourStillValid(latest, now) ? latest.fiveHour : undefined,
+      fiveHour,
+      fiveHourEstimatedNow,
+      fiveHourForecast,
       fiveHourResetsAt: latest.fiveHourResetsAt,
       forecast,
       readAt: latest.ts,
@@ -166,6 +197,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     daily,
     detectedPlan: detected && detected !== plan ? detected : undefined,
     endpointEnabled: input.endpointEnabled,
+    fiveHourCalibration,
     generatedAt: nowIso,
     plan,
     planHistory,

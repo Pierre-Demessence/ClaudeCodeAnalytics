@@ -1,10 +1,12 @@
 import type { Snapshot } from './types.ts';
 
-export const DAY_MS = 86_400_000;
+export const HOUR_MS = 3_600_000;
+export const FIVE_HOURS_MS = 5 * HOUR_MS;
+export const DAY_MS = 24 * HOUR_MS;
 export const WEEK_MS = 7 * DAY_MS;
 
 /** Utilization comes in whole percents; below this, rounding dominates. */
-const MIN_WEEKLY_FOR_FIT = 5;
+const MIN_PERCENT_FOR_FIT = 5;
 const MIN_POINTS = 3;
 
 export interface CalibrationPoint {
@@ -40,11 +42,33 @@ export function calibrationPoints(
   dataStart = Number.NEGATIVE_INFINITY,
 ): CalibrationPoint[] {
   return snapshots
-    .filter(s => s.weekly >= MIN_WEEKLY_FOR_FIT && windowStart(s) >= dataStart)
+    .filter(s => s.weekly >= MIN_PERCENT_FOR_FIT && windowStart(s) >= dataStart)
     .map((s) => {
       const ts = Date.parse(s.ts);
       return { cost: costBetween(windowStart(s), ts), ts, usage: s.weekly * (s.claudeCodeShare ?? 100) / 100 };
     });
+}
+
+/**
+ * One point per reading with a 5-hour window: the 5-hour % against the cost
+ * since that window started. The endpoint gives no Claude Code share for the
+ * 5-hour window, so claude.ai usage in it counts against Claude Code's cost.
+ */
+export function fiveHourCalibrationPoints(
+  snapshots: readonly Snapshot[],
+  costBetween: (from: number, to: number) => number,
+  /** Time of the first imported message: earlier windows have incomplete costs. */
+  dataStart = Number.NEGATIVE_INFINITY,
+): CalibrationPoint[] {
+  return snapshots.flatMap((s) => {
+    if (s.fiveHour === undefined || s.fiveHour < MIN_PERCENT_FOR_FIT || !s.fiveHourResetsAt)
+      return [];
+    const start = Date.parse(s.fiveHourResetsAt) - FIVE_HOURS_MS;
+    if (start < dataStart)
+      return [];
+    const ts = Date.parse(s.ts);
+    return [{ cost: costBetween(start, ts), ts, usage: s.fiveHour }];
+  });
 }
 
 /**

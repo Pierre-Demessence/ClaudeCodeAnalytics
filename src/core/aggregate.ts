@@ -89,3 +89,22 @@ export function dailyCostSeries(records: readonly UsageRecord[], timeZone: strin
   }
   return series;
 }
+
+/**
+ * Cost of each 5-hour session that started at or after `from` and ended by
+ * `to`, rebuilt from message times: a session opens at the first message after
+ * the previous one closed. claude.ai also opens sessions and transcripts miss
+ * it, so the boundaries are approximate.
+ */
+export function sessionCosts(records: readonly UsageRecord[], from: number, to: number, sessionMs: number): number[] {
+  const points = records.map(r => ({ cost: messageCost(r).cost, ms: Date.parse(r.ts) })).sort((a, b) => a.ms - b.ms);
+  const sessions: { cost: number; start: number }[] = [];
+  for (const point of points) {
+    const last = sessions.at(-1);
+    if (last && point.ms < last.start + sessionMs)
+      last.cost += point.cost;
+    else
+      sessions.push({ cost: point.cost, start: point.ms });
+  }
+  return sessions.filter(s => s.start >= from && s.start + sessionMs <= to).map(s => s.cost);
+}

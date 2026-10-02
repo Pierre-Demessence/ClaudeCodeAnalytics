@@ -81,6 +81,18 @@ only new bytes are read. A last line without a newline that is not valid JSON
 is still being written and is left for the next run. A file that shrank or
 changed without growing is read again from the start.
 
+## 5-hour forecast: its own calibration and session pace
+
+The 5-hour window is forecast with the weekly method (`forecastWindow`), with
+two inputs of its own. Its % per $ is fitted separately on the 5-hour readings,
+since the ratio between the 5-hour and weekly limits is not published; the
+endpoint gives no Claude Code share for that window, so claude.ai usage counts
+in the fit. Its pace is the average $/hour of each 5-hour session in the last
+4 weeks, idle time included, rebuilt from message times. Daily cost / 24 was
+rejected: a session only exists while working, so it would understate the
+pace. Every reading gets the usage since it added back, not only stale ones:
+15 minutes is 5% of a 5-hour window.
+
 ## Estimated weeks and stale readings
 
 A completed week whose last reading is more than 12 h before reset is extended

@@ -1,3 +1,4 @@
+import type { WindowForecast } from '@/core/forecast';
 import type { Summary } from '@/dashboard/api';
 
 import { formatDateTime, formatPercent, formatRelative } from '@/dashboard/format';
@@ -8,13 +9,19 @@ const SCALE_MAX = 150;
 const STALE_WARNING_MS = 6 * 3_600_000;
 const at = (value: number) => `${Math.min(value, SCALE_MAX) / SCALE_MAX * 100}%`;
 
-function Verdict({ capAt, median }: { capAt?: number; median: number }) {
+const VERDICTS = {
+  fiveHour: { bad: 'Likely to hit the 5-hour cap', good: 'On track to last until the 5-hour reset', warn: 'Tight, but should last until the 5-hour reset' },
+  week: { bad: 'Likely to hit the weekly cap', good: 'On track to last the week', warn: 'Tight, but should last the week' },
+};
+
+function Verdict({ forecast: { capAt, median }, window }: { forecast: WindowForecast; window: keyof typeof VERDICTS }) {
+  const text = VERDICTS[window];
   if (capAt !== undefined) {
     return (
       <p className="verdict verdict-bad">
         <span aria-hidden="true" className="verdict-icon">⚠</span>
         <span>
-          <strong>Likely to hit the weekly cap</strong>
+          <strong>{text.bad}</strong>
           {' '}
           around
           {' '}
@@ -28,10 +35,81 @@ function Verdict({ capAt, median }: { capAt?: number; median: number }) {
     <p className={median >= 85 ? 'verdict verdict-warn' : 'verdict verdict-good'}>
       <span aria-hidden="true" className="verdict-icon">{median >= 85 ? '!' : '✓'}</span>
       <span>
-        <strong>{median >= 85 ? 'Tight, but should last the week' : 'On track to last the week'}</strong>
+        <strong>{median >= 85 ? text.warn : text.good}</strong>
         .
       </span>
     </p>
+  );
+}
+
+/** Filled = used, hatched = projection from `start` to the median, bracket = range. */
+function Meter({ forecast, start, title, used }: { forecast?: WindowForecast; start: number; title: string; used: number }) {
+  return (
+    <div className="meter" title={title}>
+      <div className="meter-track">
+        {forecast && (
+          <div
+            className="meter-projection"
+            style={{ left: at(start), width: `calc(${at(forecast.median)} - ${at(start)})` }}
+          />
+        )}
+        <div className="meter-fill" style={{ width: at(used) }} />
+        {forecast && forecast.high > forecast.low && (
+          <div className="meter-range" style={{ left: at(forecast.low), width: `calc(${at(forecast.high)} - ${at(forecast.low)})` }} />
+        )}
+        <div className="meter-cap" style={{ left: at(100) }}>
+          <span>cap</span>
+        </div>
+      </div>
+      <div className="meter-legend">
+        <span>
+          <span aria-hidden="true" className="key key-fill" />
+          {' '}
+          used:
+          {' '}
+          {formatPercent(used)}
+        </span>
+        {forecast && (
+          <span>
+            <span aria-hidden="true" className="key key-projection" />
+            {' '}
+            projected at reset:
+            {' '}
+            {formatPercent(forecast.median)}
+            {forecast.high > forecast.low && ` (range ${formatPercent(forecast.low)}–${formatPercent(forecast.high)})`}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FiveHour({ current }: { current: NonNullable<Summary['current']> }) {
+  const { fiveHour, fiveHourEstimatedNow, fiveHourForecast: forecast, fiveHourResetsAt } = current;
+  if (fiveHour === undefined)
+    return null;
+  const methodNote = forecast?.method === 'calibrated'
+    ? 'Current % plus the usage seen in transcripts since the reading, then your typical session pace (median $/hour of 5-hour sessions in the last 4 weeks, range = 25th–75th percentile), converted with the calibrated 5-hour % per $.'
+    : 'Not enough 5-hour readings to calibrate yet: extrapolates this session\'s own pace so far.';
+  return (
+    <div className="five-hour">
+      <h3 title={methodNote}>
+        5-hour session
+        {fiveHourResetsAt && <small>{`resets ${formatDateTime(fiveHourResetsAt)} (${formatRelative(fiveHourResetsAt)})`}</small>}
+      </h3>
+      <Meter
+        forecast={forecast}
+        start={fiveHourEstimatedNow ?? fiveHour}
+        title="5-hour session limit used at the last reading, the projected range at reset, and the 100 % cap."
+        used={fiveHour}
+      />
+      {fiveHourEstimatedNow !== undefined && (
+        <p className="note">{`≈ ${formatPercent(fiveHourEstimatedNow)} now (estimated from usage since the reading).`}</p>
+      )}
+      {forecast
+        ? <Verdict forecast={forecast} window="fiveHour" />
+        : fiveHourResetsAt && <p className="empty">Too early in the session to project.</p>}
+    </div>
   );
 }
 
@@ -63,42 +141,12 @@ export function ThisWeek({ summary }: { summary: Summary }) {
   return (
     <section className="card">
       <h2>This week</h2>
-      <div className="meter" title="Weekly limit used so far, the projected range at reset, and the 100 % cap.">
-        <div className="meter-track">
-          {forecast && (
-            <div
-              className="meter-projection"
-              style={{ left: at(start), width: `calc(${at(forecast.median)} - ${at(start)})` }}
-            />
-          )}
-          <div className="meter-fill" style={{ width: at(current.weekly) }} />
-          {forecast && forecast.high > forecast.low && (
-            <div className="meter-range" style={{ left: at(forecast.low), width: `calc(${at(forecast.high)} - ${at(forecast.low)})` }} />
-          )}
-          <div className="meter-cap" style={{ left: at(100) }}>
-            <span>cap</span>
-          </div>
-        </div>
-        <div className="meter-legend">
-          <span>
-            <span aria-hidden="true" className="key key-fill" />
-            {' '}
-            used:
-            {' '}
-            {formatPercent(current.weekly)}
-          </span>
-          {forecast && (
-            <span>
-              <span aria-hidden="true" className="key key-projection" />
-              {' '}
-              projected at reset:
-              {' '}
-              {formatPercent(forecast.median)}
-              {forecast.high > forecast.low && ` (range ${formatPercent(forecast.low)}–${formatPercent(forecast.high)})`}
-            </span>
-          )}
-        </div>
-      </div>
+      <Meter
+        forecast={forecast}
+        start={start}
+        title="Weekly limit used so far, the projected range at reset, and the 100 % cap."
+        used={current.weekly}
+      />
 
       {readingAgeMs > STALE_WARNING_MS && (
         <p className="status-bad">
@@ -110,7 +158,7 @@ export function ThisWeek({ summary }: { summary: Summary }) {
       )}
 
       {forecast
-        ? <Verdict capAt={forecast.capAt} median={forecast.median} />
+        ? <Verdict forecast={forecast} window="week" />
         : <p className="empty">Too early in the window to project; check back in a few hours.</p>}
 
       <dl className="stats">
@@ -128,13 +176,6 @@ export function ThisWeek({ summary }: { summary: Summary }) {
             <small>{formatRelative(current.resetsAt)}</small>
           </dd>
         </div>
-        <div title="Share of the 5-hour session limit used at the last reading.">
-          <dt>5-hour session</dt>
-          <dd>
-            {current.fiveHour === undefined ? '—' : formatPercent(current.fiveHour)}
-            {current.fiveHour !== undefined && current.fiveHourResetsAt && <small>{`resets ${formatRelative(current.fiveHourResetsAt)}`}</small>}
-          </dd>
-        </div>
         <div title={methodNote}>
           <dt>Projection method</dt>
           <dd>
@@ -143,6 +184,8 @@ export function ThisWeek({ summary }: { summary: Summary }) {
           </dd>
         </div>
       </dl>
+
+      <FiveHour current={current} />
     </section>
   );
 }

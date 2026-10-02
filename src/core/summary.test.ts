@@ -96,6 +96,24 @@ describe('buildSummary', () => {
     expect(summary.current?.estimatedNow).toBeGreaterThan(30);
   });
 
+  it('forecasts the 5-hour window from the calibrated session pace', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    // Today's session opened at 10:00 and resets at 15:00; $20 per record.
+    const today = [at('10:00'), at('11:00'), at('11:55')].map(ts => rec(ts));
+    const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';
+    // 10 % for $20, 20 % for $40: k = 0.5 %/$.
+    const snapshots = [['10:30', 10], ['11:30', 20], ['11:50', 20]].map(([time, fiveHour]) =>
+      snap(at(time as string), 30, RESET, { fiveHour: fiveHour as number, fiveHourResetsAt }));
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [...records, ...today], snapshots, timeZone: 'UTC' });
+
+    expect(summary.fiveHourCalibration?.k).toBeCloseTo(0.5);
+    // The 11:55 record ($20) adds 10 points since the last reading.
+    expect(summary.current?.fiveHourEstimatedNow).toBeCloseTo(30);
+    // Past sessions: one $20 record each, so $4/hour × 0.5 %/$ × 3 hours left = 6 points.
+    expect(summary.current?.fiveHourForecast).toMatchObject({ method: 'calibrated' });
+    expect(summary.current?.fiveHourForecast?.median).toBeCloseTo(36);
+  });
+
   it('keeps a manual 5-hour reading for 5 hours', () => {
     const manual = (age: number) => buildSummary({
       endpointEnabled: false,
@@ -104,9 +122,10 @@ describe('buildSummary', () => {
       records: [],
       snapshots: [{ fiveHour: 35, source: 'manual', ts: new Date(NOW - age).toISOString(), weekly: 44, weeklyResetsAt: RESET }],
       timeZone: 'UTC',
-    }).current?.fiveHour;
-    expect(manual(3_600_000)).toBe(35);
-    expect(manual(6 * 3_600_000)).toBeUndefined();
+    }).current;
+    // Without a reset time the window's position is unknown: no 5-hour forecast.
+    expect(manual(3_600_000)).toMatchObject({ fiveHour: 35, fiveHourForecast: undefined });
+    expect(manual(6 * 3_600_000)?.fiveHour).toBeUndefined();
   });
 
   it('works without any data', () => {
