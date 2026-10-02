@@ -172,7 +172,7 @@ small {
   color: var(--critical-text);
 }
 
-/* Weekly meter: filled = used, hatched = projection to the median, bracket = range. */
+/* Meter: filled = used, hatched = projection to the median, bracket = likely range. */
 .meter {
   margin-bottom: 16px;
 }
@@ -189,6 +189,7 @@ small {
   inset: 0 auto 0 0;
   border-radius: 6px 0 0 6px;
   background: var(--accent);
+  color: #fff;
 }
 
 .meter-projection {
@@ -198,10 +199,33 @@ small {
   background: repeating-linear-gradient(45deg, var(--accent-soft) 0 6px, transparent 6px 10px);
 }
 
+/* In-bar labels are clipped when their segment is too narrow; the ticks keep the numbers. */
+.meter-fill,
+.meter-projection {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.meter-label {
+  margin: 0 6px;
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.meter-projection .meter-label {
+  border-radius: 4px;
+  background: var(--surface-1);
+}
+
+/* Tall enough to enclose the axis ticks: the range ends are labelled below its floor. */
 .meter-range {
   position: absolute;
   top: 36px;
-  height: 8px;
+  height: 24px;
   border: 2px solid var(--text-secondary);
   border-top: 0;
 }
@@ -222,42 +246,36 @@ small {
   font-weight: 600;
 }
 
-.meter-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 20px;
-  margin-top: 20px;
-  font-size: 0.9rem;
+.meter-ticks {
+  position: relative;
+  height: 1.2em;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
 }
 
-.key {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  vertical-align: -2px;
+.meter-ticks span {
+  position: absolute;
+  white-space: nowrap;
 }
 
-.key-fill {
-  background: var(--accent);
+.meter-ticks .tick-center {
+  transform: translateX(-50%);
 }
 
-.key-projection {
-  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 3px, transparent 3px 5px);
-  outline: 1px solid var(--accent-soft);
+.meter-ticks .tick-end {
+  transform: translateX(-100%);
 }
 
-/* The 5-hour session block, under the weekly stats. */
-.five-hour {
-  margin-top: 24px;
+.meter-axis {
+  margin-top: 6px;
 }
 
-.five-hour h3 {
-  margin-bottom: 20px;
+.meter-range-ticks {
+  margin-top: 10px;
 }
 
-.five-hour h3 small {
-  font-weight: 400;
+.meter-range-ticks + .meter-range-ticks {
+  margin-top: 2px;
 }
 
 .verdict {

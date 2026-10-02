@@ -32,3 +32,14 @@ export function formatRelative(value: string | number, now = Date.now()): string
   }
   return relative.format(Math.round(seconds), 'second');
 }
+
+/** "in 4 h 12 min" for less than a day ahead, otherwise like `formatRelative`. */
+export function formatCountdown(value: string | number, now = Date.now()): string {
+  const ms = new Date(value).getTime() - now;
+  if (ms <= 0 || ms >= 86_400_000)
+    return formatRelative(value, now);
+  // Rounded up, so the countdown never reads "in 0 min" before the reset.
+  const minutes = Math.ceil(ms / 60_000);
+  const hours = Math.floor(minutes / 60);
+  return `in ${hours > 0 ? `${hours} h ` : ''}${minutes % 60} min`;
+}

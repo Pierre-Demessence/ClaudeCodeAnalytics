@@ -16,8 +16,8 @@ Everything stays on your machine. Data comes from two places:
 
 ## Features
 
-- Current weekly %, 5-hour %, reset times, and a projection at reset with the
-  date the cap would be hit.
+- Current weekly and 5-hour %, reset times, and for each window a projection
+  at reset with its likely range and the time the cap would be hit.
 - Final % of every past week, the typical week, and its equivalent on Pro,
   Max 5× and Max 20× (approximate, from the advertised multipliers).
 - Daily and weekly usage by model family, in API-equivalent dollars or tokens.
