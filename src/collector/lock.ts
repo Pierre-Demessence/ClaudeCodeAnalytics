@@ -33,3 +33,14 @@ export async function acquireLock(dir: string, now = Date.now()): Promise<(() =>
   }
   return null;
 }
+
+/** Like `acquireLock`, but waits up to `timeoutMs` for the current holder. */
+export async function waitForLock(dir: string, timeoutMs: number): Promise<(() => Promise<void>) | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const release = await acquireLock(dir);
+    if (release || Date.now() >= deadline)
+      return release;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}

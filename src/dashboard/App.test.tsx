@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Summary } from '@/dashboard/api';
@@ -37,6 +37,7 @@ function summary(): Summary {
 
 describe('app', () => {
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
   });
 

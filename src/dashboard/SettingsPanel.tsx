@@ -180,7 +180,19 @@ export function SettingsPanel({ busy, onAddReading, onRefresh, onSaveSettings, s
             <dd>{status.lastRunAt ? formatRelative(status.lastRunAt) : 'never'}</dd>
             <dt title="Deduplicated assistant messages imported from Claude Code transcripts.">Messages imported</dt>
             <dd>{status.messages ?? 0}</dd>
+            {(status.malformedLines ?? 0) > 0 && (
+              <>
+                <dt title="Transcript lines that are not valid JSON; they are skipped.">Malformed lines</dt>
+                <dd>{status.malformedLines}</dd>
+              </>
+            )}
           </dl>
+          {status.lastError && (
+            <p className="status-bad">
+              <span aria-hidden="true">✗ </span>
+              {`Last run failed: ${status.lastError}`}
+            </p>
+          )}
           <label className="checkbox">
             <input
               checked={summary.endpointEnabled}

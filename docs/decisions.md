@@ -65,11 +65,21 @@ localhost. Writes require `application/json` and an `Origin` matching `Host`,
 which blocks cross-site form posts. Reads rely on Vite's default `allowedHosts`
 and CORS rules. No auth: anyone with local access can already read `~/.claude`.
 
-## Lock with owner token, stale after 2 minutes
+## One data-dir lock for every writer
 
-A run takes about a second; a lock older than 2 minutes was left by a crashed
-run and is taken over. The lock file holds a random token, so a slow run never
-deletes the lock of the run that took over.
+Collector runs and the dashboard's writes (settings, manual readings) take the
+same lock, so a run cannot overwrite a plan change made during its endpoint
+call; the dashboard waits up to 5 s, then answers 409. A run takes about a
+second; a lock older than 2 minutes was left by a crashed run and is taken
+over. The lock file holds a random token, so a slow run never deletes the lock
+of the run that took over.
+
+## Read transcripts incrementally
+
+Transcripts are append-only, so the scan state keeps a byte offset per file and
+only new bytes are read. A last line without a newline that is not valid JSON
+is still being written and is left for the next run. A file that shrank or
+changed without growing is read again from the start.
 
 ## Estimated weeks and stale readings
 

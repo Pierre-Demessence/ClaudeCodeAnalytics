@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { acquireLock } from './lock.ts';
+import { acquireLock, waitForLock } from './lock.ts';
 
 describe('acquireLock', () => {
   let dir: string;
@@ -29,6 +29,13 @@ describe('acquireLock', () => {
     const old = new Date(Date.now() - 10 * 60_000);
     await utimes(join(dir, 'lock'), old, old);
     expect(await acquireLock(dir)).not.toBeNull();
+  });
+
+  it('waits for the holder to release, or gives up after the timeout', async () => {
+    const release = await acquireLock(dir);
+    expect(await waitForLock(dir, 150)).toBeNull();
+    setTimeout(() => void release!(), 100);
+    expect(await waitForLock(dir, 2_000)).not.toBeNull();
   });
 
   it('never releases a lock another run took over', async () => {

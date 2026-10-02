@@ -34,7 +34,8 @@ Run lint, test and build before considering work done.
   Node runs the collector without a build step and does not resolve `@/`. The
   dashboard imports with `@/…`.
 - Co-locate tests as `<name>.test.ts(x)`. Node-side tests start with
-  `// @vitest-environment node`.
+  `// @vitest-environment node`. Vitest globals are off, so Testing Library
+  needs an explicit `afterEach(cleanup)`.
 - 2-space indent, single quotes, semicolons (enforced by ESLint).
 - ESLint (`@antfu/eslint-config`) sorts object and interface keys with `id` and
   `name` first, and imports as one flat list. A comment line starts a new sorting
@@ -54,6 +55,10 @@ Run lint, test and build before considering work done.
 - The usage endpoint needs a `claude-code/<version>` User-Agent; keep the
   throttle (default 15 min) and never add a retry loop: it shares a tight rate
   limit with Claude Code's own `/usage`.
+- The installed Claude Code hook runs `src/collector/cli.ts` from this working
+  copy, so uncommitted collector changes go live at the next response. Keep
+  the collector runnable; it fails silently in the hook (check `lastError` in
+  the status).
 - The data dir (`~/.claude-code-analytics/`, or `CCA_DATA_DIR`) holds the
   user's history: never wipe it. Tests and manual runs use a temp
   `CCA_DATA_DIR`. Stored messages contain token counts only, never content.

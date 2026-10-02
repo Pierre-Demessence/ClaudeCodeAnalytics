@@ -44,6 +44,7 @@ describe('collect', () => {
       assistantLine('m1', 600),
       JSON.stringify({ type: 'user' }),
       '{broken',
+      '',
     ].join('\n'));
     await writeFile(join(claudeDir, 'projects', 'proj-a', 'session', 'subagents', 'agent.jsonl'), assistantLine('m2', 10, '2.1.300'));
     fetchImpl.mockClear();
@@ -97,6 +98,23 @@ describe('collect', () => {
     await rm(join(claudeDir, 'projects', 'proj-a', 's1.jsonl'));
     await collect({ claudeDir, dataDir, fetchImpl, now: NOW + 60_000 });
     expect((await new Store(dataDir).loadRecords()).size).toBe(2);
+  });
+
+  it('records an unexpected failure in the status and rethrows', async () => {
+    // A directory where a month file should be makes loading fail.
+    await mkdir(join(dataDir, 'messages-2026-10.jsonl'), { recursive: true });
+    await expect(collect({ claudeDir, dataDir, fetchImpl, now: NOW })).rejects.toThrow();
+    const status = await new Store(dataDir).loadStatus();
+    expect(status.lastError).toBeTruthy();
+    expect(status.lastRunAt).toBe(new Date(NOW).toISOString());
+  });
+
+  it('releases the lock and resets the status when status.json is corrupt', async () => {
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, 'status.json'), '{corrupt');
+    await expect(collect({ claudeDir, dataDir, fetchImpl, now: NOW })).rejects.toThrow();
+    expect((await new Store(dataDir).loadStatus()).lastError).toBeTruthy();
+    expect(await collect({ claudeDir, dataDir, fetchImpl, now: NOW })).not.toEqual({ skipped: 'locked' });
   });
 
   it('skips the endpoint when it is disabled', async () => {

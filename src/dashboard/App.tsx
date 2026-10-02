@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Summary } from '@/dashboard/api';
 
@@ -16,17 +16,26 @@ export function App() {
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
+  // Overlapping requests (auto-reload during a save) may finish out of order: only the latest one counts.
+  const latestRequestRef = useRef(0);
+
   const run = useCallback(async (action: () => Promise<Summary>) => {
+    const request = ++latestRequestRef.current;
     setBusy(true);
     try {
-      setSummary(await action());
-      setError(undefined);
+      const next = await action();
+      if (request === latestRequestRef.current) {
+        setSummary(next);
+        setError(undefined);
+      }
     }
     catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (request === latestRequestRef.current)
+        setError(e instanceof Error ? e.message : String(e));
     }
     finally {
-      setBusy(false);
+      if (request === latestRequestRef.current)
+        setBusy(false);
     }
   }, []);
 

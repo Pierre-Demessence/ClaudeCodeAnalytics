@@ -76,6 +76,17 @@ function windowStartOf(ms: number, anchor: number): number {
   return anchor + Math.floor((ms - anchor) / WEEK_MS) * WEEK_MS;
 }
 
+/**
+ * Start of the weekly window holding `ms`, given the reset times seen in
+ * readings (sorted). Uses the first reset after `ms`, so usage lands in the
+ * same window as the readings grouped by that reset, even if Anthropic moves
+ * the reset time; past the last reset, windows continue from it.
+ */
+export function weekStartFor(ms: number, resets: readonly number[]): number {
+  const anchor = resets.find(reset => reset > ms) ?? resets.at(-1)!;
+  return windowStartOf(ms, anchor);
+}
+
 /** Monday 00:00 local, as a fallback week start before any reading exists. */
 function isoWeekStart(ms: number, timeZone: string): string {
   const day = dayKey(ms, timeZone);
@@ -141,10 +152,10 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
 
   const chartFrom = dayKey(now - (DAILY_CHART_DAYS - 1) * DAY_MS, timeZone);
   const daily = aggregate(records.filter(r => dayKey(Date.parse(r.ts), timeZone) >= chartFrom), ms => dayKey(ms, timeZone));
-  const anchor = latest ? Date.parse(latest.weeklyResetsAt) : undefined;
-  const weekly = aggregate(records, ms => (anchor === undefined
+  const resets = [...new Set(snapshots.map(s => Date.parse(s.weeklyResetsAt)))].sort((a, b) => a - b);
+  const weekly = aggregate(records, ms => (resets.length === 0
     ? isoWeekStart(ms, timeZone)
-    : new Date(windowStartOf(ms, anchor)).toISOString()));
+    : new Date(weekStartFor(ms, resets)).toISOString()));
 
   const detected = latest && planFromSubscription(latest.subscriptionType, latest.rateLimitTier);
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();

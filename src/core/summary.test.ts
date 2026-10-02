@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Snapshot, UsageRecord } from './types.ts';
 
 import { DAY_MS } from './calibration.ts';
-import { buildSummary } from './summary.ts';
+import { buildSummary, weekStartFor } from './summary.ts';
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const RESET = '2026-10-21T20:00:00.000Z';
@@ -16,6 +16,22 @@ function rec(ts: number, model = 'claude-opus-5-5'): UsageRecord {
 function snap(ts: number, weekly: number, weeklyResetsAt: string, extra: Partial<Snapshot> = {}): Snapshot {
   return { source: 'endpoint', ts: new Date(ts).toISOString(), weekly, weeklyResetsAt, ...extra };
 }
+
+describe('weekStartFor', () => {
+  const h = 3_600_000;
+  // The reset moved from Wednesday 20:00 to Thursday 08:00 between two weeks.
+  const resets = [Date.parse('2026-10-07T20:00:00Z'), Date.parse('2026-10-15T08:00:00Z')];
+
+  it('uses the window of the next reset', () => {
+    expect(weekStartFor(Date.parse('2026-10-05T00:00:00Z'), resets)).toBe(resets[0]! - 7 * DAY_MS);
+    expect(weekStartFor(Date.parse('2026-10-10T00:00:00Z'), resets)).toBe(resets[1]! - 7 * DAY_MS);
+  });
+
+  it('steps back whole weeks before the first reading and forward after the last', () => {
+    expect(weekStartFor(Date.parse('2026-09-25T00:00:00Z'), resets)).toBe(resets[0]! - 14 * DAY_MS);
+    expect(weekStartFor(resets[1]! + h, resets)).toBe(resets[1]);
+  });
+});
 
 describe('buildSummary', () => {
   // One record per day at noon UTC for 3 weeks: $20/day.

@@ -3,7 +3,7 @@ import type { Status } from '../core/types.ts';
 import { planFromSubscription, withDetectedPlan } from '../core/plans.ts';
 import { fetchUsage, readCredentials } from './endpoint.ts';
 import { acquireLock } from './lock.ts';
-import { compareVersions, scanTranscripts } from './scan.ts';
+import { compareVersions, malformedLineCount, scanTranscripts } from './scan.ts';
 import { Store } from './store.ts';
 
 /** Used only until a transcript reveals the installed version. */
@@ -32,12 +32,13 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
   if (!release)
     return { skipped: 'locked' };
 
+  let status: Status = {};
   try {
-    const [records, scanState, settings, status] = await Promise.all([
+    status = await store.loadStatus();
+    const [records, scanState, settings] = await Promise.all([
       store.loadRecords(),
       store.loadScanState(),
       store.loadSettings(),
-      store.loadStatus(),
     ]);
 
     const scan = await scanTranscripts(options.claudeDir, records, scanState);
@@ -47,7 +48,7 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
     }
     status.lastRunAt = new Date(now).toISOString();
     status.messages = records.size;
-    status.malformedLines = scan.malformedLines;
+    status.malformedLines = malformedLineCount(scanState);
     if (scan.claudeCodeVersion && (!status.claudeCodeVersion || compareVersions(scan.claudeCodeVersion, status.claudeCodeVersion) > 0))
       status.claudeCodeVersion = scan.claudeCodeVersion;
 
@@ -67,15 +68,25 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
         await store.appendSnapshot(snapshot);
         const plan = planFromSubscription(snapshot.subscriptionType, snapshot.rateLimitTier);
         if (plan) {
-          const planHistory = withDetectedPlan(settings.planHistory, plan, snapshot.ts);
-          if (planHistory !== settings.planHistory)
-            await store.saveSettings({ ...settings, planHistory: [...planHistory] });
+          // Re-read: the dashboard may have changed settings during the endpoint call.
+          const latest = await store.loadSettings();
+          const planHistory = withDetectedPlan(latest.planHistory, plan, snapshot.ts);
+          if (planHistory !== latest.planHistory)
+            await store.saveSettings({ ...latest, planHistory: [...planHistory] });
         }
       }
     }
 
+    delete status.lastError;
     await store.saveStatus(status);
     return { status };
+  }
+  catch (error) {
+    // Leave a trace for the dashboard; file-system errors never contain the token.
+    status.lastRunAt = new Date(now).toISOString();
+    status.lastError = error instanceof Error ? error.message : String(error);
+    await store.saveStatus(status).catch(() => {});
+    throw error;
   }
   finally {
     await release();

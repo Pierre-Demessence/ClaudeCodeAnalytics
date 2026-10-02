@@ -58,6 +58,8 @@ export interface Status {
   claudeCodeVersion?: string;
   endpointResult?: 'ok' | EndpointError;
   lastEndpointAttemptAt?: string;
+  /** Message of the last run's unexpected failure, cleared by a successful run. */
+  lastError?: string;
   lastRunAt?: string;
   malformedLines?: number;
   messages?: number;

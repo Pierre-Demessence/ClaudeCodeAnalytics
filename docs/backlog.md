@@ -9,16 +9,8 @@ that completes it.
 
 ## Tech debt
 
-- `vite.config.ts` / `vitest.config.ts` use `__dirname`; Vite warns it is unsupported by the future native config loader (use `import.meta.dirname`).
-- `eslint.config.ts` does not type-check (perfectionist `customGroups` typing), so it is left out of `tsconfig.node.json`.
-- Collector status `malformedLines` counts only files changed in the last run, not a running total.
-- `collect` reads settings at start and writes them after the endpoint call, while `/api/settings` writes without the lock: a plan change made during a run can be lost (`collect.ts`, `server/api.ts`).
-- `writeAtomic` uses a per-process temp name (`store.ts`): two concurrent writes of one file from the dashboard server can collide (rare 500).
-- `status.json` is only saved at the end of a run: an exception (other than an endpoint failure) leaves no trace in the status.
-- An active transcript is re-read in full on every run (scan state is per file); fine now, slow with multi-MB sessions.
-- The dashboard's `run()` has no ordering guard: overlapping requests can show an older summary (`App.tsx`).
-- Weekly usage buckets anchor on the latest reset only, while weekly shares use each reading's own reset; they diverge if Anthropic moves the reset time (`summary.ts`).
-- More tests: store and scan (scan-state skipping, month rewrite), server route handlers (415/403/413/409), settings forms in the dashboard.
+- A transcript rewritten to a larger size is read as an append from the old offset (`scan.ts`); Claude Code only appends, so this is theoretical.
+- Untested: the dashboard's out-of-order request guard (`App.tsx`), old scan-state entries without `offset`, and a settings write that waits for a running collector then succeeds.
 
 ## Ideas
 

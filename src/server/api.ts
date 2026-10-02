@@ -6,12 +6,15 @@ import { Buffer } from 'node:buffer';
 import type { Plan, PlanPeriod, Settings, Snapshot } from '../core/types.ts';
 
 import { collect } from '../collector/collect.ts';
+import { waitForLock } from '../collector/lock.ts';
 import { claudeDir, dataDir, Store } from '../collector/store.ts';
 import { PLANS } from '../core/plans.ts';
 import { buildSummary } from '../core/summary.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_RESET_AHEAD_MS = 7 * 86_400_000 + 60_000;
+/** A collector run takes about a second, longer only while the endpoint call is slow. */
+const LOCK_WAIT_MS = 5_000;
 
 class HttpError extends Error {
   readonly status: number;
@@ -118,6 +121,20 @@ export function parseManualReading(body: unknown, now: number): Snapshot {
   return snapshot;
 }
 
+/** Runs a write while holding the collector lock, so a running collector cannot overwrite it. */
+async function underLock(store: Store, waitMs: number, write: () => Promise<void>): Promise<void> {
+  await store.ensureDir();
+  const release = await waitForLock(store.dir, waitMs);
+  if (!release)
+    throw new HttpError(409, 'The collector is busy; try again in a few seconds');
+  try {
+    await write();
+  }
+  finally {
+    await release();
+  }
+}
+
 async function summary(store: Store, timeZone: string) {
   const [records, snapshots, settings, status] = await Promise.all([
     store.loadRecords(),
@@ -138,14 +155,15 @@ async function summary(store: Store, timeZone: string) {
   };
 }
 
-async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handle(req: IncomingMessage, res: ServerResponse, lockWaitMs: number): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const store = new Store(dataDir());
   const timeZone = validTimeZone(url.searchParams.get('tz'));
 
   if (req.method === 'GET' && url.pathname === '/summary') {
     // Opening the dashboard imports new transcripts; the endpoint keeps its throttle.
-    await collect({ claudeDir: claudeDir(), dataDir: store.dir });
+    // A failed run is recorded in the status, which the summary shows.
+    await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
     return send(res, 200, await summary(store, timeZone));
   }
   if (req.method === 'POST' && url.pathname === '/collect') {
@@ -156,34 +174,39 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return send(res, 200, await summary(store, timeZone));
   }
   if (req.method === 'POST' && url.pathname === '/settings') {
-    await store.ensureDir();
-    await store.saveSettings(parseSettingsUpdate(await readBody(req), await store.loadSettings()));
+    const body = await readBody(req);
+    await underLock(store, lockWaitMs, async () => store.saveSettings(parseSettingsUpdate(body, await store.loadSettings())));
     return send(res, 200, await summary(store, timeZone));
   }
   if (req.method === 'POST' && url.pathname === '/readings') {
     const snapshot = parseManualReading(await readBody(req), Date.now());
-    await store.ensureDir();
-    await store.appendSnapshot(snapshot);
+    await underLock(store, lockWaitMs, () => store.appendSnapshot(snapshot));
     return send(res, 200, await summary(store, timeZone));
   }
   throw new HttpError(404, 'Not found');
 }
 
-function middleware(req: IncomingMessage, res: ServerResponse) {
-  handle(req, res).catch((error: unknown) => {
-    if (error instanceof HttpError) {
-      send(res, error.status, { error: error.message });
-    }
-    else {
-      // Collector errors are file-system errors: they never contain the token.
-      console.error('[usage-api]', error instanceof Error ? error.message : error);
-      send(res, 500, { error: 'Internal error (see the server console)' });
-    }
-  });
+/** Connect-style handler for the `/api` routes (paths relative to the mount point). */
+export function createApiMiddleware({ lockWaitMs = LOCK_WAIT_MS } = {}) {
+  return (req: IncomingMessage, res: ServerResponse) => {
+    handle(req, res, lockWaitMs).catch((error: unknown) => onError(res, error));
+  };
+}
+
+function onError(res: ServerResponse, error: unknown) {
+  if (error instanceof HttpError) {
+    send(res, error.status, { error: error.message });
+  }
+  else {
+    // Collector errors are file-system errors: they never contain the token.
+    console.error('[usage-api]', error instanceof Error ? error.message : error);
+    send(res, 500, { error: 'Internal error (see the server console)' });
+  }
 }
 
 /** Serves `/api/*` from the collector's data dir, in `vite dev` and `vite preview`. */
 export function apiPlugin(): Plugin {
+  const middleware = createApiMiddleware();
   return {
     name: 'usage-api',
     configurePreviewServer(server) {

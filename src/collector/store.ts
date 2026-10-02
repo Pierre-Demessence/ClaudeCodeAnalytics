@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { appendFile, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -5,8 +6,8 @@ import process from 'node:process';
 
 import type { Settings, Snapshot, Status, UsageRecord } from '../core/types.ts';
 
-/** Per transcript file: size and mtime at the last import, to skip unchanged files. */
-export type ScanState = Record<string, { mtimeMs: number; size: number }>;
+/** Per transcript file: bytes already imported, mtime, and malformed lines seen. */
+export type ScanState = Record<string, { malformed?: number; mtimeMs: number; offset: number }>;
 
 export const DEFAULT_SETTINGS: Settings = { endpointEnabled: true, planHistory: [], throttleMinutes: 15 };
 
@@ -52,7 +53,8 @@ async function readJsonLines<T>(path: string): Promise<T[]> {
 
 /** Writes through a temp file and rename, so readers never see half a file. */
 async function writeAtomic(path: string, content: string): Promise<void> {
-  const temp = `${path}.${process.pid}.tmp`;
+  // Unique per write: the dashboard server can write the same file twice at once.
+  const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(temp, content);
   await rename(temp, path);
 }
