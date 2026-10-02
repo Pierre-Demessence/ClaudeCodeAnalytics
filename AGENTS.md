@@ -20,7 +20,8 @@ Run lint, test and build before considering work done.
 ## Layout
 
 - `src/core/` — pure logic, no Node or DOM APIs: transcript parsing, pricing,
-  aggregation, calibration, forecast, weekly share, plans, `buildSummary`.
+  aggregation, calibration, forecast, weekly share, plans, breakdown,
+  `buildSummary`.
 - `src/collector/` — Node: transcript scan, usage endpoint client, data-dir
   store, lock, hook installer; entry `cli.ts` (also run by the Claude Code hook).
 - `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview.

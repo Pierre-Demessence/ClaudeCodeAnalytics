@@ -170,6 +170,34 @@ describe('buildSummary', () => {
     expect(manual(6 * 3_600_000)?.fiveHour).toBeUndefined();
   });
 
+  it('breaks usage down for this week, the last 4 weeks and all time', () => {
+    const older = rec(NOW - 30 * DAY_MS);
+    const summary = buildSummary({
+      endpointEnabled: true,
+      now: NOW,
+      planHistory: [],
+      records: [...records.map(r => ({ ...r, sessionId: 's1' })), older],
+      snapshots: [snap(NOW, 10, RESET)],
+      timeZone: 'UTC',
+      titles: { s1: { title: 'Daily work' } },
+    });
+    // This week starts 14 Oct 20:00: records of 15–19 Oct.
+    expect(summary.breakdown.week.total).toEqual({ cost: 100, messages: 5 });
+    // Four windows back: from 23 Sep 20:00, which leaves out the 20 Sep record.
+    expect(summary.breakdown.fourWeeks.total).toEqual({ cost: 420, messages: 21 });
+    expect(summary.breakdown.all.total).toEqual({ cost: 440, messages: 22 });
+    expect(summary.breakdown.week.conversations[0]?.title).toBe('Daily work');
+  });
+
+  it('starts this week on local Monday before any reading', () => {
+    const sunday = rec(Date.parse('2026-10-18T23:00:00Z'));
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [sunday], snapshots: [], timeZone: 'Europe/Paris' });
+    // Sunday 23:00 UTC is Monday 01:00 in Paris.
+    expect(summary.breakdown.week.total.messages).toBe(1);
+    const utc = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [sunday], snapshots: [], timeZone: 'UTC' });
+    expect(utc.breakdown.week.total.messages).toBe(0);
+  });
+
   it('works without any data', () => {
     const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [], snapshots: [], timeZone: 'UTC' });
     expect(summary).toMatchObject({ current: undefined, daily: [], weekly: [], weeks: [] });

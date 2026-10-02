@@ -11,6 +11,7 @@ describe('tabFromHash', () => {
 
   it('reads a known tab', () => {
     expect(tabFromHash('#/usage')).toBe('usage');
+    expect(tabFromHash('#/breakdown')).toBe('breakdown');
     expect(tabFromHash('#calibration')).toBe('calibration');
   });
 

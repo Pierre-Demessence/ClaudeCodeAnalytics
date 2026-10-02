@@ -25,15 +25,12 @@ that completes it.
 - Treat a `seven_day.resets_at` of null (if the endpoint ever returns it) as "no usage yet" rather than `bad-shape`.
 - Per-model weekly limits (`seven_day_opus` / `seven_day_sonnet` in the endpoint response) if a plan ever reports them.
 - Weekday-aware daily usage (weekends differ) for the forecast.
-- Usage per project: cost per project this week and past weeks; `UsageRecord.project` is stored but no view uses it.
 - Activity heatmap: cost by weekday × hour from `ts`, to show when usage happens and time heavy work after a 5-hour reset.
-- Cache efficiency: cache-read share of input and dollars saved versus uncached input, per day and per project.
+- Cache efficiency: cache-read share of input and dollars saved versus uncached input, per day (the Breakdown shows the share per project).
 - Past 5-hour sessions: timeline of rebuilt sessions (`aggregate.ts` `sessionCosts`) with cost and the peak 5-hour % where a reading exists.
 - Cost-per-message distribution, listing outliers (date, project), e.g. a large cache write after a long-context resume.
-- Per conversation (`UsageRecord.sessionId`, titles in `sessions.json`): cost, length, model mix, duration, most expensive this week.
-- Main agent vs subagents (`UsageRecord.sidechain`): share of usage spent by subagents.
-- Effort and thinking (`UsageRecord.effort`, `thinking`): cost by effort level, thinking share of output.
-- By surface (`entrypoint`) and by `gitBranch`: terminal vs IDE, cost per feature branch.
+- Cost per git branch (`UsageRecord.gitBranch`); the Breakdown tab only shows each conversation's main branch.
+- Git worktrees (`X.worktrees\<branch>`) count as separate projects in the Breakdown (`core/breakdown.ts` `projectOf`), named after the branch folder; they could merge into their main repository.
 - Claude Code version timeline (`UsageRecord.version`): mark upgrades on the daily chart to spot token-use changes.
 - Calibration drift: plan % per dollar per week, to detect a silent limit change and test the price-scaling assumption.
 - claude.ai vs Claude Code split per week from `claudeCodeShare` (only feeds the fit today).

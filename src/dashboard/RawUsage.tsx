@@ -8,6 +8,7 @@ import type { Family } from '@/dashboard/models';
 import { formatDay, formatTokens, formatUsd, formatUsdShort } from '@/dashboard/format';
 import { familyOf, modelLabel, SERIES } from '@/dashboard/models';
 import { Legend } from '@/dashboard/Patterns';
+import { Toggle } from '@/dashboard/Toggle';
 
 type Period = 'daily' | 'weekly';
 type Metric = 'cost' | 'tokens';
@@ -35,18 +36,6 @@ function toBuckets(rows: readonly UsageRow[], metric: Metric, period: Period): B
     bucket.total += value;
   }
   return [...buckets.values()];
-}
-
-function Toggle<T extends string>({ label, onChange, options, value }: { label: string; onChange: (value: T) => void; options: [T, string][]; value: T }) {
-  return (
-    <div aria-label={label} className="toggle" role="group">
-      {options.map(([option, text]) => (
-        <button aria-pressed={value === option} key={option} onClick={() => onChange(option)} type="button">
-          {text}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 export function RawUsage({ summary }: { summary: Summary }) {

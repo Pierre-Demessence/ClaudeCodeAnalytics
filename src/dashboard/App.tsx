@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Summary } from '@/dashboard/api';
 
 import { addReading, loadSummary, refreshNow, saveSettings } from '@/dashboard/api';
+import { Breakdown } from '@/dashboard/Breakdown';
 import { Header } from '@/dashboard/Header';
 import { Overview } from '@/dashboard/Overview';
 import { PatternDefs } from '@/dashboard/Patterns';
@@ -73,6 +74,7 @@ export function App() {
               <>
                 {tab === 'overview' && <Overview summary={summary} />}
                 {tab === 'usage' && <RawUsage summary={summary} />}
+                {tab === 'breakdown' && <Breakdown summary={summary} />}
                 {tab === 'calibration' && (
                   <SettingsPanel
                     busy={busy}

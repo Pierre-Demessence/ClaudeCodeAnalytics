@@ -942,3 +942,211 @@ details .table {
 .status-bad {
   color: var(--critical-text);
 }
+
+/* Breakdown: every bar carries a $ or % label; model parts use the family patterns. */
+.breakdown-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.breakdown-total {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.breakdown-total strong {
+  color: var(--text-primary);
+}
+
+.breakdown-grid,
+.breakdown-side {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+
+@media (min-width: 900px) {
+  .breakdown-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.secondary {
+  color: var(--text-secondary);
+}
+
+.model-bar {
+  display: flex;
+  height: 20px;
+  min-width: 2px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.model-bar svg {
+  display: block;
+  width: 0;
+  height: 100%;
+  flex-basis: 0;
+  min-width: 1px;
+}
+
+.project-table {
+  width: 100%;
+  margin-bottom: 12px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.project-table th,
+.project-table td {
+  padding: 5px 6px;
+  text-align: right;
+}
+
+.project-table thead th {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.project-table th:first-child {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 400;
+}
+
+.project-table thead th:nth-child(2),
+.project-table td.project-bar {
+  text-align: left;
+}
+
+.project-table td.project-bar {
+  width: 100%;
+}
+
+/* On phones the model bar goes under the project name. */
+@media (max-width: 599px) {
+  .project-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px 48px 48px;
+    align-items: center;
+  }
+
+  .project-table th:first-child {
+    max-width: none;
+  }
+
+  .project-table thead th:nth-child(2) {
+    display: none;
+  }
+
+  .project-table td.project-bar {
+    grid-column: 1 / -1;
+    order: 1;
+    padding-top: 0;
+  }
+}
+
+.share-bars {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.share-bars li {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) 44px;
+  gap: 10px;
+  align-items: center;
+}
+
+.share-bars strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.share-track {
+  height: 12px;
+  border-radius: 3px;
+  background: var(--surface-0);
+}
+
+.share-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.agent-bar {
+  display: flex;
+  height: 24px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.agent-main {
+  background: var(--text-secondary);
+}
+
+.agent-sub,
+.legend-swatch.agent-sub {
+  background: repeating-linear-gradient(45deg, var(--text-secondary) 0 2px, var(--grid) 2px 7px);
+}
+
+.legend-swatch.agent-main {
+  background: var(--text-secondary);
+}
+
+.agent-labels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.agent-labels > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.conversation-table {
+  min-width: 760px;
+  margin-top: 0;
+}
+
+.conversation-table th[scope='row'] {
+  font-weight: 400;
+}
+
+.conversation-table td {
+  white-space: nowrap;
+}
+
+.conversation-table td.conversation-models {
+  width: 160px;
+}
+
+.conversation-models .model-bar {
+  height: 12px;
+  border-radius: 3px;
+}

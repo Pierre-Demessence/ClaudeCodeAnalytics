@@ -1,11 +1,13 @@
 import type { UsageRow } from './aggregate.ts';
+import type { Breakdown } from './breakdown.ts';
 import type { Calibration } from './calibration.ts';
 import type { WindowForecast } from './forecast.ts';
 import type { WeekPacing } from './pacing.ts';
 import type { TypicalWeek, WeekShare } from './share.ts';
-import type { Plan, PlanPeriod, Snapshot, UsageRecord } from './types.ts';
+import type { Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
 
 import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts } from './aggregate.ts';
+import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { forecastWindow } from './forecast.ts';
 import { weekPacing } from './pacing.ts';
@@ -27,7 +29,11 @@ export interface SummaryInput {
   records: readonly UsageRecord[];
   snapshots: readonly Snapshot[];
   timeZone: string;
+  /** Conversation titles by session id. */
+  titles?: Readonly<Record<string, SessionInfo>>;
 }
+
+export type BreakdownPeriod = 'week' | 'fourWeeks' | 'all';
 
 export interface CurrentWeek {
   /** Weekly % now, estimated from usage since a stale reading. */
@@ -51,6 +57,8 @@ export interface CurrentWeek {
 }
 
 export interface DashboardSummary {
+  /** Where the usage went: this weekly window, it and the 3 before, all time. */
+  breakdown: Record<BreakdownPeriod, Breakdown>;
   calibration?: Calibration;
   /** The current weekly window, from its reading or, without one yet, from the last known reset. */
   current?: CurrentWeek;
@@ -104,6 +112,15 @@ function isoWeekStart(ms: number, timeZone: string): string {
   const date = new Date(`${day}T12:00:00Z`);
   const offset = (date.getUTCDay() + 6) % 7;
   return dayKey(date.getTime() - offset * DAY_MS, 'UTC');
+}
+
+/** First instant of a local day (`YYYY-MM-DD`) in a time zone. */
+function startOfDay(day: string, timeZone: string): number {
+  const utcMidnight = Date.parse(`${day}T00:00:00Z`);
+  const parts = new Intl.DateTimeFormat('en-CA', { day: '2-digit', hour: '2-digit', hourCycle: 'h23', minute: '2-digit', month: '2-digit', timeZone, year: 'numeric' }).formatToParts(utcMidnight);
+  const part = (type: string) => parts.find(p => p.type === type)!.value;
+  const wallClock = Date.parse(`${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:00Z`);
+  return utcMidnight - (wallClock - utcMidnight);
 }
 
 /** Everything the dashboard shows, computed from collector data. */
@@ -234,10 +251,19 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     ? isoWeekStart(ms, timeZone)
     : new Date(weekStartFor(ms, resets)).toISOString()));
 
+  const weekStart = resets.length === 0 ? startOfDay(isoWeekStart(now, timeZone), timeZone) : weekStartFor(now, resets);
+  const titles = input.titles ?? {};
+  const breakdown = {
+    all: buildBreakdown(records, titles),
+    fourWeeks: buildBreakdown(records, titles, weekStart - 3 * WEEK_MS),
+    week: buildBreakdown(records, titles, weekStart),
+  };
+
   const detected = latest && planFromSubscription(latest.subscriptionType, latest.rateLimitTier);
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();
 
   return {
+    breakdown,
     calibration,
     current,
     daily,

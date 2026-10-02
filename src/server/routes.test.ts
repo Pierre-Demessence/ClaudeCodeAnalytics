@@ -80,4 +80,14 @@ describe('api routes', () => {
       await release!();
     }
   });
+
+  it('titles the conversations of the breakdown', async () => {
+    const store = new Store(process.env.CCA_DATA_DIR!);
+    const ts = new Date(Date.now() - 60_000).toISOString();
+    const record = { cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, input: 0, key: 'm1|r1', model: 'claude-opus-5-5', output: 1000, project: 'p', sessionId: 's1', ts };
+    await store.saveRecords(new Map([[record.key, record]]), [ts.slice(0, 7)]);
+    await store.saveSessions({ s1: { title: 'Plan the Breakdown tab' } });
+    const summary = await (await fetch(`${base}/summary`)).json() as { breakdown: { week: { conversations: { title?: string }[] } } };
+    expect(summary.breakdown.week.conversations[0]?.title).toBe('Plan the Breakdown tab');
+  });
 });

@@ -25,9 +25,13 @@ Everything stays on your machine. Data comes from two places:
 - Final % of the last weeks, the typical week, and its equivalent on Pro,
   Max 5× and Max 20× (approximate, from the advertised multipliers).
 - Daily and weekly usage by model family, in API-equivalent dollars or tokens.
+- Where the usage goes, this week, the last 4 weeks or all time: by project
+  (with the model mix and cache share), main agent vs subagents, effort level,
+  thinking share and surface, and the most expensive conversations.
 - Plan setting with history; the plan is also detected from Claude Code's login.
-- Tabs: Overview (limits, pacing and past weeks), Usage (charts by model) and
-  Calibration (plan, readings, collection status).
+- Tabs: Overview (limits, pacing and past weeks), Usage (charts by model),
+  Breakdown (projects, conversations, agents) and Calibration (plan, readings,
+  collection status).
 - Light and dark themes: follows the OS until you pick one in the header.
 - Colorblind-friendly: every series has a texture and a label, not just a color.
 
