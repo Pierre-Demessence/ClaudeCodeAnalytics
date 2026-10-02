@@ -47,7 +47,7 @@ describe('typicalWeek', () => {
       { estimated: false, percent: 60, plan: 'pro', resetsAt: 'b' },
       { estimated: false, percent: 10, plan: 'max5', resetsAt: 'c' }, // = 50 % of Pro
     ], 'pro');
-    expect(typical).toEqual({ max: 60, median: 50, min: 40, weeks: 3 });
+    expect(typical).toEqual({ high: 55, low: 45, max: 60, median: 50, min: 40, weeks: 3 });
   });
 
   it('is undefined without completed weeks', () => {

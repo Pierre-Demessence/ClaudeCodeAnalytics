@@ -6,6 +6,7 @@ that completes it.
 ## Bugs
 
 - `index.html` has no favicon: every page load logs a 404 for `/favicon.ico`.
+- The 5-hour card needs a current week (`Overview.tsx`): with usage since the weekly reset but no reading and no calibration, a still-valid 5-hour reading shows as "No session in progress". Rare (a reset within the last 5 hours).
 
 ## Tech debt
 
@@ -38,5 +39,4 @@ that completes it.
 - Calibration drift: plan % per dollar per week, to detect a silent limit change and test the price-scaling assumption.
 - claude.ai vs Claude Code split per week from `claudeCodeShare` (only feeds the fit today).
 - What-if simulator: final % of a week with another model mix (e.g. Opus as Sonnet) or another plan, from pricing and calibration.
-- Budget pacing for the current week: ideal line to 100% at reset versus actual, and the daily spend left.
 - 5-hour sessions are rebuilt from transcript times only (`aggregate.ts` `sessionCosts`); the real windows (e.g. 07:50 for a first message at 07:59) start earlier, likely from claude.ai use or some rounding. Readings' `fiveHourResetsAt` could anchor past sessions.

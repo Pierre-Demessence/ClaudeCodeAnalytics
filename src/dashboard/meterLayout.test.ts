@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Measure } from '@/dashboard/meter';
+import type { Measure } from '@/dashboard/meterLayout';
 
-import { CAP_LABEL, meterLayout } from '@/dashboard/meter';
+import { CAP_LABEL, meterLayout } from '@/dashboard/meterLayout';
 
 const measure: Measure = { trackPx: 500, labelPx: text => text.length * 7 };
 
@@ -76,7 +76,7 @@ describe('meterLayout', () => {
     const layout = meterLayout({ estimated: false, high: 131, low: 104, median: 118, used: 81 }, measure);
     expect(layout.capAt).toBeCloseTo(100 / 140);
     expect(layout.projection?.width).toBeCloseTo((100 - 81) / 140);
-    expect(layout.over).toMatchObject({ inside: '▲ +18%' });
+    expect(layout.over).toMatchObject({ inside: '+18%' });
     expect(layout.capLabel?.row).toBe('bottom');
   });
 

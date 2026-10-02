@@ -18,11 +18,13 @@ Everything stays on your machine. Data comes from two places:
 
 - Current weekly and 5-hour %, reset times, and for each window a projection
   at reset with its likely range and the time the cap would be hit.
-- Final % of every past week, the typical week, and its equivalent on Pro,
+- Budget pacing: this week's % against an even pace, and the daily spend left
+  to reach 100% at reset.
+- Final % of the last weeks, the typical week, and its equivalent on Pro,
   Max 5× and Max 20× (approximate, from the advertised multipliers).
 - Daily and weekly usage by model family, in API-equivalent dollars or tokens.
 - Plan setting with history; the plan is also detected from Claude Code's login.
-- Tabs: Overview (limits and past weeks), Usage (charts by model) and
+- Tabs: Overview (limits, pacing and past weeks), Usage (charts by model) and
   Calibration (plan, readings, collection status).
 - Light and dark themes: follows the OS until you pick one in the header.
 - Colorblind-friendly: every series has a texture and a label, not just a color.

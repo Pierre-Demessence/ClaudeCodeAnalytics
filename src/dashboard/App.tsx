@@ -1,16 +1,16 @@
+import { CircleX } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Summary } from '@/dashboard/api';
 
 import { addReading, loadSummary, refreshNow, saveSettings } from '@/dashboard/api';
 import { Header } from '@/dashboard/Header';
+import { Overview } from '@/dashboard/Overview';
 import { PatternDefs } from '@/dashboard/Patterns';
-import { PerWeek } from '@/dashboard/PerWeek';
 import { RawUsage } from '@/dashboard/RawUsage';
 import { SettingsPanel } from '@/dashboard/SettingsPanel';
 import { useTab } from '@/dashboard/tabs';
 import { useTheme } from '@/dashboard/theme';
-import { ThisWeek } from '@/dashboard/ThisWeek';
 
 const RELOAD_MS = 5 * 60_000;
 
@@ -64,19 +64,14 @@ export function App() {
       <main>
         {error && (
           <p className="error" role="alert">
-            <span aria-hidden="true">✗ </span>
+            <CircleX aria-hidden="true" className="icon-inline" size={16} />
             {error}
           </p>
         )}
         {summary
           ? (
               <>
-                {tab === 'overview' && (
-                  <>
-                    <ThisWeek summary={summary} />
-                    <PerWeek summary={summary} />
-                  </>
-                )}
+                {tab === 'overview' && <Overview summary={summary} />}
                 {tab === 'usage' && <RawUsage summary={summary} />}
                 {tab === 'calibration' && (
                   <SettingsPanel

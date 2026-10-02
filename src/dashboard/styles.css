@@ -20,8 +20,12 @@
   --good: #0ca30c;
   --good-text: #006300;
   --warning: #fab219;
+  --warning-text: #8a5a00;
   --critical: #d03b3b;
   --critical-text: #b02a2a;
+  --good-bg: #dcf1dc;
+  --warning-bg: #fbecc9;
+  --critical-bg: #f3c9c9;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,7 +49,11 @@
     --series-4: #c98500;
     --series-5: #d55181;
     --good-text: #4cc74c;
+    --warning-text: #fab219;
     --critical-text: #f08080;
+    --good-bg: #173d17;
+    --warning-bg: #3d2e0c;
+    --critical-bg: #3d1c1c;
   }
 }
 
@@ -70,7 +78,11 @@
   --series-4: #c98500;
   --series-5: #d55181;
   --good-text: #4cc74c;
+  --warning-text: #fab219;
   --critical-text: #f08080;
+  --good-bg: #173d17;
+  --warning-bg: #3d2e0c;
+  --critical-bg: #3d1c1c;
 }
 
 * {
@@ -89,7 +101,7 @@ body {
 }
 
 main {
-  max-width: 1080px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 24px 16px 48px;
   display: grid;
@@ -162,7 +174,7 @@ select {
 }
 
 .app-header-inner {
-  max-width: 1080px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 12px 16px 0;
 }
@@ -249,8 +261,8 @@ small {
 .card {
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-1);
+  border-radius: 10px;
+  background: var(--surface-2);
   min-width: 0;
 }
 
@@ -396,68 +408,376 @@ small {
   white-space: nowrap;
 }
 
-.verdict {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: var(--surface-2);
-  border-left: 8px solid var(--verdict-color);
-}
-
-.verdict-icon {
-  display: grid;
-  place-items: center;
+/* Icons: Lucide, colored by status; their shape and the text next to them carry the meaning. */
+.icon-inline {
   flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--verdict-color);
-  color: #fff;
-  font-weight: 700;
-  font-size: 1.1rem;
+  margin-right: 4px;
+  vertical-align: -2px;
 }
 
-.verdict-good {
-  --verdict-color: var(--good);
+.icon-good {
+  color: var(--good-text);
 }
 
-.verdict-warn {
-  --verdict-color: var(--warning);
+.icon-warning {
+  color: var(--warning-text);
 }
 
-.verdict-warn .verdict-icon {
-  color: #000;
+.icon-critical {
+  color: var(--critical-text);
 }
 
-.verdict-bad {
-  --verdict-color: var(--critical);
+.icon-info {
+  color: var(--text-secondary);
 }
 
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+}
+
+.card-head h2 {
   margin: 0;
 }
 
-.stats div {
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--surface-2);
-}
-
-.stats dt {
+.card-subtitle {
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
-.stats dd {
+.card-head-spacer {
+  flex-grow: 1;
+}
+
+.overview-limits,
+.overview-bottom {
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .overview-limits {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-bottom {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
+.limit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Status band: a large color area, paired with the verdict's icon and text. */
+.card-good {
+  border-top: 6px solid var(--good);
+}
+
+.card-tight {
+  border-top: 6px solid var(--warning);
+}
+
+.card-cap {
+  border-top: 6px solid var(--critical);
+}
+
+.limit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.limit-head h2 {
   margin: 0;
-  font-size: 1.3rem;
+}
+
+.limit-resets {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.limit-number-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.limit-number {
+  font-size: 2.75rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Dimmed with a warning icon next to it: the number is an estimate, not a reading. */
+.limit-number.dim {
+  opacity: 0.6;
+}
+
+.limit-card .meter {
+  margin-bottom: 0;
+}
+
+.verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-0);
+  font-size: 0.95rem;
+}
+
+.verdict svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.verdict-good {
+  background: var(--good-bg);
+}
+
+.verdict-tight {
+  background: var(--warning-bg);
+}
+
+.verdict-cap {
+  background: var(--critical-bg);
+}
+
+.estimate-warning {
+  position: relative;
+}
+
+.icon-button.round {
+  border-radius: 50%;
+  background: var(--surface-0);
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 2;
+  width: min(340px, 80vw);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+/* Budget pacing: each line has its own style and a label on the chart. */
+.pacing-room {
+  font-size: 0.95rem;
+}
+
+/* Below this width the chart's text would be too small: the chart scrolls sideways instead. */
+.pacing-scroll {
+  overflow-x: auto;
+}
+
+.pacing-chart {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+}
+
+.pacing-grid {
+  stroke: var(--grid);
+}
+
+.pacing-axis {
+  fill: var(--text-secondary);
+  font-size: 11px;
+}
+
+.pacing-limit {
+  stroke: var(--text-primary);
+  stroke-width: 2;
+}
+
+.pacing-band {
+  fill: var(--estimate-fill);
+  opacity: 0.8;
+}
+
+.pacing-even {
+  stroke: var(--text-secondary);
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+}
+
+.pacing-actual {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+}
+
+.pacing-projection {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+}
+
+.pacing-now {
+  stroke: var(--text-primary);
+}
+
+.pacing-dot {
+  fill: var(--accent);
+}
+
+.pacing-label {
+  fill: var(--text-secondary);
+  font-size: 12px;
+}
+
+.pacing-label-strong {
+  fill: var(--text-primary);
+  font-size: 11px;
+}
+
+.pacing-value {
+  fill: var(--accent);
+  font-size: 12px;
   font-weight: 600;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 22px;
+  border-top: 3px solid var(--accent);
+}
+
+.legend-projection {
+  border-top-style: dotted;
+}
+
+.legend-even {
+  border-top: 2px dashed var(--text-secondary);
+}
+
+.legend-band,
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--estimate-fill);
+}
+
+.legend-swatch {
+  background: var(--accent);
+}
+
+.legend-typical {
+  display: inline-block;
+  height: 14px;
+  border-left: 2px dashed var(--text-primary);
+}
+
+/* Past weeks and plan equivalents: horizontal bars. */
+.week-bars,
+.plan-bars {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.week-bars li {
+  display: grid;
+  grid-template-columns: 7.5em minmax(0, 1fr) 5.5em;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+.week-label {
+  color: var(--text-secondary);
+}
+
+.week-track,
+.plan-track {
+  position: relative;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--surface-0);
+}
+
+.week-bar,
+.plan-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.week-bar.hit,
+.plan-bar.over,
+.legend-swatch.over {
+  background: repeating-linear-gradient(45deg, var(--critical) 0 4px, var(--critical-bg) 4px 8px);
+}
+
+.week-bar.estimated,
+.legend-swatch.estimated {
+  background: repeating-linear-gradient(45deg, var(--accent) 0 2px, var(--estimate-fill) 2px 7px);
+}
+
+.week-typical {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  border-left: 2px dashed var(--text-primary);
+}
+
+.week-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.week-value .icon-inline {
+  margin: 0 0 0 4px;
+}
+
+.plan-bars {
+  gap: 12px;
+}
+
+.plan-bars li {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.plan-bar-head small {
+  display: inline;
+}
+
+.plan-track {
+  height: 10px;
 }
 
 .chart {
@@ -555,13 +875,6 @@ summary {
   font-weight: 600;
 }
 
-.current-plan th {
-  font-weight: 700;
-}
-
-.current-plan small {
-  display: inline;
-}
 
 details .table {
   display: block;

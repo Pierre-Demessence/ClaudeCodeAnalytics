@@ -1,11 +1,13 @@
 import type { FormEvent } from 'react';
 
+import { CircleAlert, CircleCheck, CircleX } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Plan, PlanPeriod } from '@/core/types';
 import type { ManualReading, Summary } from '@/dashboard/api';
 
 import { PLAN_LABELS, PLANS } from '@/core/plans';
+import { endpointResultText } from '@/dashboard/endpoint';
 import { formatDateTime, formatRelative } from '@/dashboard/format';
 
 interface Props {
@@ -29,14 +31,6 @@ function today(): string {
   return toLocalInput(new Date().toISOString()).slice(0, 10);
 }
 
-const ENDPOINT_RESULTS: Record<string, string> = {
-  'bad-shape': 'the response format changed; manual readings still work',
-  'expired': 'token expired; Claude Code refreshes it on its next start',
-  'network': 'network error',
-  'no-token': 'no Claude Code login found',
-  'ok': 'OK',
-};
-
 function EndpointStatus({ summary }: { summary: Summary }) {
   const result = summary.status.endpointResult;
   if (!summary.endpointEnabled)
@@ -46,8 +40,8 @@ function EndpointStatus({ summary }: { summary: Summary }) {
   const ok = result === 'ok';
   return (
     <span className={ok ? 'status-good' : 'status-bad'}>
-      <span aria-hidden="true">{ok ? '✓ ' : '✗ '}</span>
-      {ENDPOINT_RESULTS[result] ?? (result === 'http-429' ? 'rate limited; retried at the next run' : `failed (${result})`)}
+      {ok ? <CircleCheck aria-hidden="true" className="icon-inline" size={16} /> : <CircleX aria-hidden="true" className="icon-inline" size={16} />}
+      {endpointResultText(result)}
     </span>
   );
 }
@@ -98,7 +92,7 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
           </p>
           {summary.detectedPlan && (
             <p className="status-bad">
-              <span aria-hidden="true">! </span>
+              <CircleAlert aria-hidden="true" className="icon-inline" size={16} />
               {`Claude Code reports ${PLAN_LABELS[summary.detectedPlan]}, but your setting says ${PLAN_LABELS[summary.plan]}. `}
               <button
                 disabled={busy}
@@ -188,7 +182,7 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
           </dl>
           {status.lastError && (
             <p className="status-bad">
-              <span aria-hidden="true">✗ </span>
+              <CircleX aria-hidden="true" className="icon-inline" size={16} />
               {`Last run failed: ${status.lastError}`}
             </p>
           )}
@@ -221,7 +215,7 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
             : <p className="note">Needs at least 3 readings of 5% or more on the current plan.</p>}
           {summary.unknownModels.length > 0 && (
             <p className="status-bad">
-              <span aria-hidden="true">! </span>
+              <CircleAlert aria-hidden="true" className="icon-inline" size={16} />
               {`No price for ${summary.unknownModels.join(', ')}: counted as $0.`}
             </p>
           )}

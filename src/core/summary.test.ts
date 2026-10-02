@@ -87,6 +87,48 @@ describe('buildSummary', () => {
     expect(summary.detectedPlan).toBe('max5');
   });
 
+  it('starts a new week without a reading at 0 %, projected from the typical week', () => {
+    const lastReset = Date.parse('2026-10-14T20:00:00Z');
+    const now = lastReset + 2 * 3_600_000;
+    const snapshots = [
+      snap(Date.parse('2026-10-07T19:00:00Z'), 40, '2026-10-07T20:00:00.000Z'),
+      snap(Date.parse('2026-10-14T19:00:00Z'), 60, '2026-10-14T20:00:00.000Z'),
+    ];
+    const summary = buildSummary({ endpointEnabled: true, now, planHistory: [], records: records.filter(r => Date.parse(r.ts) < lastReset), snapshots, timeZone: 'UTC' });
+    expect(summary.current).toMatchObject({ resetsAt: '2026-10-21T20:00:00.000Z', weekly: 0, withoutReading: true });
+    expect(summary.current?.estimatedNow).toBeUndefined();
+    expect(summary.current?.forecast).toMatchObject({ median: 50, method: 'typical' });
+    expect(summary.current?.pacing.points).toEqual([{ at: lastReset, percent: 0 }]);
+  });
+
+  it('keeps the typical week for an uncalibrated week without a reading, even past its first hours', () => {
+    const lastReset = Date.parse('2026-10-14T20:00:00Z');
+    const snapshots = [
+      snap(Date.parse('2026-10-07T19:00:00Z'), 40, '2026-10-07T20:00:00.000Z'),
+      snap(Date.parse('2026-10-14T19:00:00Z'), 60, '2026-10-14T20:00:00.000Z'),
+    ];
+    const summary = buildSummary({ endpointEnabled: true, now: lastReset + 3 * DAY_MS, planHistory: [], records: records.filter(r => Date.parse(r.ts) < lastReset), snapshots, timeZone: 'UTC' });
+    expect(summary.current?.forecast).toMatchObject({ median: 50, method: 'typical' });
+  });
+
+  it('estimates a week without a reading from transcripts when calibrated', () => {
+    const windowStart = Date.parse(RESET) - 7 * DAY_MS;
+    // Calibrated on last week's readings (k = 0.5 %/$); nothing read since the reset.
+    const lastWeek = Date.parse(RESET) - 14 * DAY_MS;
+    const lastReset = new Date(windowStart).toISOString();
+    const snapshots = [1, 2, 3, 4].map(d => snap(lastWeek + d * DAY_MS, d * 10, lastReset));
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' });
+    expect(summary.current).toMatchObject({ resetsAt: RESET, weekly: 0, withoutReading: true });
+    // $20 a day for 5 days since the reset at 0.5 %/$.
+    expect(summary.current?.estimatedNow).toBeCloseTo(50, 0);
+  });
+
+  it('has no current week without a reading, a calibration and an idle week', () => {
+    const snapshots = [snap(Date.parse('2026-10-14T19:00:00Z'), 60, '2026-10-14T20:00:00.000Z')];
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' });
+    expect(summary.current).toBeUndefined();
+  });
+
   it('estimates the current % from usage since a stale reading', () => {
     const windowStart = Date.parse(RESET) - 7 * DAY_MS;
     // k = 0.5 %/$ from readings; the last one is 12 h old and $20/day was spent since (noon records).

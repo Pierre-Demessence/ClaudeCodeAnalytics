@@ -1,7 +1,7 @@
 import type { Plan, PlanPeriod, Snapshot } from './types.ts';
 
 import { convertPercent, planAt } from './plans.ts';
-import { median } from './stats.ts';
+import { median, quantile } from './stats.ts';
 
 export interface WeekShare {
   resetsAt: string;
@@ -13,6 +13,10 @@ export interface WeekShare {
 }
 
 export interface TypicalWeek {
+  /** 75th percentile of final weekly %. */
+  high: number;
+  /** 25th percentile of final weekly %. */
+  low: number;
   max: number;
   median: number;
   min: number;
@@ -55,10 +59,17 @@ export function weeklyShares(
     });
 }
 
-/** Median and range of completed weeks, all expressed on `plan`. */
+/** Median, quartiles and range of completed weeks, all expressed on `plan`. */
 export function typicalWeek(shares: readonly WeekShare[], plan: Plan): TypicalWeek | undefined {
   if (shares.length === 0)
     return undefined;
   const values = shares.map(share => convertPercent(share.percent, share.plan, plan));
-  return { max: Math.max(...values), median: median(values)!, min: Math.min(...values), weeks: values.length };
+  return {
+    high: quantile(values, 0.75)!,
+    low: quantile(values, 0.25)!,
+    max: Math.max(...values),
+    median: median(values)!,
+    min: Math.min(...values),
+    weeks: values.length,
+  };
 }

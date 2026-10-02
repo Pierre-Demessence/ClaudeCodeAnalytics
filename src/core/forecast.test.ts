@@ -32,8 +32,25 @@ describe('forecastWindow', () => {
     expect(forecast.median).toBeCloseTo(70);
   });
 
-  it('declines to forecast in the first hours of a window without a calibration', () => {
+  it('declines to forecast in the first hours of a window without a calibration or past weeks', () => {
     expect(forecastWindow({ ...week, asOf: resetsAt - 7 * DAY_MS + HOUR_MS, paceSamples: [], used: 2 })).toBeUndefined();
+  });
+
+  it('uses the typical past window in the first hours without a calibration', () => {
+    const typical = { high: 80, low: 60, median: 70 };
+    const forecast = forecastWindow({ ...week, asOf: resetsAt - 7 * DAY_MS + HOUR_MS, paceSamples: [], typical, used: 2 })!;
+    expect(forecast).toEqual({ high: 80, low: 60, median: 70, method: 'typical' });
+  });
+
+  it('keeps a typical projection at or above what is already used', () => {
+    const typical = { high: 30, low: 10, median: 20 };
+    const forecast = forecastWindow({ ...week, asOf: resetsAt - 7 * DAY_MS + HOUR_MS, paceSamples: [], typical, used: 25 })!;
+    expect(forecast).toMatchObject({ high: 30, low: 25, median: 25 });
+  });
+
+  it('prefers the trend over the typical window once it is usable', () => {
+    const forecast = forecastWindow({ ...week, asOf: resetsAt - 5 * DAY_MS, paceSamples: [], typical: { high: 1, low: 1, median: 1 }, used: 20 })!;
+    expect(forecast.method).toBe('trend');
   });
 
   it('reports a cap already reached', () => {

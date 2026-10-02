@@ -49,25 +49,26 @@ describe('app', () => {
   it('opens on the overview tab', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json(summary())));
     render(<App />);
-    expect(await screen.findByRole('heading', { name: 'This week' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Share of the plan per week' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Weekly limit' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Past weeks' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Budget pacing this week' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Raw usage' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
     // 95 % after 4 days: the trend fallback crosses the cap before reset.
-    expect(screen.getByText('Likely to hit the weekly cap')).toBeTruthy();
+    expect(screen.getByText(/^Likely to hit the limit/)).toBeTruthy();
     expect(screen.getByTitle(/Plan in effect now/).textContent).toBe('Pro');
   });
 
   it('switches tabs with the URL hash', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json(summary())));
     render(<App />);
-    await screen.findByRole('heading', { name: 'This week' });
+    await screen.findByRole('heading', { name: 'Weekly limit' });
     act(() => {
       location.hash = '#/usage';
       dispatchEvent(new HashChangeEvent('hashchange'));
     });
     expect(screen.getByRole('heading', { name: 'Raw usage' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'This week' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Weekly limit' })).toBeNull();
     act(() => {
       location.hash = '#/calibration';
       dispatchEvent(new HashChangeEvent('hashchange'));
@@ -90,7 +91,7 @@ describe('app', () => {
     const fetch = vi.fn(async (_url: string, _init?: RequestInit) => Response.json(summary()));
     vi.stubGlobal('fetch', fetch);
     render(<App />);
-    await screen.findByRole('heading', { name: 'This week' });
+    await screen.findByRole('heading', { name: 'Weekly limit' });
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.startsWith('/api/collect'))).toBe(true));
   });

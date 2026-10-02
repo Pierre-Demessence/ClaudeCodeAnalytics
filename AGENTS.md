@@ -52,6 +52,8 @@ Run lint, test and build before considering work done.
 - Theme: `data-theme` on `<html>`. Dark variables exist twice in `styles.css`
   (OS media query and `[data-theme='dark']`): change both. The storage key
   `cca-theme` is also read by the inline script in `index.html`.
+- Icons: Lucide (`lucide-react`), `aria-hidden` next to their text; never
+  text symbols (✓ ! ▲ ⓘ) or emoji.
 - Charts: never color alone. Each model family has a fixed color slot and an
   SVG pattern (`dashboard/models.ts`, `Patterns.tsx`); metrics carry `title`
   tooltips.

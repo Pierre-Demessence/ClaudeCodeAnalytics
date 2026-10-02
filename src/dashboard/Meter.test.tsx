@@ -1,7 +1,7 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { Meter } from '@/dashboard/ThisWeek';
+import { Meter } from '@/dashboard/Meter';
 
 const measure = { trackPx: 500, labelPx: (text: string) => text.length * 7 };
 
@@ -23,7 +23,7 @@ describe('meter', () => {
     const { container } = render(
       <Meter estimated={false} forecast={{ high: 131, low: 104, median: 118, method: 'calibrated' }} measure={measure} title="t" used={81} />,
     );
-    expect(container.querySelector('.meter-over')?.textContent).toBe('▲ +18%');
+    expect(container.querySelector('.meter-over')?.textContent).toBe('+18%');
     expect(container.querySelector('.meter-outside')?.textContent).toBe('projected 118%');
   });
 

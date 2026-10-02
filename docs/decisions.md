@@ -140,3 +140,26 @@ and after font loads; a character-count estimate was rejected as wrong for
 proportional fonts. "limit 100%" is placed last, in the first free spot: above
 the bar by the cap line, below it left of the line, else above with the other
 labels moved around it. A fixed spot collided with the range bracket.
+
+## Weekly projection without a calibration: typical week, then trend
+
+Without a calibration, a week's own pace is noise for its first 12 hours, so the
+projection is the typical past week (median and quartiles of final %, on the
+current plan, never below what is used). After 12 hours the window's own trend
+takes over. Only a first week without any history has no projection.
+
+## A week without a reading still gets a card
+
+Weekly windows are fixed 7-day blocks, so a week with no reading yet (nothing
+used since the reset) follows the last known reset. Its usage is 0 % when the
+transcripts show nothing since the start, else the calibrated cost since the
+start, shown as an estimate. claude.ai use stays unseen until the first reading;
+a plain 0 % was preferred over marking it `≈`.
+
+## Limit card status: color band and tinted verdict
+
+Each limit card has a 6 px top band and a tinted verdict box in the verdict's
+color (green, orange, red). A thin colored border was rejected: with
+deuteranomaly small colored areas are hard to tell apart. The verdict's icon
+shape and text carry the same meaning. A stale reading does not change the
+color; a warning icon by the number explains it.

@@ -58,7 +58,8 @@ const overlaps = (a: Span, b: Span) => a.left < b.right + LABEL_GAP && b.left < 
 
 const usedText = ({ estimated, used }: MeterInput) => `used ${estimated ? '≈ ' : ''}${formatPercent(used)}`;
 const projectionText = (median?: number) => median === undefined ? undefined : `projected ${formatPercent(median)}`;
-const overText = (median?: number) => median !== undefined && median > 100 ? `▲ +${formatPercent(median - 100)}` : undefined;
+/** Drawn after a warning icon; the measured width includes it. */
+export const overText = (median?: number) => median !== undefined && median > 100 ? `+${formatPercent(median - 100)}` : undefined;
 
 function rangeText({ high, low }: MeterInput): string | undefined {
   return low !== undefined && high !== undefined && high > low ? `likely ${formatPercent(low).slice(0, -1)}–${formatPercent(high)}` : undefined;

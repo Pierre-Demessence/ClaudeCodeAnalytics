@@ -1,12 +1,14 @@
 import type { UsageRow } from './aggregate.ts';
 import type { Calibration } from './calibration.ts';
 import type { WindowForecast } from './forecast.ts';
+import type { WeekPacing } from './pacing.ts';
 import type { TypicalWeek, WeekShare } from './share.ts';
 import type { Plan, PlanPeriod, Snapshot, UsageRecord } from './types.ts';
 
 import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts } from './aggregate.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { forecastWindow } from './forecast.ts';
+import { weekPacing } from './pacing.ts';
 import { convertPercent, planAt, planFromSubscription, PLANS } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
@@ -36,16 +38,21 @@ export interface CurrentWeek {
   fiveHourForecast?: WindowForecast;
   fiveHourResetsAt?: string;
   forecast?: WindowForecast;
-  /** ISO time of the reading. */
+  /** How the weekly % built up this week, and the daily budget left. */
+  pacing: WeekPacing;
+  /** ISO time of the last reading; from an earlier week when `withoutReading`. */
   readAt: string;
   resetsAt: string;
   source: Snapshot['source'];
+  /** Weekly % at the last reading; 0 when `withoutReading`. */
   weekly: number;
+  /** No reading yet in this window: it follows the last known reset, usage comes from transcripts. */
+  withoutReading?: true;
 }
 
 export interface DashboardSummary {
   calibration?: Calibration;
-  /** Weekly % in the current window, if a reading exists for it. */
+  /** The current weekly window, from its reading or, without one yet, from the last known reset. */
   current?: CurrentWeek;
   /** Usage per local day and model, for the last weeks. */
   daily: UsageRow[];
@@ -126,60 +133,99 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   // Average $/hour of each recent session, idle time included, like the zero days in `dailyCosts`.
   const sessionPaces = sessionCosts(records, now - TYPICAL_DAYS * DAY_MS, now, FIVE_HOURS_MS).map(cost => cost / 5);
 
-  let current: CurrentWeek | undefined;
-  if (latest && Date.parse(latest.weeklyResetsAt) > now) {
-    const readAt = Date.parse(latest.ts);
-    const resetsAt = Date.parse(latest.weeklyResetsAt);
-    // A stale reading misses the usage since; with a calibration, add it back from transcripts.
-    const sinceReading = calibration ? calibration.k * costBetween(readAt, now) : 0;
-    const estimatedNow = now - readAt > STALE_READING_MS && sinceReading > 0
-      ? Math.min(100, latest.weekly + sinceReading)
-      : undefined;
-    const week = { k: calibration?.k, paceSamples: dailyCosts, resetsAt, sampleMs: DAY_MS, windowMs: WEEK_MS };
-    const forecast = estimatedNow !== undefined
-      ? forecastWindow({ ...week, asOf: now, used: estimatedNow })
-      : forecastWindow({ ...week, asOf: calibration ? now : readAt, used: latest.weekly });
-
-    const fiveHour = fiveHourStillValid(latest, now) ? latest.fiveHour : undefined;
-    let fiveHourEstimatedNow: number | undefined;
-    let fiveHourForecast: WindowForecast | undefined;
-    // Without a reset time (manual readings), the window's position is unknown.
-    if (fiveHour !== undefined && latest.fiveHourResetsAt) {
-      const k = fiveHourCalibration?.k;
-      // A 5-hour window moves fast: always add the usage since the reading when calibrated.
-      const sinceFiveHour = k !== undefined ? k * costBetween(readAt, now) : 0;
-      fiveHourEstimatedNow = sinceFiveHour > 0 ? Math.min(100, fiveHour + sinceFiveHour) : undefined;
-      fiveHourForecast = forecastWindow({
-        asOf: k !== undefined ? now : readAt,
-        k,
-        paceSamples: sessionPaces,
-        resetsAt: Date.parse(latest.fiveHourResetsAt),
-        sampleMs: HOUR_MS,
-        used: fiveHourEstimatedNow ?? fiveHour,
-        windowMs: FIVE_HOURS_MS,
-      });
-    }
-
-    current = {
-      estimatedNow,
-      fiveHour,
-      fiveHourEstimatedNow,
-      fiveHourForecast,
-      fiveHourResetsAt: latest.fiveHourResetsAt,
-      forecast,
-      readAt: latest.ts,
-      resetsAt: latest.weeklyResetsAt,
-      source: latest.source,
-      weekly: latest.weekly,
-    };
-  }
-
   const weeks = weeklyShares(snapshots, costBetween, calibration && { k: calibration.k, plan }, planHistory, now);
   const typicalBase = typicalWeek(weeks, plan);
   const typical = typicalBase && {
     ...typicalBase,
     byPlan: Object.fromEntries(PLANS.map(p => [p, convertPercent(typicalBase.median, plan, p)])) as Record<Plan, number>,
   };
+
+  let current: CurrentWeek | undefined;
+  if (latest) {
+    const readAt = Date.parse(latest.ts);
+    const latestReset = Date.parse(latest.weeklyResetsAt);
+    const withoutReading = latestReset <= now;
+    // Weekly windows are fixed 7-day blocks: a week without a reading yet follows the last known reset.
+    const resetsAt = withoutReading ? windowStartOf(now, latestReset) + WEEK_MS : latestReset;
+    const windowFrom = resetsAt - WEEK_MS;
+
+    let used: number | undefined;
+    let estimatedNow: number | undefined;
+    if (!withoutReading) {
+      used = latest.weekly;
+      // A stale reading misses the usage since; with a calibration, add it back from transcripts.
+      const sinceReading = calibration ? calibration.k * costBetween(readAt, now) : 0;
+      if (now - readAt > STALE_READING_MS && sinceReading > 0)
+        estimatedNow = Math.min(100, latest.weekly + sinceReading);
+    }
+    else {
+      // No Claude Code usage this week is a known 0 %; other usage needs a calibration to become a %.
+      const sinceStart = costBetween(windowFrom, now);
+      if (sinceStart === 0 || calibration)
+        used = 0;
+      if (sinceStart > 0 && calibration)
+        estimatedNow = Math.min(100, calibration.k * sinceStart);
+    }
+
+    if (used !== undefined) {
+      const week = {
+        k: calibration?.k,
+        paceSamples: dailyCosts,
+        resetsAt,
+        sampleMs: DAY_MS,
+        typical: typicalBase && { high: typicalBase.high, low: typicalBase.low, median: typicalBase.median },
+        windowMs: WEEK_MS,
+      };
+      const forecast = estimatedNow !== undefined || withoutReading
+        // Uncalibrated, a week without a reading has no pace of its own (claude.ai use is unseen): project it from its start, i.e. the typical week.
+        ? forecastWindow({ ...week, asOf: calibration || !withoutReading ? now : windowFrom, used: estimatedNow ?? used })
+        : forecastWindow({ ...week, asOf: calibration ? now : readAt, used });
+
+      const fiveHour = fiveHourStillValid(latest, now) ? latest.fiveHour : undefined;
+      let fiveHourEstimatedNow: number | undefined;
+      let fiveHourForecast: WindowForecast | undefined;
+      // Without a reset time (manual readings), the window's position is unknown.
+      if (fiveHour !== undefined && latest.fiveHourResetsAt) {
+        const k = fiveHourCalibration?.k;
+        // A 5-hour window moves fast: always add the usage since the reading when calibrated.
+        const sinceFiveHour = k !== undefined ? k * costBetween(readAt, now) : 0;
+        fiveHourEstimatedNow = sinceFiveHour > 0 ? Math.min(100, fiveHour + sinceFiveHour) : undefined;
+        fiveHourForecast = forecastWindow({
+          asOf: k !== undefined ? now : readAt,
+          k,
+          paceSamples: sessionPaces,
+          resetsAt: Date.parse(latest.fiveHourResetsAt),
+          sampleMs: HOUR_MS,
+          used: fiveHourEstimatedNow ?? fiveHour,
+          windowMs: FIVE_HOURS_MS,
+        });
+      }
+
+      const resetsAtIso = new Date(resetsAt).toISOString();
+      current = {
+        estimatedNow,
+        fiveHour,
+        fiveHourEstimatedNow,
+        fiveHourForecast,
+        fiveHourResetsAt: latest.fiveHourResetsAt,
+        forecast,
+        readAt: latest.ts,
+        resetsAt: withoutReading ? resetsAtIso : latest.weeklyResetsAt,
+        source: latest.source,
+        weekly: used,
+        withoutReading: withoutReading || undefined,
+        pacing: weekPacing({
+          costBetween,
+          k: calibration?.k,
+          now,
+          readings: snapshots.filter(s => Date.parse(s.weeklyResetsAt) === resetsAt),
+          resetsAt,
+          usedNow: estimatedNow ?? used,
+          windowMs: WEEK_MS,
+        }),
+      };
+    }
+  }
 
   const chartFrom = dayKey(now - (DAILY_CHART_DAYS - 1) * DAY_MS, timeZone);
   const daily = aggregate(records.filter(r => dayKey(Date.parse(r.ts), timeZone) >= chartFrom), ms => dayKey(ms, timeZone));

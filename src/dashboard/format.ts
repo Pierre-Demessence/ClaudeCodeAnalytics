@@ -8,14 +8,22 @@ const usdShort = new Intl.NumberFormat(LOCALE, { currency: 'USD', maximumFractio
 const compact = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1, notation: 'compact' });
 const dateTime = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', hour: '2-digit', minute: '2-digit', month: 'short', weekday: 'short' });
 const date = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short' });
+const weekdayDate = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short', weekday: 'short' });
+const time = new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute: '2-digit' });
+const localDay = new Intl.DateTimeFormat('en-CA');
+const weekday = new Intl.DateTimeFormat(LOCALE, { weekday: 'short' });
 const relative = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto' });
 
 export const formatPercent = (value: number) => `${percent.format(value)}%`;
 export const formatUsd = (value: number) => usd.format(value);
+/** Whole dollars in running text: "$46" (the currency formatter writes "US$" in en-GB). */
+export const formatDollars = (value: number) => `$${Math.round(value)}`;
 /** Whole dollars, for axis ticks. */
 export const formatUsdShort = (value: number) => usdShort.format(value);
 export const formatTokens = (value: number) => compact.format(value);
 export const formatDateTime = (value: string | number) => dateTime.format(new Date(value));
+/** "Fri". */
+export const formatWeekday = (value: string | number) => weekday.format(new Date(value));
 
 /** `2026-10-02` (a local day) or an ISO instant, as a short date. */
 export function formatDay(value: string): string {
@@ -38,8 +46,19 @@ export function formatCountdown(value: string | number, now = Date.now()): strin
   const ms = new Date(value).getTime() - now;
   if (ms <= 0 || ms >= 86_400_000)
     return formatRelative(value, now);
-  // Rounded up, so the countdown never reads "in 0 min" before the reset.
-  const minutes = Math.ceil(ms / 60_000);
+  return `in ${formatDuration(ms)}`;
+}
+
+/** "today, 17:50" for an instant later today, otherwise "Fri 2 Oct, 09:00" (local time). */
+export function formatResets(value: string | number, now = Date.now()): string {
+  const at = new Date(value);
+  const day = localDay.format(at) === localDay.format(new Date(now)) ? 'today' : weekdayDate.format(at);
+  return `${day}, ${time.format(at)}`;
+}
+
+/** "2 h 10 min" or "45 min", rounded up so a countdown never reads "0 min" before its end. */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.ceil(ms / 60_000));
   const hours = Math.floor(minutes / 60);
-  return `in ${hours > 0 ? `${hours} h ` : ''}${minutes % 60} min`;
+  return hours > 0 ? `${hours} h ${minutes % 60} min` : `${minutes} min`;
 }
