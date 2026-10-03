@@ -15,8 +15,17 @@ describe('formatCountdown', () => {
     expect(formatCountdown(later(10_000), now)).toBe('in 1 min');
   });
 
-  it('falls back to relative days from a day ahead', () => {
-    expect(formatCountdown(later(5 * 86_400_000), now)).toBe('in 5 days');
+  it('counts days and hours from a day ahead', () => {
+    expect(formatCountdown(later((2 * 24 + 23) * 3_600_000), now)).toBe('in 2 d 23 h');
+    expect(formatCountdown(later(5 * 86_400_000), now)).toBe('in 5 d');
+  });
+
+  it('rounds up the last partial hour', () => {
+    expect(formatCountdown(later(86_400_000 + 60_000), now)).toBe('in 1 d 1 h');
+  });
+
+  it('falls back to relative wording once past', () => {
+    expect(formatCountdown(later(-3 * 3_600_000), now)).toBe('3 hours ago');
   });
 });
 

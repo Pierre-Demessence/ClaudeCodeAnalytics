@@ -44,12 +44,16 @@ export function formatRelative(value: string | number, now = Date.now()): string
   return relative.format(Math.round(seconds), 'second');
 }
 
-/** "in 4 h 12 min" for less than a day ahead, otherwise like `formatRelative`. */
+/** "in 4 h 12 min" under a day ahead, "in 2 d 23 h" beyond, otherwise like `formatRelative` (past). */
 export function formatCountdown(value: string | number, now = Date.now()): string {
   const ms = new Date(value).getTime() - now;
-  if (ms <= 0 || ms >= 86_400_000)
+  if (ms <= 0)
     return formatRelative(value, now);
-  return `in ${formatDuration(ms)}`;
+  if (ms < 86_400_000)
+    return `in ${formatDuration(ms)}`;
+  const hours = Math.ceil(ms / 3_600_000);
+  const days = Math.floor(hours / 24);
+  return `in ${days} d${hours % 24 > 0 ? ` ${hours % 24} h` : ''}`;
 }
 
 /** "today, 17:50" for an instant later today, otherwise "Fri 2 Oct, 09:00" (local time). */

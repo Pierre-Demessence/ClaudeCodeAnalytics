@@ -9,7 +9,7 @@ import type { VerdictKind } from '@/dashboard/verdict';
 
 import { FIVE_HOURS_MS } from '@/core/calibration';
 import { endpointResultText } from '@/dashboard/endpoint';
-import { formatDateTime, formatPercent, formatRelative, formatResets } from '@/dashboard/format';
+import { formatCountdown, formatDateTime, formatPercent, formatRelative } from '@/dashboard/format';
 import { Meter } from '@/dashboard/Meter';
 import { PacingChart } from '@/dashboard/PacingChart';
 import { PlanEquivalents } from '@/dashboard/PlanEquivalents';
@@ -93,7 +93,7 @@ function LimitCard({ estimated, forecast, now, resetsAt, roomPerDay, title, used
     <section className={`card limit-card card-${verdict.kind}`}>
       <div className="limit-head">
         <h2>{title}</h2>
-        <span className="limit-resets" {...tip(`Resets ${formatDateTime(resetsAt)}`)}>{`resets ${formatResets(resetsAt, now)}`}</span>
+        <span className="limit-resets" {...tip(`Resets ${formatDateTime(resetsAt)}`)}>{`resets ${formatCountdown(resetsAt, now)}`}</span>
       </div>
       <div className="limit-number-row">
         <span className={warning ? 'limit-number dim' : 'limit-number'}>
