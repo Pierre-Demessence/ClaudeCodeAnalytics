@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { CurrentWeek } from '@/core/summary';
+import type { CurrentWeek, FiveHourSession } from '@/core/summary';
 import type { Summary } from '@/dashboard/api';
 
 import { DAY_MS, HOUR_MS } from '@/core/calibration';
@@ -102,8 +102,21 @@ describe('overview', () => {
   });
 
   it('shows the 5-hour session with its own verdict', () => {
-    render(<Overview summary={summary({ fiveHour: 30, fiveHourForecast: { high: 60, low: 40, median: 50, method: 'calibrated' }, fiveHourResetsAt: new Date(NOW + 2 * HOUR_MS).toISOString() })} />);
+    const fiveHourSession: FiveHourSession = {
+      forecast: { high: 60, low: 40, median: 50, method: 'calibrated' },
+      percent: 30,
+      readAt: new Date(NOW - HOUR_MS).toISOString(),
+      resetsAt: new Date(NOW + 2 * HOUR_MS).toISOString(),
+    };
+    render(<Overview summary={summary({}, { fiveHourSession })} />);
     expect(screen.getByText('No cap expected this session.')).toBeTruthy();
+  });
+
+  it('shows the 5-hour session even without a current week', () => {
+    const fiveHourSession: FiveHourSession = { percent: 30, readAt: new Date(NOW - HOUR_MS).toISOString(), resetsAt: new Date(NOW + 2 * HOUR_MS).toISOString() };
+    render(<Overview summary={summary(null, { fiveHourSession })} />);
+    expect(screen.queryByText('No session in progress.')).toBeNull();
+    expect(screen.getByRole('heading', { name: '5-hour session' }).closest('section')!.textContent).toContain('30%');
   });
 
   it('shows the daily room left in the pacing chart when calibrated', () => {

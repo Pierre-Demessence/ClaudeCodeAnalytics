@@ -188,10 +188,10 @@ describe('buildSummary', () => {
 
     expect(summary.fiveHourCalibration?.k).toBeCloseTo(0.5);
     // The 11:55 record ($20) adds 10 points since the last reading.
-    expect(summary.current?.fiveHourEstimatedNow).toBeCloseTo(30);
+    expect(summary.fiveHourSession?.estimatedNow).toBeCloseTo(30);
     // Past sessions: one $20 record each, so $4/hour × 0.5 %/$ × 3 hours left = 6 points.
-    expect(summary.current?.fiveHourForecast).toMatchObject({ method: 'calibrated' });
-    expect(summary.current?.fiveHourForecast?.median).toBeCloseTo(36);
+    expect(summary.fiveHourSession?.forecast).toMatchObject({ method: 'calibrated' });
+    expect(summary.fiveHourSession?.forecast?.median).toBeCloseTo(36);
   });
 
   it('lists the 5-hour windows, estimated peaks from the 5-hour calibration', () => {
@@ -218,10 +218,26 @@ describe('buildSummary', () => {
       records: [],
       snapshots: [{ fiveHour: 35, source: 'manual', ts: new Date(NOW - age).toISOString(), weekly: 44, weeklyResetsAt: RESET }],
       timeZone: 'UTC',
-    }).current;
+    }).fiveHourSession;
     // Without a reset time the window's position is unknown: no 5-hour forecast.
-    expect(manual(3_600_000)).toMatchObject({ fiveHour: 35, fiveHourForecast: undefined });
-    expect(manual(6 * 3_600_000)?.fiveHour).toBeUndefined();
+    expect(manual(3_600_000)?.percent).toBe(35);
+    expect(manual(3_600_000)?.forecast).toBeUndefined();
+    expect(manual(6 * 3_600_000)).toBeUndefined();
+  });
+
+  it('keeps a valid 5-hour reading when the new week has no calibration yet', () => {
+    // The weekly window reset 2 hours ago; the last reading came just before, and a message since makes the week non-zero.
+    const resetAt = NOW - 2 * 3_600_000;
+    const summary = buildSummary({
+      endpointEnabled: true,
+      now: NOW,
+      planHistory: [],
+      records: [rec(NOW - 3_600_000)],
+      snapshots: [snap(NOW - 2.5 * 3_600_000, 50, new Date(resetAt).toISOString(), { fiveHour: 30, fiveHourResetsAt: new Date(NOW + 2 * 3_600_000).toISOString() })],
+      timeZone: 'UTC',
+    });
+    expect(summary.current).toBeUndefined();
+    expect(summary.fiveHourSession).toMatchObject({ percent: 30 });
   });
 
   it('breaks usage down for this week, the last 4 weeks and all time', () => {

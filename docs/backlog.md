@@ -5,8 +5,6 @@ that completes it.
 
 ## Bugs
 
-- The 5-hour card needs a current week (`Overview.tsx`): with usage since the weekly reset but no reading and no calibration, a still-valid 5-hour reading shows as "No session in progress". Rare (a reset within the last 5 hours).
-
 ## Tech debt
 
 - A transcript rewritten to a larger size is read as an append from the old offset (`scan.ts`); Claude Code only appends, so this is theoretical.

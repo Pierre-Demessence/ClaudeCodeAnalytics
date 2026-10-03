@@ -47,14 +47,22 @@ export interface SummaryInput {
 
 export type BreakdownPeriod = 'week' | 'fourWeeks' | 'all';
 
+/** The 5-hour window of the latest reading, while that reading is still valid. */
+export interface FiveHourSession {
+  /** % now, estimated from usage since the reading. */
+  estimatedNow?: number;
+  forecast?: WindowForecast;
+  /** % at the last reading. */
+  percent: number;
+  /** ISO time of the last reading. */
+  readAt: string;
+  /** ISO; absent for manual readings, whose window position is unknown. */
+  resetsAt?: string;
+}
+
 export interface CurrentWeek {
   /** Weekly % now, estimated from usage since a stale reading. */
   estimatedNow?: number;
-  fiveHour?: number;
-  /** 5-hour % now, estimated from usage since the reading. */
-  fiveHourEstimatedNow?: number;
-  fiveHourForecast?: WindowForecast;
-  fiveHourResetsAt?: string;
   forecast?: WindowForecast;
   /** How the weekly % built up this week, and the daily budget left. */
   pacing: WeekPacing;
@@ -85,6 +93,8 @@ export interface DashboardSummary {
   endpointEnabled: boolean;
   /** % of the 5-hour limit per dollar. */
   fiveHourCalibration?: Calibration;
+  /** The 5-hour window of the latest reading, whether or not the current week is known. */
+  fiveHourSession?: FiveHourSession;
   generatedAt: string;
   /** 5-hour % from which a window counts as having hit the limit. */
   limitThreshold: number;
@@ -177,8 +187,30 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   };
 
   let current: CurrentWeek | undefined;
+  let fiveHourSession: FiveHourSession | undefined;
   if (latest) {
     const readAt = Date.parse(latest.ts);
+    const fiveHour = fiveHourStillValid(latest, now) ? latest.fiveHour : undefined;
+    if (fiveHour !== undefined) {
+      fiveHourSession = { percent: fiveHour, readAt: latest.ts, resetsAt: latest.fiveHourResetsAt };
+      // Without a reset time (manual readings), the window's position is unknown.
+      if (latest.fiveHourResetsAt) {
+        const k = fiveHourCalibration?.k;
+        // A 5-hour window moves fast: always add the usage since the reading when calibrated.
+        const sinceFiveHour = k !== undefined ? k * costBetween(readAt, now) : 0;
+        fiveHourSession.estimatedNow = sinceFiveHour > 0 ? Math.min(100, fiveHour + sinceFiveHour) : undefined;
+        fiveHourSession.forecast = forecastWindow({
+          asOf: k !== undefined ? now : readAt,
+          k,
+          paceSamples: sessionPaces,
+          resetsAt: Date.parse(latest.fiveHourResetsAt),
+          sampleMs: HOUR_MS,
+          used: fiveHourSession.estimatedNow ?? fiveHour,
+          windowMs: FIVE_HOURS_MS,
+        });
+      }
+    }
+
     const latestReset = Date.parse(latest.weeklyResetsAt);
     const withoutReading = latestReset <= now;
     // Weekly windows are fixed 7-day blocks: a week without a reading yet follows the last known reset.
@@ -217,33 +249,9 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
         ? forecastWindow({ ...week, asOf: calibration || !withoutReading ? now : windowFrom, used: estimatedNow ?? used })
         : forecastWindow({ ...week, asOf: calibration ? now : readAt, used });
 
-      const fiveHour = fiveHourStillValid(latest, now) ? latest.fiveHour : undefined;
-      let fiveHourEstimatedNow: number | undefined;
-      let fiveHourForecast: WindowForecast | undefined;
-      // Without a reset time (manual readings), the window's position is unknown.
-      if (fiveHour !== undefined && latest.fiveHourResetsAt) {
-        const k = fiveHourCalibration?.k;
-        // A 5-hour window moves fast: always add the usage since the reading when calibrated.
-        const sinceFiveHour = k !== undefined ? k * costBetween(readAt, now) : 0;
-        fiveHourEstimatedNow = sinceFiveHour > 0 ? Math.min(100, fiveHour + sinceFiveHour) : undefined;
-        fiveHourForecast = forecastWindow({
-          asOf: k !== undefined ? now : readAt,
-          k,
-          paceSamples: sessionPaces,
-          resetsAt: Date.parse(latest.fiveHourResetsAt),
-          sampleMs: HOUR_MS,
-          used: fiveHourEstimatedNow ?? fiveHour,
-          windowMs: FIVE_HOURS_MS,
-        });
-      }
-
       const resetsAtIso = new Date(resetsAt).toISOString();
       current = {
         estimatedNow,
-        fiveHour,
-        fiveHourEstimatedNow,
-        fiveHourForecast,
-        fiveHourResetsAt: latest.fiveHourResetsAt,
         forecast,
         readAt: latest.ts,
         resetsAt: withoutReading ? resetsAtIso : latest.weeklyResetsAt,
@@ -306,6 +314,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     detectedPlan: detected && detected !== plan ? detected : undefined,
     endpointEnabled: input.endpointEnabled,
     fiveHourCalibration,
+    fiveHourSession,
     generatedAt: nowIso,
     limits: buildLimits({ costBetween, dataStart: first, now, plan, planHistory, snapshots }),
     limitThreshold,

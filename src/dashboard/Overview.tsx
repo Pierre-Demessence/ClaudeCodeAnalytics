@@ -153,9 +153,9 @@ function weeklyWarning(summary: Summary, now: number): ReactNode {
 export function Overview({ summary }: { summary: Summary }) {
   const now = useNow();
   const current = summary.current;
-  const fiveHour = current?.fiveHour !== undefined ? current : undefined;
+  const fiveHour = summary.fiveHourSession;
   // A manual reading has no reset time: it counts for 5 hours from when it was taken.
-  const fiveHourResetsAt = fiveHour && (fiveHour.fiveHourResetsAt ?? Date.parse(fiveHour.readAt) + FIVE_HOURS_MS);
+  const fiveHourResetsAt = fiveHour && (fiveHour.resetsAt ? Date.parse(fiveHour.resetsAt) : Date.parse(fiveHour.readAt) + FIVE_HOURS_MS);
 
   return (
     <>
@@ -193,12 +193,12 @@ export function Overview({ summary }: { summary: Summary }) {
         {fiveHour
           ? (
               <LimitCard
-                estimated={fiveHour.fiveHourEstimatedNow !== undefined}
-                forecast={fiveHour.fiveHourForecast}
+                estimated={fiveHour.estimatedNow !== undefined}
+                forecast={fiveHour.forecast}
                 now={now}
                 resetsAt={fiveHourResetsAt!}
                 title="5-hour session"
-                used={fiveHour.fiveHourEstimatedNow ?? fiveHour.fiveHour!}
+                used={fiveHour.estimatedNow ?? fiveHour.percent}
                 window="fiveHour"
               />
             )
