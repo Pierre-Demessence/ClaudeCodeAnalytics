@@ -102,6 +102,26 @@ describe('app', () => {
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.startsWith('/api/collect'))).toBe(true));
   });
 
+  it('ignores a slow response that a newer request has superseded', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let finishRefresh!: (response: Response) => void;
+    let plan = 'pro';
+    const fetch = vi.fn((url: string) => url.startsWith('/api/collect')
+      ? new Promise<Response>((resolve) => { finishRefresh = resolve; })
+      : Promise.resolve(Response.json({ ...summary(), plan })));
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Weekly limit' });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    // The auto-reload fires while the refresh is still running and finishes first.
+    plan = 'max5';
+    await act(async () => vi.advanceTimersByTime(5 * 60_000));
+    await waitFor(() => expect(document.querySelector('.plan-badge')?.textContent).toBe('Max 5×'));
+    await act(async () => finishRefresh(Response.json({ ...summary(), plan: 'pro' })));
+    expect(document.querySelector('.plan-badge')!.textContent).toBe('Max 5×');
+    vi.useRealTimers();
+  });
+
   it('shows the server error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'boom' }, { status: 500 })));
     render(<App />);

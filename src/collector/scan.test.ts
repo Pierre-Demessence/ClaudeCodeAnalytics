@@ -49,6 +49,19 @@ describe('scanTranscripts', () => {
     expect(Object.values(state)[0]!.offset).toBeGreaterThan(firstOffset);
   });
 
+  it('re-reads a file whose state entry predates offsets', async () => {
+    await writeFile(file, line('a'));
+    await scanTranscripts(claudeDir, records, state);
+    const [id, entry] = Object.entries(state)[0]!;
+    state[id] = { malformed: entry.malformed, mtimeMs: entry.mtimeMs } as ScanState[string];
+    records.clear();
+
+    const result = await scanTranscripts(claudeDir, records, state);
+    expect(result.filesRead).toBe(1);
+    expect([...records.keys()]).toEqual(['a|req_a']);
+    expect(state[id]!.offset).toBe(entry.offset);
+  });
+
   it('skips unchanged files', async () => {
     await writeFile(file, line('a'));
     await scanTranscripts(claudeDir, records, state);
