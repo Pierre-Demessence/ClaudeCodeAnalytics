@@ -57,6 +57,24 @@ export function projectOf(cwd: string | undefined, folder: string): { name: stri
   return { name: path.split(/[\\/]/).at(-1) || path, path };
 }
 
+/**
+ * Returns each record's project: the directory its conversation started in.
+ * Claude Code moves into subfolders mid-conversation, and each message's own
+ * directory would scatter a project.
+ */
+export function sessionProjects(records: readonly UsageRecord[]): (record: UsageRecord) => { name: string; path: string } {
+  const startCwd = new Map<string, { cwd: string; ms: number }>();
+  for (const record of records) {
+    if (!record.sessionId || !record.cwd)
+      continue;
+    const ms = Date.parse(record.ts);
+    const known = startCwd.get(record.sessionId);
+    if (!known || ms < known.ms)
+      startCwd.set(record.sessionId, { cwd: record.cwd, ms });
+  }
+  return record => projectOf((record.sessionId && startCwd.get(record.sessionId)?.cwd) || record.cwd, record.project);
+}
+
 function addTo(split: CostSplit, model: string, cost: number): void {
   split.cost += cost;
   split.byModel[model] = (split.byModel[model] ?? 0) + cost;
@@ -67,19 +85,10 @@ const byCost = <T extends { cost: number }>(a: T, b: T) => b.cost - a.cost;
 /**
  * Usage of the records at or after `from`, by project, conversation, agent,
  * effort and surface. A conversation counts under the directory it started
- * in, even when it started before `from`: Claude Code moves into subfolders
- * mid-conversation, and each message's own directory would scatter a project.
+ * in, even when it started before `from`.
  */
 export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly<Record<string, SessionInfo>>, from = -Infinity): Breakdown {
-  const startCwd = new Map<string, { cwd: string; ms: number }>();
-  for (const record of records) {
-    if (!record.sessionId || !record.cwd)
-      continue;
-    const ms = Date.parse(record.ts);
-    const known = startCwd.get(record.sessionId);
-    if (!known || ms < known.ms)
-      startCwd.set(record.sessionId, { cwd: record.cwd, ms });
-  }
+  const projectFor = sessionProjects(records);
 
   const total = { cost: 0, messages: 0 };
   const agents = { main: 0, subagents: 0 };
@@ -95,7 +104,7 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
     if (ms < from)
       continue;
     const { cost } = messageCost(record);
-    const project = projectOf((record.sessionId && startCwd.get(record.sessionId)?.cwd) || record.cwd, record.project);
+    const project = projectFor(record);
 
     total.cost += cost;
     total.messages++;

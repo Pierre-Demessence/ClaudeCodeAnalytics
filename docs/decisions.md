@@ -203,3 +203,16 @@ state per click for no gain at this size. "Last 4 weeks" is this weekly window
 and the 3 before it, so "This week" is a subset of it. A conversation that
 straddles a period start is ranked and measured by its messages inside the
 period only.
+
+## Usage tab: upgrades by highest version, outliers from $1
+
+An upgrade is a local day on which the highest Claude Code version seen so far
+rose: several surfaces run at once (the Python SDK stayed on 2.1.281 while VS
+Code ran 2.1.287), so comparing each message with the previous one would mark
+false downgrades and upgrades. Markers are dashed lines at the start of the
+day's bar, with the version written to the right of the line's top.
+
+A message is an outlier from $1, a fixed amount rather than a percentile,
+because it reads plainly and matches what the data shows: the costliest
+messages are 1-hour cache rewrites of 200k–550k tokens after a pause. The cause
+names the largest cost component and the pause when it outlived that cache.

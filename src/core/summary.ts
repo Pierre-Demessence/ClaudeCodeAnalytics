@@ -1,3 +1,4 @@
+import type { Activity } from './activity.ts';
 import type { UsageRow } from './aggregate.ts';
 import type { Breakdown } from './breakdown.ts';
 import type { Calibration } from './calibration.ts';
@@ -6,6 +7,7 @@ import type { WeekPacing } from './pacing.ts';
 import type { TypicalWeek, WeekShare } from './share.ts';
 import type { Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
 
+import { buildActivity } from './activity.ts';
 import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
@@ -57,6 +59,8 @@ export interface CurrentWeek {
 }
 
 export interface DashboardSummary {
+  /** Heatmap, cache use, message costs (this weekly window) and Claude Code upgrades. */
+  activity: Activity;
   /** Where the usage went: this weekly window, it and the 3 before, all time. */
   breakdown: Record<BreakdownPeriod, Breakdown>;
   calibration?: Calibration;
@@ -262,7 +266,10 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const detected = latest && planFromSubscription(latest.subscriptionType, latest.rateLimitTier);
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();
 
+  const activity = buildActivity({ chartFrom, now, records, timeZone, weekStart });
+
   return {
+    activity,
     breakdown,
     calibration,
     current,

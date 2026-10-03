@@ -36,16 +36,34 @@ export function priceFor(model: string): ModelPrice | undefined {
   return best ? PRICES[best] : undefined;
 }
 
-/** API-equivalent cost in USD; `known` is false when the model has no price. */
-export function messageCost(record: UsageRecord): { cost: number; known: boolean } {
+/** API-equivalent cost in USD of each token kind of a message. */
+export interface CostParts {
+  cacheRead: number;
+  cacheWrite1h: number;
+  cacheWrite5m: number;
+  input: number;
+  output: number;
+}
+
+/** Cost per token kind; undefined when the model has no price. */
+export function costParts(record: UsageRecord): CostParts | undefined {
   const price = priceFor(record.model);
   if (!price)
+    return undefined;
+  const usd = (tokens: number, perMillion: number) => tokens * perMillion / 1_000_000 * (record.speed === 'fast' ? FAST_MODE : 1);
+  return {
+    cacheRead: usd(record.cacheRead, price.cacheRead),
+    cacheWrite1h: usd(record.cacheWrite1h, price.input * CACHE_WRITE_1H),
+    cacheWrite5m: usd(record.cacheWrite5m, price.input * CACHE_WRITE_5M),
+    input: usd(record.input, price.input),
+    output: usd(record.output, price.output),
+  };
+}
+
+/** API-equivalent cost in USD; `known` is false when the model has no price. */
+export function messageCost(record: UsageRecord): { cost: number; known: boolean } {
+  const parts = costParts(record);
+  if (!parts)
     return { cost: 0, known: false };
-  const perMillion = record.input * price.input
-    + record.output * price.output
-    + record.cacheWrite5m * price.input * CACHE_WRITE_5M
-    + record.cacheWrite1h * price.input * CACHE_WRITE_1H
-    + record.cacheRead * price.cacheRead;
-  const multiplier = record.speed === 'fast' ? FAST_MODE : 1;
-  return { cost: perMillion / 1_000_000 * multiplier, known: true };
+  return { cost: parts.input + parts.output + parts.cacheWrite5m + parts.cacheWrite1h + parts.cacheRead, known: true };
 }

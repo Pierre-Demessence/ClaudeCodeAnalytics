@@ -24,12 +24,16 @@ Everything stays on your machine. Data comes from two places:
   to reach 100% at reset.
 - Final % of the last weeks, the typical week, and its equivalent on Pro,
   Max 5× and Max 20× (approximate, from the advertised multipliers).
-- Daily and weekly usage by model family, in API-equivalent dollars or tokens.
+- Daily and weekly usage by model family, in API-equivalent dollars or tokens,
+  with Claude Code upgrades marked on the daily chart.
+- When you work (average cost per weekday and hour), cache efficiency (share
+  of input from cache, dollars saved, daily share), and the cost per message
+  with this week's outliers and their cause (e.g. a cache rewrite after a pause).
 - Where the usage goes, this week, the last 4 weeks or all time: by project
   (with the model mix and cache share), main agent vs subagents, effort level,
   thinking share and surface, and the most expensive conversations.
 - Plan setting with history; the plan is also detected from Claude Code's login.
-- Tabs: Overview (limits, pacing and past weeks), Usage (charts by model),
+- Tabs: Overview (limits, pacing and past weeks), Usage (charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents) and Calibration (plan, readings,
   collection status).
 - Light and dark themes: follows the OS until you pick one in the header.

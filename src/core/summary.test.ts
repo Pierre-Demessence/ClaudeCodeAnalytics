@@ -187,6 +187,9 @@ describe('buildSummary', () => {
     expect(summary.breakdown.fourWeeks.total).toEqual({ cost: 420, messages: 21 });
     expect(summary.breakdown.all.total).toEqual({ cost: 440, messages: 22 });
     expect(summary.breakdown.week.conversations[0]?.title).toBe('Daily work');
+    // Message costs share the Breakdown's week: 5 messages of $20.
+    expect(summary.activity.messageCost.bins.reduce((a, b) => a + b)).toBe(5);
+    expect(summary.activity.messageCost.outlierCount).toBe(5);
   });
 
   it('starts this week on local Monday before any reading', () => {
@@ -201,5 +204,7 @@ describe('buildSummary', () => {
   it('works without any data', () => {
     const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [], snapshots: [], timeZone: 'UTC' });
     expect(summary).toMatchObject({ current: undefined, daily: [], weekly: [], weeks: [] });
+    expect(summary.activity.cache.week).toBeUndefined();
+    expect(summary.activity.heatmap.cells.flat().every(v => v === 0)).toBe(true);
   });
 });

@@ -52,7 +52,7 @@ describe('app', () => {
     expect(await screen.findByRole('heading', { name: 'Weekly limit' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Past weeks' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Budget pacing this week' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Raw usage' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Daily usage by model' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
     // 95 % after 4 days: the trend fallback crosses the cap before reset.
     expect(screen.getByText(/^Likely to hit the limit/)).toBeTruthy();
@@ -67,7 +67,7 @@ describe('app', () => {
       location.hash = '#/usage';
       dispatchEvent(new HashChangeEvent('hashchange'));
     });
-    expect(screen.getByRole('heading', { name: 'Raw usage' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Daily usage by model' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Weekly limit' })).toBeNull();
     act(() => {
       location.hash = '#/calibration';

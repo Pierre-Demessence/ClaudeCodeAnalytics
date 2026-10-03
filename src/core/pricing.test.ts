@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { UsageRecord } from './types.ts';
 
-import { messageCost, priceFor } from './pricing.ts';
+import { costParts, messageCost, priceFor } from './pricing.ts';
 
 const base: UsageRecord = {
   cacheRead: 1_000_000,
@@ -40,5 +40,16 @@ describe('messageCost', () => {
 
   it('flags unknown models with zero cost', () => {
     expect(messageCost({ ...base, model: 'claude-unknown-9' })).toEqual({ cost: 0, known: false });
+  });
+});
+
+describe('costParts', () => {
+  it('prices each token kind separately, fast mode included', () => {
+    expect(costParts(base)).toEqual({ cacheRead: 0.2, cacheWrite1h: 8, cacheWrite5m: 5, input: 4, output: 20 });
+    expect(costParts({ ...base, speed: 'fast' })?.cacheWrite1h).toBe(16);
+  });
+
+  it('is undefined for unknown models', () => {
+    expect(costParts({ ...base, model: 'claude-unknown-9' })).toBeUndefined();
   });
 });

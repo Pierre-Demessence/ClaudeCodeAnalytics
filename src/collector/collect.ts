@@ -1,9 +1,10 @@
 import type { Status } from '../core/types.ts';
 
 import { planFromSubscription, withDetectedPlan } from '../core/plans.ts';
+import { compareVersions } from '../core/versions.ts';
 import { fetchUsage, readCredentials } from './endpoint.ts';
 import { acquireLock } from './lock.ts';
-import { compareVersions, malformedLineCount, scanTranscripts } from './scan.ts';
+import { malformedLineCount, scanTranscripts } from './scan.ts';
 import { SCAN_FORMAT, Store } from './store.ts';
 
 /** Used only until a transcript reveals the installed version. */

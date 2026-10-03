@@ -8,10 +8,10 @@ import { Breakdown } from '@/dashboard/Breakdown';
 import { Header } from '@/dashboard/Header';
 import { Overview } from '@/dashboard/Overview';
 import { PatternDefs } from '@/dashboard/Patterns';
-import { RawUsage } from '@/dashboard/RawUsage';
 import { SettingsPanel } from '@/dashboard/SettingsPanel';
 import { useTab } from '@/dashboard/tabs';
 import { useTheme } from '@/dashboard/theme';
+import { Usage } from '@/dashboard/Usage';
 
 const RELOAD_MS = 5 * 60_000;
 
@@ -73,7 +73,7 @@ export function App() {
           ? (
               <>
                 {tab === 'overview' && <Overview summary={summary} />}
-                {tab === 'usage' && <RawUsage summary={summary} />}
+                {tab === 'usage' && <Usage summary={summary} />}
                 {tab === 'breakdown' && <Breakdown summary={summary} />}
                 {tab === 'calibration' && (
                   <SettingsPanel

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { SessionInfo, UsageRecord } from '../core/types.ts';
 import type { ScanState } from './store.ts';
 
-import { compareVersions, malformedLineCount, scanTranscripts } from './scan.ts';
+import { malformedLineCount, scanTranscripts } from './scan.ts';
 
 function line(id: string, output = 10) {
   return `${JSON.stringify({
@@ -122,13 +122,5 @@ describe('scanTranscripts session titles', () => {
     expect((await scanTranscripts(claudeDir, new Map(), {}, { s1: { title: 'Same' } })).sessionsChanged).toBe(false);
     await writeFile(file, line('a'));
     expect((await scanTranscripts(claudeDir, new Map(), {}, {})).sessionsChanged).toBe(false);
-  });
-});
-
-describe('compareVersions', () => {
-  it('compares numerically', () => {
-    expect(compareVersions('2.1.300', '2.1.287')).toBeGreaterThan(0);
-    expect(compareVersions('2.10.0', '2.9.9')).toBeGreaterThan(0);
-    expect(compareVersions('2.1', '2.1.0')).toBe(0);
   });
 });

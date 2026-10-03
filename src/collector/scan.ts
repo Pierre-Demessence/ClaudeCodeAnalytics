@@ -6,6 +6,7 @@ import type { SessionInfo, UsageRecord } from '../core/types.ts';
 import type { ScanState } from './store.ts';
 
 import { mergeRecord, parseTitleLine, parseTranscriptLine } from '../core/transcript.ts';
+import { compareVersions } from '../core/versions.ts';
 
 export interface ScanResult {
   /** Newest Claude Code version seen in the scanned files, if any. */
@@ -26,18 +27,6 @@ async function listTranscripts(dir: string): Promise<string[]> {
     return [];
   }
   return entries.filter(e => e.isFile() && e.name.endsWith('.jsonl')).map(e => join(e.parentPath, e.name));
-}
-
-/** Compares dotted version strings numerically. */
-export function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0)
-      return diff;
-  }
-  return 0;
 }
 
 function isJson(line: string): boolean {

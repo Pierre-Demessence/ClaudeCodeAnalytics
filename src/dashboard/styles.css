@@ -26,6 +26,12 @@
   --good-bg: #dcf1dc;
   --warning-bg: #fbecc9;
   --critical-bg: #f3c9c9;
+  /* Heatmap steps, one hue: darker = more. */
+  --heat-1: #cde2fb;
+  --heat-2: #8db8ee;
+  --heat-3: #3f86dc;
+  --heat-4: #1d5fae;
+  --heat-5: #0b3f7a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -54,6 +60,12 @@
     --good-bg: #173d17;
     --warning-bg: #3d2e0c;
     --critical-bg: #3d1c1c;
+    /* Lighter = more, so the busiest hours stand out from the dark page. */
+    --heat-1: #103a6e;
+    --heat-2: #1d5fae;
+    --heat-3: #3987e5;
+    --heat-4: #8db8ee;
+    --heat-5: #d6e6fb;
   }
 }
 
@@ -83,6 +95,11 @@
   --good-bg: #173d17;
   --warning-bg: #3d2e0c;
   --critical-bg: #3d1c1c;
+  --heat-1: #103a6e;
+  --heat-2: #1d5fae;
+  --heat-3: #3987e5;
+  --heat-4: #8db8ee;
+  --heat-5: #d6e6fb;
 }
 
 * {
@@ -1149,4 +1166,306 @@ details .table {
 .conversation-models .model-bar {
   height: 12px;
   border-radius: 3px;
+}
+
+/* Usage tab: the heatmap uses one hue in steps; flagged bars are hatched, not just recolored. */
+.chart-tooltip {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-size: 0.85rem;
+}
+
+.chart-tooltip ul {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-tooltip li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-tooltip li span {
+  margin-left: auto;
+  padding-left: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tooltip-total {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid var(--grid);
+  font-weight: 600;
+}
+
+.chart-tooltip p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.card-head .controls {
+  margin-bottom: 0;
+}
+
+.upgrade-label {
+  fill: var(--text-secondary);
+  font-size: 11px;
+}
+
+.legend-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.legend-upgrade {
+  display: inline-block;
+  height: 14px;
+  border-left: 2px dashed var(--text-secondary);
+}
+
+.heatmap {
+  display: grid;
+  gap: 6px;
+}
+
+.heatmap-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.heatmap-day {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.heatmap-cells {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.heat-cell {
+  display: block;
+  height: 26px;
+  border-radius: 3px;
+}
+
+.heat-0 {
+  box-shadow: inset 0 0 0 1px var(--grid);
+}
+
+.heat-1 {
+  background: var(--heat-1);
+}
+
+.heat-2 {
+  background: var(--heat-2);
+}
+
+.heat-3 {
+  background: var(--heat-3);
+}
+
+.heat-4 {
+  background: var(--heat-4);
+}
+
+.heat-5 {
+  background: var(--heat-5);
+}
+
+.heatmap-hours {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.heatmap-scale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.heatmap-scale .heat-cell {
+  width: 22px;
+  height: 14px;
+}
+
+.usage-grid {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin-bottom: 16px;
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+}
+
+.stats strong {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.stats span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.mini-bars,
+.cost-bins {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: 110px;
+  border-bottom: 1px solid var(--text-primary);
+}
+
+.mini-bars {
+  gap: 4px;
+}
+
+.mini-bar {
+  display: block;
+  flex: 1 1 0;
+  border-radius: 3px 3px 0 0;
+  background: var(--series-1);
+}
+
+.mini-bar.poor,
+.legend-swatch.cache-poor {
+  background: repeating-linear-gradient(45deg, var(--critical) 0 3px, var(--critical-bg) 3px 6px);
+}
+
+.legend-swatch.cache-good {
+  background: var(--series-1);
+}
+
+.cache-reference {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 2px dashed var(--text-secondary);
+  pointer-events: none;
+}
+
+.cache-reference span {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.legend-reference {
+  border-top: 2px dashed var(--text-secondary);
+}
+
+.mini-legend {
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.cost-bins {
+  gap: 6px;
+}
+
+.cost-bin {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 100%;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.cost-bin .mini-bar {
+  flex: none;
+  width: 100%;
+}
+
+.cost-bin-labels {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  margin: 4px 0 16px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.outlier-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.outlier-table td {
+  padding: 6px 8px 6px 0;
+  border-top: 1px solid var(--grid);
+}
+
+.outlier-table td:first-child {
+  white-space: nowrap;
+}
+
+.outlier-table td:last-child {
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* On phones each outlier is a block: date and cost, then project, then cause. */
+@media (max-width: 599px) {
+  .outlier-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 6px 0;
+    border-top: 1px solid var(--grid);
+  }
+
+  .outlier-table td {
+    padding: 0;
+    border-top: 0;
+  }
+
+  .outlier-table td:last-child {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .outlier-table td:nth-child(3) {
+    grid-column: 1 / -1;
+  }
 }

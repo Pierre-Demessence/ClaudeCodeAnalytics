@@ -3,8 +3,9 @@
 const LOCALE = 'en-GB';
 
 const percent = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
-const usd = new Intl.NumberFormat(LOCALE, { currency: 'USD', maximumFractionDigits: 2, style: 'currency' });
-const usdShort = new Intl.NumberFormat(LOCALE, { currency: 'USD', maximumFractionDigits: 0, style: 'currency' });
+// narrowSymbol: en-GB writes "US$" otherwise.
+const usd = new Intl.NumberFormat(LOCALE, { currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 2, style: 'currency' });
+const usdShort = new Intl.NumberFormat(LOCALE, { currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0, style: 'currency' });
 const compact = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1, notation: 'compact' });
 const dateTime = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', hour: '2-digit', minute: '2-digit', month: 'short', weekday: 'short' });
 const date = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short' });
@@ -16,7 +17,7 @@ const relative = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto' });
 
 export const formatPercent = (value: number) => `${percent.format(value)}%`;
 export const formatUsd = (value: number) => usd.format(value);
-/** Whole dollars in running text: "$46" (the currency formatter writes "US$" in en-GB). */
+/** Whole dollars in running text: "$46". */
 export const formatDollars = (value: number) => `$${Math.round(value)}`;
 /** Whole dollars, for axis ticks. */
 export const formatUsdShort = (value: number) => usdShort.format(value);

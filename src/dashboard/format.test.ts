@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCountdown, formatDuration, formatResets } from '@/dashboard/format';
+import { formatCountdown, formatDuration, formatResets, formatUsd, formatUsdShort } from '@/dashboard/format';
 
 describe('formatCountdown', () => {
   const now = Date.parse('2026-10-02T12:00:00Z');
@@ -37,5 +37,12 @@ describe('formatDuration', () => {
   it('shows hours and minutes, or minutes alone', () => {
     expect(formatDuration((2 * 60 + 10) * 60_000)).toBe('2 h 10 min');
     expect(formatDuration(45 * 60_000)).toBe('45 min');
+  });
+});
+
+describe('formatUsd', () => {
+  it('writes "$", not "US$"', () => {
+    expect(formatUsd(1234.5)).toBe('$1,234.50');
+    expect(formatUsdShort(40.4)).toBe('$40');
   });
 });
