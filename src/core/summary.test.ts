@@ -85,6 +85,38 @@ describe('buildSummary', () => {
     });
     expect(summary.unknownModels).toEqual(['claude-mystery-1']);
     expect(summary.detectedPlan).toBe('max5');
+    expect(summary).toMatchObject({ detected: 'max5', planSource: 'manual' });
+  });
+
+  it('reports the raw detection even when it matches the plan, and no source without history', () => {
+    const detected = buildSummary({
+      endpointEnabled: true,
+      now: NOW,
+      planHistory: [],
+      records: [],
+      snapshots: [snap(NOW, 10, RESET, { rateLimitTier: 'default_claude_max_5x', subscriptionType: 'max' })],
+      timeZone: 'UTC',
+    });
+    expect(detected).toMatchObject({ detected: 'max5', detectedPlan: 'max5', planSource: undefined });
+    const same = buildSummary({
+      endpointEnabled: true,
+      now: NOW,
+      planHistory: [{ from: '2026-01-01T00:00:00Z', plan: 'max5', source: 'detected' }],
+      records: [],
+      snapshots: [snap(NOW, 10, RESET, { rateLimitTier: 'default_claude_max_5x', subscriptionType: 'max' })],
+      timeZone: 'UTC',
+    });
+    expect(same).toMatchObject({ detected: 'max5', detectedPlan: undefined, planSource: 'detected' });
+  });
+
+  it('builds the limit drift from the readings and the first imported message', () => {
+    const snapshots = [snap(NOW, 10, RESET)];
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' });
+    expect(summary.limits.readings).toEqual(snapshots);
+    expect(summary.limits.readingsPerPeriod).toEqual([]);
+    // The window started 14 Oct, after the first record: 10 % over the 5 noon records of 15–19 Oct, $100.
+    expect(summary.limits.drift).toMatchObject([{ current: true, resetsAt: RESET }]);
+    expect(summary.limits.drift[0]!.ratio).toBeCloseTo(10);
   });
 
   it('starts a new week without a reading at 0 %, projected from the typical week', () => {

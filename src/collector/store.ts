@@ -148,6 +148,31 @@ export class Store {
     await appendFile(this.path('snapshots.jsonl'), `${JSON.stringify(snapshot)}\n`);
   }
 
+  /**
+   * Removes the manual reading taken at `ts` (the first match) and reports
+   * whether there was one; endpoint readings are never touched. The removed
+   * line is kept in `deleted-readings.jsonl`: a manual reading cannot be typed
+   * back. The caller holds the data-dir lock, so nothing is appended meanwhile.
+   */
+  async deleteManualSnapshot(ts: string): Promise<boolean> {
+    const lines = ((await readText(this.path('snapshots.jsonl'))) ?? '').split('\n');
+    const index = lines.findIndex((line) => {
+      try {
+        const snapshot = JSON.parse(line) as Snapshot;
+        return snapshot.source === 'manual' && snapshot.ts === ts;
+      }
+      catch {
+        return false;
+      }
+    });
+    if (index === -1)
+      return false;
+    await appendFile(this.path('deleted-readings.jsonl'), `${lines[index]}\n`);
+    lines.splice(index, 1);
+    await writeAtomic(this.path('snapshots.jsonl'), lines.join('\n'));
+    return true;
+  }
+
   async loadSettings(): Promise<Settings> {
     return { ...DEFAULT_SETTINGS, ...await readJson<Partial<Settings>>(this.path('settings.json'), {}) };
   }

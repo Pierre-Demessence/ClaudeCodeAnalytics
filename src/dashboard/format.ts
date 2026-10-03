@@ -4,6 +4,7 @@ const LOCALE = 'en-GB';
 
 const percent = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
 // narrowSymbol: en-GB writes "US$" otherwise.
+const integer = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
 const usd = new Intl.NumberFormat(LOCALE, { currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 2, style: 'currency' });
 const usdShort = new Intl.NumberFormat(LOCALE, { currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0, style: 'currency' });
 const compact = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1, notation: 'compact' });
@@ -16,6 +17,7 @@ const weekday = new Intl.DateTimeFormat(LOCALE, { weekday: 'short' });
 const relative = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto' });
 
 export const formatPercent = (value: number) => `${percent.format(value)}%`;
+export const formatInteger = (value: number) => integer.format(value);
 export const formatUsd = (value: number) => usd.format(value);
 /** Whole dollars in running text: "$46". */
 export const formatDollars = (value: number) => `$${Math.round(value)}`;

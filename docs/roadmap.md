@@ -6,7 +6,4 @@ plan in `docs/plans/` and is deleted from here when done. The items themselves
 live in `docs/backlog.md`. A tab's milestone is done only when the whole tab
 matches its design artboard, existing views included.
 
-1. **Calibration tab**: the existing settings, readings and status restyled to
-   the design, plus limit drift, Claude Code vs claude.ai split, what-if
-   simulator, deleting manual readings, Claude Code share in the manual form.
 2. **Typical week on each plan**: The missing card from the design on the Overview tab: "Your median week, converted with the advertised multipliers. Approximate."

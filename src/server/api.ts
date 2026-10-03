@@ -15,6 +15,9 @@ const MAX_BODY_BYTES = 64 * 1024;
 const MAX_RESET_AHEAD_MS = 7 * 86_400_000 + 60_000;
 /** A collector run takes about a second, longer only while the endpoint call is slow. */
 const LOCK_WAIT_MS = 5_000;
+/** The endpoint shares Claude Code's rate limit: never poll faster than the 15-minute default. */
+const MIN_THROTTLE_MINUTES = 15;
+const MAX_THROTTLE_MINUTES = 1440;
 
 class HttpError extends Error {
   readonly status: number;
@@ -79,7 +82,7 @@ function validTimeZone(value: string | null): string {
 
 /** Validates a settings update; only known fields with valid values are kept. */
 export function parseSettingsUpdate(body: unknown, current: Settings): Settings {
-  const update = body as { endpointEnabled?: unknown; limitThreshold?: unknown; planHistory?: unknown } | null;
+  const update = body as { endpointEnabled?: unknown; limitThreshold?: unknown; planHistory?: unknown; throttleMinutes?: unknown } | null;
   const next = { ...current };
   if (update?.endpointEnabled !== undefined) {
     if (typeof update.endpointEnabled !== 'boolean')
@@ -90,6 +93,12 @@ export function parseSettingsUpdate(body: unknown, current: Settings): Settings 
     if (!Number.isInteger(update.limitThreshold) || (update.limitThreshold as number) < 50 || (update.limitThreshold as number) > 100)
       throw new HttpError(400, 'limitThreshold must be a whole percentage from 50 to 100');
     next.limitThreshold = update.limitThreshold as number;
+  }
+  if (update?.throttleMinutes !== undefined) {
+    const minutes = update.throttleMinutes;
+    if (!Number.isInteger(minutes) || (minutes as number) < MIN_THROTTLE_MINUTES || (minutes as number) > MAX_THROTTLE_MINUTES)
+      throw new HttpError(400, `throttleMinutes must be a whole number from ${MIN_THROTTLE_MINUTES} to ${MAX_THROTTLE_MINUTES}`);
+    next.throttleMinutes = minutes as number;
   }
   if (update?.planHistory !== undefined) {
     if (!Array.isArray(update.planHistory))
@@ -106,7 +115,7 @@ export function parseSettingsUpdate(body: unknown, current: Settings): Settings 
 
 /** Validates a manual `/usage` reading. */
 export function parseManualReading(body: unknown, now: number): Snapshot {
-  const reading = body as { fiveHour?: unknown; weekly?: unknown; weeklyResetsAt?: unknown } | null;
+  const reading = body as { claudeCodeShare?: unknown; fiveHour?: unknown; weekly?: unknown; weeklyResetsAt?: unknown } | null;
   if (!isPercent(reading?.weekly))
     throw new HttpError(400, 'weekly must be a percentage');
   // The weekly window is 7 days: a later reset is a typo that would skew every chart.
@@ -122,6 +131,11 @@ export function parseManualReading(body: unknown, now: number): Snapshot {
     if (!isPercent(reading.fiveHour))
       throw new HttpError(400, 'fiveHour must be a percentage');
     snapshot.fiveHour = reading.fiveHour;
+  }
+  if (reading.claudeCodeShare !== undefined) {
+    if (!isPercent(reading.claudeCodeShare))
+      throw new HttpError(400, 'claudeCodeShare must be a percentage');
+    snapshot.claudeCodeShare = reading.claudeCodeShare;
   }
   return snapshot;
 }
@@ -156,6 +170,7 @@ async function summary(store: Store, timeZone: string) {
       planHistory: settings.planHistory,
       records: [...records.values()],
       snapshots,
+      throttleMinutes: settings.throttleMinutes,
       timeZone,
       titles,
     }),
@@ -189,6 +204,18 @@ async function handle(req: IncomingMessage, res: ServerResponse, lockWaitMs: num
   if (req.method === 'POST' && url.pathname === '/readings') {
     const snapshot = parseManualReading(await readBody(req), Date.now());
     await underLock(store, lockWaitMs, () => store.appendSnapshot(snapshot));
+    return send(res, 200, await summary(store, timeZone));
+  }
+  if (req.method === 'POST' && url.pathname === '/readings/delete') {
+    const { ts } = await readBody(req) as { ts?: unknown } | null ?? {};
+    if (!isIso(ts))
+      throw new HttpError(400, 'ts must be the time of a manual reading');
+    let deleted = false;
+    await underLock(store, lockWaitMs, async () => {
+      deleted = await store.deleteManualSnapshot(ts);
+    });
+    if (!deleted)
+      throw new HttpError(404, 'No manual reading at that time');
     return send(res, 200, await summary(store, timeZone));
   }
   throw new HttpError(404, 'Not found');

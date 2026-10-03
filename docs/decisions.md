@@ -231,3 +231,20 @@ A window "hit the limit" when a reading reached the limit threshold (setting,
 95% by default, 50–100), not only 100%: close to the limit a new agent run
 stops almost at once, so the window is as good as spent. Estimates never count.
 The weekly views keep 100%.
+
+## Calibration tab: drift against the median, not the fit
+
+The drift chart compares each weekly window's ratio (% of the limit per $100 of
+Claude Code usage, from its last reading) with the median of the completed
+windows, not with the fit's `k`: the fit already leans toward recent weeks
+(half-life 2 weeks), so a real drift would pull the reference toward itself and
+hide. A window is off beyond 15%; the alert needs the last two completed
+windows off the same way. Windows under 10% are skipped (not the fit's 5%): a
+whole-percent rounding is ±0.5 pt, 10% of a 5% reading, close to the threshold.
+
+Deleting a manual reading removes its line from `snapshots.jsonl` under the
+data-dir lock and keeps it in `deleted-readings.jsonl`: a manual reading cannot
+be typed back, its numbers came from `/usage` at that moment. Marking readings
+deleted inside `snapshots.jsonl` was rejected: every reader would need to
+filter them. Only manual readings can be deleted; the endpoint's are never
+touched.

@@ -4,6 +4,8 @@ import type { PlanPeriod, Status } from '@/core/types';
 export type Summary = DashboardSummary & { status: Status };
 
 export interface ManualReading {
+  /** Claude Code's share of the weekly %, 0–100. */
+  claudeCodeShare?: number;
   fiveHour?: number;
   weekly: number;
   weeklyResetsAt: string;
@@ -30,8 +32,13 @@ export interface SettingsUpdate {
   endpointEnabled?: boolean;
   limitThreshold?: number;
   planHistory?: readonly PlanPeriod[];
+  /** Whole minutes from 15 to 1440. */
+  throttleMinutes?: number;
 }
 
 export const saveSettings = (settings: SettingsUpdate) => request('/settings', settings);
 
 export const addReading = (reading: ManualReading) => request('/readings', reading);
+
+/** Removes the manual reading taken at `ts`; the server refuses endpoint readings. */
+export const deleteReading = (ts: string) => request('/readings/delete', { ts });

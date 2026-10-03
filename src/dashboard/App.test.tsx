@@ -73,8 +73,8 @@ describe('app', () => {
       location.hash = '#/calibration';
       dispatchEvent(new HashChangeEvent('hashchange'));
     });
-    expect(screen.getByRole('heading', { name: /Settings/ })).toBeTruthy();
-    expect(screen.getByText('Current plan:', { exact: false }).textContent).toContain('Pro');
+    expect(screen.getByRole('heading', { name: 'Limit drift' })).toBeTruthy();
+    expect((screen.getByLabelText('Plan', { selector: '#plan-select' }) as HTMLSelectElement).value).toBe('pro');
   });
 
   it('toggles the theme from the header', async () => {

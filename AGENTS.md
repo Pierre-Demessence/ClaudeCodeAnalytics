@@ -79,7 +79,8 @@ Run lint, test and build before considering work done.
   user's history: never wipe it. Tests and manual runs use a temp
   `CCA_DATA_DIR`. Stored messages hold token counts and session metadata
   (`sessionId`, `cwd`, `gitBranch`, …), never content; conversation titles are
-  kept per session in `sessions.json`. `backup-format-<n>/` holds the message
+  kept per session in `sessions.json`. `deleted-readings.jsonl` keeps the manual readings deleted from the
+  dashboard: keep it. `backup-format-<n>/` holds the message
   files from before a scan-format re-read: keep it.
 - Bump `SCAN_FORMAT` (`collector/store.ts`) only when records gain fields that
   old messages need: the next run re-reads every transcript once. Make the bump

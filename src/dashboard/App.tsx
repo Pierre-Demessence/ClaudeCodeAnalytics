@@ -3,13 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Summary } from '@/dashboard/api';
 
-import { addReading, loadSummary, refreshNow, saveSettings } from '@/dashboard/api';
+import { addReading, deleteReading, loadSummary, refreshNow, saveSettings } from '@/dashboard/api';
 import { Breakdown } from '@/dashboard/Breakdown';
+import { Calibration } from '@/dashboard/Calibration';
 import { Header } from '@/dashboard/Header';
 import { Overview } from '@/dashboard/Overview';
 import { PatternDefs } from '@/dashboard/Patterns';
 import { Sessions } from '@/dashboard/Sessions';
-import { SettingsPanel } from '@/dashboard/SettingsPanel';
 import { useTab } from '@/dashboard/tabs';
 import { useTheme } from '@/dashboard/theme';
 import { TipProvider } from '@/dashboard/Tip';
@@ -79,9 +79,10 @@ export function App() {
                 {tab === 'breakdown' && <Breakdown summary={summary} />}
                 {tab === 'sessions' && <Sessions summary={summary} />}
                 {tab === 'calibration' && (
-                  <SettingsPanel
+                  <Calibration
                     busy={busy}
                     onAddReading={reading => run(() => addReading(reading))}
+                    onDeleteReading={ts => run(() => deleteReading(ts))}
                     onSaveSettings={settings => run(() => saveSettings(settings))}
                     summary={summary}
                   />

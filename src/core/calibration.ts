@@ -19,6 +19,8 @@ export interface CalibrationPoint {
 
 /** % of the weekly limit used per dollar of API-equivalent usage. */
 export interface Calibration {
+  /** ISO time of the oldest reading in the fit. */
+  from: string;
   k: number;
   n: number;
   /** Root-mean-square error of the fit, in % points. */
@@ -89,5 +91,6 @@ export function fitRatio(points: readonly CalibrationPoint[], now: number, halfL
     return undefined;
   const k = num / den;
   const squared = points.reduce((sum, p) => sum + (p.usage - k * p.cost) ** 2, 0);
-  return { k, n: points.length, rmse: Math.sqrt(squared / points.length) };
+  const from = new Date(Math.min(...points.map(p => p.ts))).toISOString();
+  return { from, k, n: points.length, rmse: Math.sqrt(squared / points.length) };
 }

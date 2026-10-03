@@ -1,7 +1,7 @@
 // @vitest-environment node
 import type { AddressInfo } from 'node:net';
 
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -63,6 +63,26 @@ describe('api routes', () => {
     expect(await (await fetch(`${base}/summary`)).json()).toMatchObject({ limitThreshold: 95 });
   });
 
+  it('deletes a manual reading only, keeping the removed line', async () => {
+    const dir = process.env.CCA_DATA_DIR!;
+    const store = new Store(dir);
+    const resetsAt = new Date(Date.now() + 86_400_000).toISOString();
+    const endpoint = { source: 'endpoint', ts: '2026-10-01T10:00:00.000Z', weekly: 20, weeklyResetsAt: resetsAt };
+    const manual = { source: 'manual', ts: '2026-10-01T11:00:00.000Z', weekly: 30, weeklyResetsAt: resetsAt };
+    await writeFile(join(dir, 'snapshots.jsonl'), `${[endpoint, manual].map(s => JSON.stringify(s)).join('\n')}\n`);
+
+    // An endpoint reading cannot be deleted, even by its exact time.
+    expect((await post('/readings/delete', { ts: endpoint.ts })).status).toBe(404);
+    expect((await post('/readings/delete', { ts: 'nope' })).status).toBe(400);
+    expect(await store.loadSnapshots()).toHaveLength(2);
+
+    const response = await post('/readings/delete', { ts: manual.ts });
+    expect(response.status).toBe(200);
+    expect(await store.loadSnapshots()).toEqual([endpoint]);
+    expect(await readFile(join(dir, 'deleted-readings.jsonl'), 'utf8')).toBe(`${JSON.stringify(manual)}\n`);
+    expect((await post('/readings/delete', { ts: manual.ts })).status).toBe(404);
+  });
+
   it('rejects writes that are not same-origin JSON', async () => {
     const form = await fetch(`${base}/settings`, { body: 'endpointEnabled=true', headers: { 'Content-Type': 'text/plain' }, method: 'POST' });
     expect(form.status).toBe(415);
@@ -81,6 +101,7 @@ describe('api routes', () => {
     try {
       expect((await post('/settings', { endpointEnabled: false })).status).toBe(409);
       expect((await post('/collect', {})).status).toBe(409);
+      expect((await post('/readings/delete', { ts: '2026-10-01T11:00:00.000Z' })).status).toBe(409);
     }
     finally {
       await release!();

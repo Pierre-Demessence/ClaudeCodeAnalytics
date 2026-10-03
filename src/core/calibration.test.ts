@@ -61,6 +61,11 @@ describe('fitRatio', () => {
     expect(fit.n).toBe(3);
   });
 
+  it('reports the time of its oldest reading', () => {
+    const points = [3, 1, 2].map(i => ({ cost: i, ts: now - i * DAY, usage: i }));
+    expect(fitRatio(points, now)!.from).toBe(new Date(now - 3 * DAY).toISOString());
+  });
+
   it('weights recent readings more', () => {
     const old = { cost: 10, ts: now - 60 * DAY, usage: 100 }; // k = 10, four half-lives ago
     const recent = [{ cost: 10, ts: now, usage: 10 }, { cost: 20, ts: now, usage: 20 }]; // k = 1

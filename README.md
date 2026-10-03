@@ -39,13 +39,13 @@ Everything stays on your machine. Data comes from two places:
 - Plan setting with history; the plan is also detected from Claude Code's login.
 - Tabs: Overview (limits, pacing and past weeks), Usage (charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents), Sessions (past 5-hour windows)
-  and Calibration (plan, 5-hour limit threshold, readings, collection status).
+  and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
 - Light and dark themes: follows the OS until you pick one in the header.
 - Colorblind-friendly: every series has a texture and a label, not just a color.
 
 Assumptions: transcripts come from this machine only, and plan limits scale
 with API prices across models. The endpoint separates Claude Code from
-claude.ai usage; manual readings cannot, so they count claude.ai use as Claude
+claude.ai usage; a manual reading can carry that share too (from `/usage`); without it, claude.ai use counts as Claude
 Code. When the endpoint fails, the dashboard warns that the last reading is old
 and estimates the usage since from transcripts.
 

@@ -1140,7 +1140,7 @@ details .table {
   font-size: 0.85rem;
 }
 
-.agent-labels > span {
+.agent-labels>span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1531,7 +1531,7 @@ button.info-tip:hover {
 
 .session-stats strong {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
   font-size: 2rem;
   line-height: 1.1;
@@ -1728,4 +1728,260 @@ button.info-tip:hover {
     padding: 0 2px;
     font-size: 0.7rem;
   }
+}
+
+/* Calibration tab: wrapping flex rows stack the cards at phone width without a media query. */
+.cal-row {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.cal-row-top {
+  align-items: flex-start;
+}
+
+.cal-wide {
+  flex: 999 1 560px;
+}
+
+.cal-narrow {
+  flex: 1 1 320px;
+}
+
+.cal-column {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cal-card h2,
+.cal-card .card-head {
+  margin-bottom: 0;
+}
+
+.cal-card .note,
+.cal-card .facts,
+.cal-card .checkbox {
+  margin: 0;
+}
+
+.cal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--grid);
+}
+
+.cal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--grid);
+}
+
+.cal-form h3 {
+  margin-bottom: 2px;
+  font-size: 0.95rem;
+}
+
+.helper {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.field-label button.info-tip {
+  margin-left: 2px;
+}
+
+.callout,
+.alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-0);
+  font-size: 0.9rem;
+}
+
+.callout>span,
+.alert>span {
+  flex: 1 1 180px;
+}
+
+.callout .icon-inline,
+.alert .icon-inline {
+  margin: 2px 0 0;
+}
+
+.callout.critical,
+.alert {
+  background: var(--critical-bg);
+}
+
+.badge {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.readings-table,
+.plan-table {
+  margin-top: 0;
+}
+
+.readings-table {
+  min-width: 520px;
+}
+
+.plan-table {
+  min-width: 560px;
+}
+
+.readings-table td:first-child,
+.readings-table th:nth-child(2),
+.readings-table td:nth-child(2),
+.plan-table th:not(:last-child, :nth-child(5)),
+.plan-table td:not(:last-child, :nth-child(5)) {
+  text-align: left;
+}
+
+.readings-table td:first-child,
+.plan-table td:nth-child(2),
+.plan-table td:nth-child(3) {
+  white-space: nowrap;
+}
+
+.table-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.fit-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fit-figure strong {
+  font-size: 2.25rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.fit-figure span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* Limit drift: a bar off the usual ratio is hatched, so it differs by pattern and not only by color. */
+.drift-chart {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 170px;
+  border-bottom: 1px solid var(--text-primary);
+}
+
+.drift-usual {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 2px dashed var(--text-secondary);
+}
+
+.drift-usual-label {
+  position: absolute;
+  left: 0;
+  padding-right: 4px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.drift-bar,
+.legend-swatch.drift-off {
+  border-radius: 3px 3px 0 0;
+  background: var(--series-1);
+}
+
+.drift-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+  color: #fff;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.drift-bar.off,
+.legend-swatch.drift-off {
+  background-color: var(--critical-bg);
+  background-image: repeating-linear-gradient(-45deg, var(--critical) 0 3px, transparent 3px 7px);
+}
+
+.drift-bar.off span {
+  height: fit-content;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--chip);
+  color: var(--text-primary);
+}
+
+.drift-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.legend-usual {
+  display: inline-block;
+  width: 18px;
+  border-top: 2px dashed var(--text-secondary);
 }

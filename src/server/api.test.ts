@@ -35,8 +35,15 @@ describe('parseSettingsUpdate', () => {
       expect(() => parseSettingsUpdate({ limitThreshold: bad }, SETTINGS)).toThrow();
   });
 
+  it('accepts whole minutes from 15 to 1440 between endpoint calls', () => {
+    expect(parseSettingsUpdate({ throttleMinutes: 15 }, SETTINGS).throttleMinutes).toBe(15);
+    expect(parseSettingsUpdate({ throttleMinutes: 1440 }, SETTINGS).throttleMinutes).toBe(1440);
+    for (const bad of [14, 1441, 30.5, '30', null])
+      expect(() => parseSettingsUpdate({ throttleMinutes: bad }, SETTINGS)).toThrow();
+  });
+
   it('ignores unknown fields', () => {
-    expect(parseSettingsUpdate({ throttleMinutes: 1 }, SETTINGS)).toEqual(SETTINGS);
+    expect(parseSettingsUpdate({ theme: 'dark' }, SETTINGS)).toEqual(SETTINGS);
   });
 });
 
@@ -49,6 +56,13 @@ describe('parseManualReading', () => {
       weekly: 44,
       weeklyResetsAt: '2026-10-07T20:00:00.000Z',
     });
+  });
+
+  it('keeps the Claude Code share, a percentage', () => {
+    const reading = parseManualReading({ claudeCodeShare: 80, weekly: 44, weeklyResetsAt: '2026-10-07T20:00:00Z' }, NOW);
+    expect(reading.claudeCodeShare).toBe(80);
+    expect(() => parseManualReading({ claudeCodeShare: 101, weekly: 44, weeklyResetsAt: '2026-10-07T20:00:00Z' }, NOW)).toThrow();
+    expect(() => parseManualReading({ claudeCodeShare: 'half', weekly: 44, weeklyResetsAt: '2026-10-07T20:00:00Z' }, NOW)).toThrow();
   });
 
   it('rejects out-of-range or past values', () => {

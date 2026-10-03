@@ -3,6 +3,7 @@ import type { UsageRow } from './aggregate.ts';
 import type { Breakdown } from './breakdown.ts';
 import type { Calibration } from './calibration.ts';
 import type { WindowForecast } from './forecast.ts';
+import type { Limits } from './limits.ts';
 import type { WeekPacing } from './pacing.ts';
 import type { Sessions } from './sessions.ts';
 import type { TypicalWeek, WeekShare } from './share.ts';
@@ -13,6 +14,7 @@ import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts, star
 import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { forecastWindow } from './forecast.ts';
+import { buildLimits } from './limits.ts';
 import { weekPacing } from './pacing.ts';
 import { convertPercent, planAt, planFromSubscription, PLANS } from './plans.ts';
 import { priceFor } from './pricing.ts';
@@ -34,6 +36,8 @@ export interface SummaryInput {
   planHistory: readonly PlanPeriod[];
   records: readonly UsageRecord[];
   snapshots: readonly Snapshot[];
+  /** Minutes between endpoint calls; 15 by default. */
+  throttleMinutes?: number;
   timeZone: string;
   /** Conversation titles by session id. */
   titles?: Readonly<Record<string, SessionInfo>>;
@@ -72,6 +76,8 @@ export interface DashboardSummary {
   current?: CurrentWeek;
   /** Usage per local day and model, for the last weeks. */
   daily: UsageRow[];
+  /** The plan the latest reading reports, whether or not it is the active one. */
+  detected?: Plan;
   /** A detected plan that differs from a manual setting. */
   detectedPlan?: Plan;
   endpointEnabled: boolean;
@@ -80,10 +86,16 @@ export interface DashboardSummary {
   generatedAt: string;
   /** 5-hour % from which a window counts as having hit the limit. */
   limitThreshold: number;
+  /** Limit drift and the readings table. */
+  limits: Limits;
   plan: Plan;
   planHistory: readonly PlanPeriod[];
+  /** How the active plan period was set; absent without history. */
+  planSource?: PlanPeriod['source'];
   /** Past 5-hour windows of the last 7 days. */
   sessions: Sessions;
+  /** Minutes between endpoint calls. */
+  throttleMinutes: number;
   timeZone: string;
   /** Typical week on the current plan, and its equivalent on every plan. */
   typical?: TypicalWeek & { byPlan: Record<Plan, number> };
@@ -275,14 +287,18 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     calibration,
     current,
     daily,
+    detected,
     detectedPlan: detected && detected !== plan ? detected : undefined,
     endpointEnabled: input.endpointEnabled,
     fiveHourCalibration,
     generatedAt: nowIso,
+    limits: buildLimits({ costBetween, dataStart: first, now, plan, planHistory, snapshots }),
     limitThreshold,
     plan,
     planHistory,
+    planSource: (planHistory.findLast(period => Date.parse(period.from) <= now) ?? planHistory[0])?.source,
     sessions,
+    throttleMinutes: input.throttleMinutes ?? 15,
     timeZone,
     typical,
     unknownModels,
