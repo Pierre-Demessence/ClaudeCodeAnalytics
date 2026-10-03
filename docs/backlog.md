@@ -5,12 +5,6 @@ that completes it.
 
 ## Bugs
 
-## Tech debt
-
-- A transcript rewritten to a larger size is read as an append from the old offset (`scan.ts`); Claude Code only appends, so this is theoretical.
-- The data-dir lock (`lock.ts`, `wx` create) is shared by the host's hook and the Docker dashboard across Docker Desktop's file sharing, where exclusive create is not strictly atomic; a simultaneous run could race. Unlikely; revisit if `records` ever shows duplicates or lost writes.
-- Untested: a settings write that waits for a running collector then succeeds.
-
 ## Ideas
 
 - The Docker dashboard shares the `proxy` network with other containers, which can reach its API by IP (Vite always allows IP hosts, and a request without `Origin` passes the POST check). A dedicated network joined only by Traefik would close this; it needs a change in `S:\Dev\DockerInfra\compose.yml`.

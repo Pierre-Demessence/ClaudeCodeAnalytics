@@ -260,3 +260,20 @@ plan like the Overview did; a completed week without a reading gets `k × cost`
 are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,
 and fixed blocks ignore DST. The Overview's "Past weeks" card was removed: the
 tab shows the same windows with more.
+
+## Accepted risks: append-only transcripts, non-atomic lock on Docker
+
+The scan resumes each transcript from its stored byte offset and never checks
+that the bytes before it are unchanged, so a transcript rewritten to a larger
+size would be read from the middle of a line. Claude Code only appends, and
+every scanned transcript has an offset on a line end with no malformed lines.
+A checksum of the bytes before the offset would catch it; rejected as code for a
+case that does not occur.
+
+The data-dir lock (`wx` create) is shared by the host's hook and the Docker
+dashboard through Docker Desktop's file sharing, where exclusive create is not
+strictly atomic, so two simultaneous runs could both take it. Accepted: runs
+last about a second, writes are atomic (temp file, then rename), and a lost
+write is imported again by the next scan because offsets only advance after a
+save. A read-back of the lock file would narrow the race without closing it and
+cannot be tested. Revisit if malformed lines or missing messages ever appear.

@@ -108,6 +108,14 @@ describe('api routes', () => {
     }
   });
 
+  it('applies a settings write that waited for a running collector', async () => {
+    const release = await acquireLock(process.env.CCA_DATA_DIR!);
+    setTimeout(() => void release!(), 50);
+    expect((await post('/settings', { throttleMinutes: 30 })).status).toBe(200);
+    expect((await new Store(process.env.CCA_DATA_DIR!).loadSettings()).throttleMinutes).toBe(30);
+    expect((await post('/settings', { throttleMinutes: 15 })).status).toBe(200);
+  });
+
   it('titles the conversations of the breakdown', async () => {
     const store = new Store(process.env.CCA_DATA_DIR!);
     const ts = new Date(Date.now() - 60_000).toISOString();
