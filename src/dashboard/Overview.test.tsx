@@ -128,34 +128,10 @@ describe('overview', () => {
   });
 });
 
-describe('past weeks', () => {
+describe('plan equivalents', () => {
   afterEach(cleanup);
 
-  const weeks = Array.from({ length: 10 }, (_, i) => ({
-    estimated: i === 9,
-    percent: i === 8 ? 100 : 50 + i,
-    plan: 'pro' as const,
-    resetsAt: new Date(NOW - (10 - i) * 7 * DAY_MS).toISOString(),
-  }));
   const typical = { byPlan: { max20: 2.75, max5: 11, pro: 55 }, high: 60, low: 52, max: 100, median: 55, min: 50, weeks: 10 };
-
-  it('lists the last 8 weeks, newest first, with the typical marker, hits and estimates', () => {
-    render(<Overview summary={summary(null, { typical, weeks })} />, { wrapper: TipProvider });
-    const rows = screen.getAllByText(/^Week of /);
-    expect(rows).toHaveLength(8);
-    const values = [...document.querySelectorAll('.week-value strong')].map(el => el.textContent);
-    expect(values.slice(0, 3)).toEqual(['59%', '100%', '57%']);
-    expect(document.querySelector('.week-bar.hit')).toBeTruthy();
-    expect(document.querySelector('.week-bar.estimated')).toBeTruthy();
-    const markers = document.querySelectorAll('.week-typical');
-    expect(markers).toHaveLength(8);
-    expect(tipOf(markers[0]!)).toBe('Typical week: 55%');
-  });
-
-  it('says when no week is complete', () => {
-    render(<Overview summary={summary()} />);
-    expect(screen.getByText(/No completed week with readings yet/)).toBeTruthy();
-  });
 
   it('converts the typical week to each plan, striping plans it overflows', () => {
     render(<Overview summary={summary(null, { plan: 'max5', typical: { ...typical, byPlan: { max20: 25, max5: 100 * 1.0, pro: 500 } } })} />, { wrapper: TipProvider });

@@ -12,7 +12,7 @@ import { endpointResultText } from '@/dashboard/endpoint';
 import { formatDateTime, formatPercent, formatRelative, formatResets } from '@/dashboard/format';
 import { Meter } from '@/dashboard/Meter';
 import { PacingChart } from '@/dashboard/PacingChart';
-import { PastWeeks, PlanEquivalents } from '@/dashboard/PastWeeks';
+import { PlanEquivalents } from '@/dashboard/PlanEquivalents';
 import { InfoTip } from '@/dashboard/Tip';
 import { useNow } from '@/dashboard/useNow';
 import { useTip } from '@/dashboard/useTip';
@@ -209,10 +209,7 @@ export function Overview({ summary }: { summary: Summary }) {
             )}
       </div>
       {current && <PacingChart forecast={current.forecast} now={now} pacing={current.pacing} usedNow={current.estimatedNow ?? current.weekly} />}
-      <div className="overview-bottom">
-        <PastWeeks summary={summary} />
-        <PlanEquivalents summary={summary} />
-      </div>
+      <PlanEquivalents summary={summary} />
     </>
   );
 }

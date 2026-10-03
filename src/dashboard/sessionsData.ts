@@ -39,7 +39,7 @@ export const formatSessionDay = (day: string) => dayFormat.format(new Date(`${da
 
 const timeFormats = new Map<string, Intl.DateTimeFormat>();
 
-function formatTime(iso: string, timeZone: string): string {
+export function formatTime(iso: string, timeZone: string): string {
   let format = timeFormats.get(timeZone);
   if (!format) {
     format = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', minute: '2-digit', timeZone });

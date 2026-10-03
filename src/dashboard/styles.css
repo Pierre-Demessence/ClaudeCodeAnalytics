@@ -34,6 +34,12 @@
   --heat-3: #3f86dc;
   --heat-4: #1d5fae;
   --heat-5: #0b3f7a;
+  /* Text on a heat step. */
+  --heat-ink-1: #0b0b0b;
+  --heat-ink-2: #0b0b0b;
+  --heat-ink-3: #0b0b0b;
+  --heat-ink-4: #ffffff;
+  --heat-ink-5: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -69,6 +75,11 @@
     --heat-3: #3987e5;
     --heat-4: #8db8ee;
     --heat-5: #d6e6fb;
+    --heat-ink-1: #ffffff;
+    --heat-ink-2: #ffffff;
+    --heat-ink-3: #0b0b0b;
+    --heat-ink-4: #0b0b0b;
+    --heat-ink-5: #0b0b0b;
   }
 }
 
@@ -104,6 +115,11 @@
   --heat-3: #3987e5;
   --heat-4: #8db8ee;
   --heat-5: #d6e6fb;
+  --heat-ink-1: #ffffff;
+  --heat-ink-2: #ffffff;
+  --heat-ink-3: #0b0b0b;
+  --heat-ink-4: #0b0b0b;
+  --heat-ink-5: #0b0b0b;
 }
 
 * {
@@ -473,8 +489,7 @@ small {
   flex-grow: 1;
 }
 
-.overview-limits,
-.overview-bottom {
+.overview-limits {
   display: grid;
   gap: 20px;
 }
@@ -482,10 +497,6 @@ small {
 @media (min-width: 900px) {
   .overview-limits {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .overview-bottom {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   }
 }
 
@@ -712,26 +723,13 @@ small {
   border-left: 2px dashed var(--text-primary);
 }
 
-/* Past weeks and plan equivalents: horizontal bars. */
-.week-bars,
+/* Plan equivalents and Weeks percent bars. */
 .plan-bars {
   display: grid;
   gap: 6px;
   margin: 0 0 12px;
   padding: 0;
   list-style: none;
-}
-
-.week-bars li {
-  display: grid;
-  grid-template-columns: 7.5em minmax(0, 1fr) 5.5em;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.9rem;
-}
-
-.week-label {
-  color: var(--text-secondary);
 }
 
 .week-track,
@@ -1984,4 +1982,208 @@ button.info-tip:hover {
   display: inline-block;
   width: 18px;
   border-top: 2px dashed var(--text-secondary);
+}
+/* Weeks tab: a week x day grid of costs, shaded in steps with the amount written in each cell. */
+.wk-grid {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.wk-row {
+  display: grid;
+  grid-template-columns: 8.5em minmax(0, 1fr) 15em;
+  align-items: center;
+  gap: 16px;
+}
+
+.wk-head {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.wk-days,
+.wk-cells {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.wk-days span {
+  text-align: center;
+}
+
+.wk-label {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.wk-now {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 99px;
+  font-size: 0.72rem;
+}
+
+.wk-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.wk-cell.heat-0 {
+  background: var(--grid);
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.wk-cell.later {
+  border: 1px dashed var(--border);
+}
+
+.wk-cell.heat-1 {
+  color: var(--heat-ink-1);
+}
+
+.wk-cell.heat-2 {
+  color: var(--heat-ink-2);
+}
+
+.wk-cell.heat-3 {
+  color: var(--heat-ink-3);
+}
+
+.wk-cell.heat-4 {
+  color: var(--heat-ink-4);
+}
+
+.wk-cell.heat-5 {
+  color: var(--heat-ink-5);
+}
+
+/* The mini bar replaces the shading on a phone. */
+.wk-fill {
+  display: none;
+}
+
+/* The list below has these figures; the phone timeline carries them too. */
+.wk-meta {
+  display: none;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.wk-percent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.5em;
+  align-items: center;
+  gap: 10px;
+}
+
+.wk-percent .week-track {
+  height: 14px;
+}
+
+.wk-capped {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+}
+
+.week-table {
+  min-width: 760px;
+  margin-top: 0;
+}
+
+.week-table th[scope='row'] {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Text columns read from the left; numbers stay right-aligned. */
+.week-table :is(th, td):is(:nth-child(2), :nth-child(7)) {
+  text-align: left;
+}
+
+.legend-session.heat-1,
+.legend-session.heat-2,
+.legend-session.heat-3,
+.legend-session.heat-4,
+.legend-session.heat-5 {
+  width: 16px;
+  height: 12px;
+}
+
+@media (max-width: 799px) {
+  .wk-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+  }
+
+  .wk-head {
+    display: none;
+  }
+
+  .wk-grid {
+    gap: 14px;
+  }
+
+  .wk-cells {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-items: end;
+    height: 52px;
+  }
+
+  .wk-meta {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+
+  .wk-percent {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .wk-cell,
+  .wk-cell[class*='heat-'] {
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 100%;
+    background: none;
+    box-shadow: none;
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    font-weight: 400;
+  }
+
+  /* Shading steps do not apply to the mini bars. */
+  .session-legend .wk-legend-heat {
+    display: none;
+  }
+
+  .wk-cell.later {
+    border: 0;
+  }
+
+  .wk-fill {
+    display: block;
+    order: 2;
+    width: 100%;
+    min-height: 2px;
+    margin-top: 2px;
+    border-radius: 3px 3px 0 0;
+    background: var(--accent);
+    opacity: 0.85;
+  }
 }

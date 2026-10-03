@@ -248,3 +248,15 @@ be typed back, its numbers came from `/usage` at that moment. Marking readings
 deleted inside `snapshots.jsonl` was rejected: every reader would need to
 filter them. Only manual readings can be deleted; the endpoint's are never
 touched.
+
+## Weeks tab: windows follow the readings, estimates never hit
+
+The Weeks tab lists the last 12 weekly windows, cut where `weekStartFor` cuts
+them (the first reset after a message), so its weeks match the Usage tab's
+weekly chart. A week's final % is its last reading, converted to the current
+plan like the Overview did; a completed week without a reading gets `k × cost`
+(capped at 100, shown with "~"). A week "hit the limit" only from a final reading at
+100%: a transcript estimate, or a reading extended from before the reset, never counts, as on the Sessions tab. The day cells
+are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,
+and fixed blocks ignore DST. The Overview's "Past weeks" card was removed: the
+tab shows the same windows with more.

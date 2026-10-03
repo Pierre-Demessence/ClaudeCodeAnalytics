@@ -63,12 +63,16 @@ function newWindow(start: number, end: number, source: Building['source']): Buil
   return { cost: 0, end, messages: 0, projects: new Map(), source, start };
 }
 
+/** `SessionsInput` without the time zone: `fiveHourWindows` is not cut to the last 7 local days. */
+export type FiveHourWindowsInput = Omit<SessionsInput, 'timeZone'>;
+
 /**
- * The 5-hour windows of the last 7 local days. Readings place their windows
- * exactly (`fiveHourResetsAt` − 5 h); messages outside them open estimated
- * windows, as `sessionCosts` does, cut short where a reading window starts.
+ * Every 5-hour window since the first reading or message, newest first.
+ * Readings place their windows exactly (`fiveHourResetsAt` − 5 h); messages
+ * outside them open estimated windows, as `sessionCosts` does, cut short where
+ * a reading window starts.
  */
-export function buildSessions({ k, limitThreshold, now, records, snapshots, timeZone }: SessionsInput): Sessions {
+export function fiveHourWindows({ k, limitThreshold, now, records, snapshots }: FiveHourWindowsInput): FiveHourWindow[] {
   const anchored = new Map<number, Building>();
   for (const snapshot of snapshots) {
     if (!snapshot.fiveHourResetsAt)
@@ -114,13 +118,8 @@ export function buildSessions({ k, limitThreshold, now, records, snapshots, time
     window.messages++;
   }
 
-  // Step through calendar days at UTC noon so DST never skips or repeats a day.
-  const today = Date.parse(`${dayKey(now, timeZone)}T12:00:00Z`);
-  const days = Array.from({ length: SESSION_DAYS }, (_, i) => new Date(today - i * DAY_MS).toISOString().slice(0, 10));
-  const from = startOfDay(days.at(-1)!, timeZone);
-
-  const shown = windows
-    .filter(w => w.end > from && w.start <= now)
+  return windows
+    .filter(w => w.start <= now)
     .sort((a, b) => b.start - a.start)
     .map((w): FiveHourWindow => {
       const peak = w.source === 'reading' ? w.peak : k !== undefined ? Math.min(100, k * w.cost) : undefined;
@@ -137,6 +136,15 @@ export function buildSessions({ k, limitThreshold, now, records, snapshots, time
         start: new Date(w.start).toISOString(),
       };
     });
+}
+
+/** The 5-hour windows of the last 7 local days. */
+export function buildSessions({ timeZone, ...input }: SessionsInput): Sessions {
+  // Step through calendar days at UTC noon so DST never skips or repeats a day.
+  const today = Date.parse(`${dayKey(input.now, timeZone)}T12:00:00Z`);
+  const days = Array.from({ length: SESSION_DAYS }, (_, i) => new Date(today - i * DAY_MS).toISOString().slice(0, 10));
+  const from = startOfDay(days.at(-1)!, timeZone);
+  const shown = fiveHourWindows(input).filter(w => Date.parse(w.end) > from);
 
   const done = shown.filter(w => !w.inProgress);
   return {

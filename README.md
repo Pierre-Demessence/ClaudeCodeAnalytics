@@ -22,8 +22,8 @@ Everything stays on your machine. Data comes from two places:
   at reset with its likely range and the time the cap would be hit.
 - Budget pacing: this week's % against an even pace, and the daily spend left
   to reach 100% at reset.
-- Final % of the last weeks, the typical week, and its equivalent on Pro,
-  Max 5× and Max 20× (approximate, from the advertised multipliers).
+- The typical week, and its equivalent on Pro, Max 5× and Max 20×
+  (approximate, from the advertised multipliers).
 - Daily and weekly usage by model family, in API-equivalent dollars or tokens,
   with Claude Code upgrades marked on the daily chart.
 - When you work (average cost per weekday and hour), cache efficiency (share
@@ -36,10 +36,13 @@ Everything stays on your machine. Data comes from two places:
   list: cost, messages, projects and peak %, each window placed by a reading
   or estimated from transcript times, and the ones that hit the limit (from a
   configurable threshold, 95% by default).
+- The last 12 weekly windows on a week × day timeline and in a list: final %
+  (estimated from transcripts when no reading ends the week), cost per 24 h
+  block, sessions, messages, projects, and the weeks that hit the limit.
 - Plan setting with history; the plan is also detected from Claude Code's login.
-- Tabs: Overview (limits, pacing and past weeks), Usage (charts by model, heatmap, cache, message costs),
-  Breakdown (projects, conversations, agents), Sessions (past 5-hour windows)
-  and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
+- Tabs: Overview (limits, pacing and the typical week on each plan), Usage (charts by model, heatmap, cache, message costs),
+  Breakdown (projects, conversations, agents), Sessions (past 5-hour windows),
+  Weeks (past weekly windows) and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
 - Light and dark themes: follows the OS until you pick one in the header.
 - Colorblind-friendly: every series has a texture and a label, not just a color.
 

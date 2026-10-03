@@ -119,6 +119,12 @@ describe('buildSummary', () => {
     expect(summary.limits.drift[0]!.ratio).toBeCloseTo(10);
   });
 
+  it('builds the week history, the running window first with its reading', () => {
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots: [snap(NOW, 10, RESET)], timeZone: 'UTC' });
+    expect(summary.weekHistory.weeks[0]).toMatchObject({ cost: 100, end: RESET, inProgress: true, messages: 5, percent: 10, start: '2026-10-14T20:00:00.000Z' });
+    expect(summary.weekHistory.weeks[0]!.sessions).toBe(5);
+  });
+
   it('starts a new week without a reading at 0 %, projected from the typical week', () => {
     const lastReset = Date.parse('2026-10-14T20:00:00Z');
     const now = lastReset + 2 * 3_600_000;

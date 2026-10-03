@@ -8,6 +8,7 @@ import type { WeekPacing } from './pacing.ts';
 import type { Sessions } from './sessions.ts';
 import type { TypicalWeek, WeekShare } from './share.ts';
 import type { Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
+import type { WeekHistory } from './weekHistory.ts';
 
 import { buildActivity } from './activity.ts';
 import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts, startOfDay } from './aggregate.ts';
@@ -18,8 +19,9 @@ import { buildLimits } from './limits.ts';
 import { weekPacing } from './pacing.ts';
 import { convertPercent, planAt, planFromSubscription, PLANS } from './plans.ts';
 import { priceFor } from './pricing.ts';
-import { buildSessions, DEFAULT_LIMIT_THRESHOLD } from './sessions.ts';
+import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
+import { buildWeekHistory } from './weekHistory.ts';
 
 /** Days of daily cost and 5-hour sessions used as "typical" for forecasts. */
 const TYPICAL_DAYS = 28;
@@ -103,6 +105,8 @@ export interface DashboardSummary {
   unknownModels: string[];
   /** Usage per weekly window (bucket = window start, ISO) and model. */
   weekly: UsageRow[];
+  /** The last 12 weekly windows: final %, cost per day, sessions and projects. */
+  weekHistory: WeekHistory;
   /** Final % of every completed window with readings. */
   weeks: WeekShare[];
 }
@@ -280,6 +284,17 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const activity = buildActivity({ chartFrom, now, records, timeZone, weekStart });
   const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
   const sessions = buildSessions({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots, timeZone });
+  const weekHistory = buildWeekHistory({
+    calibrationK: calibration?.k,
+    current,
+    now,
+    plan,
+    records,
+    sessionWindows: fiveHourWindows({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots }),
+    shares: weeks,
+    snapshots,
+    weekStartOf: ms => (resets.length === 0 ? startOfDay(isoWeekStart(ms, timeZone), timeZone) : weekStartFor(ms, resets)),
+  });
 
   return {
     activity,
@@ -302,6 +317,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     timeZone,
     typical,
     unknownModels,
+    weekHistory,
     weekly,
     weeks,
   };

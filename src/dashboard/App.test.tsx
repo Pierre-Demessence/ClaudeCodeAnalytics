@@ -50,7 +50,7 @@ describe('app', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json(summary())));
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Weekly limit' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Past weeks' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Past weeks' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Budget pacing this week' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Daily usage by model' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
@@ -69,6 +69,12 @@ describe('app', () => {
     });
     expect(screen.getByRole('heading', { name: 'Daily usage by model' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Weekly limit' })).toBeNull();
+    act(() => {
+      location.hash = '#/weeks';
+      dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(screen.getByRole('heading', { name: 'Weekly usage, last 12 weeks' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Weeks' }).getAttribute('aria-current')).toBe('page');
     act(() => {
       location.hash = '#/calibration';
       dispatchEvent(new HashChangeEvent('hashchange'));

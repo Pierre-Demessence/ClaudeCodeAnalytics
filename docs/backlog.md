@@ -29,4 +29,3 @@ that completes it.
 - claude.ai vs Claude Code split per week from `claudeCodeShare` (only feeds the fit today). Design board: `Split.dc.html`.
 - What-if simulator: final % of a week with another model mix (e.g. Opus as Sonnet) or another plan, from pricing and calibration. Design board: `WhatIf.dc.html`.
 - The 5-hour forecast's session pace (`summary.ts` `sessionPaces`) still uses the transcript-only `sessionCosts`; the reading-anchored windows of `core/sessions.ts` would give truer boundaries.
-- Something kinda equivalent of the Sessions tab, but for weeks. Basically to see the history of weekly usage.

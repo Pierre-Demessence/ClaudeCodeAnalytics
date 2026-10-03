@@ -14,6 +14,7 @@ import { useTab } from '@/dashboard/tabs';
 import { useTheme } from '@/dashboard/theme';
 import { TipProvider } from '@/dashboard/Tip';
 import { Usage } from '@/dashboard/Usage';
+import { Weeks } from '@/dashboard/Weeks';
 
 const RELOAD_MS = 5 * 60_000;
 
@@ -78,6 +79,7 @@ export function App() {
                 {tab === 'usage' && <Usage summary={summary} />}
                 {tab === 'breakdown' && <Breakdown summary={summary} />}
                 {tab === 'sessions' && <Sessions summary={summary} />}
+                {tab === 'weeks' && <Weeks summary={summary} />}
                 {tab === 'calibration' && (
                   <Calibration
                     busy={busy}
