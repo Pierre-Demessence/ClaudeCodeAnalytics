@@ -1,0 +1,137 @@
+import { describe, expect, it } from 'vitest';
+
+import type { SessionsInput } from './sessions.ts';
+import type { Snapshot, UsageRecord } from './types.ts';
+
+import { buildSessions } from './sessions.ts';
+
+/** $20 of Opus 5.5 output by default. */
+function rec(ts: string, extra: Partial<UsageRecord> = {}): UsageRecord {
+  return { cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, cwd: 'S:\\Dev\\app', input: 0, key: ts + JSON.stringify(extra), model: 'claude-opus-5-5', output: 1_000_000, project: 'S--Dev-app', sessionId: 's1', ts, ...extra };
+}
+
+function snap(ts: string, fiveHourResetsAt: string | undefined, fiveHour?: number): Snapshot {
+  return { fiveHour, fiveHourResetsAt, source: 'endpoint', ts, weekly: 10, weeklyResetsAt: '2026-10-08T00:00:00.000Z' };
+}
+
+/** Saturday 3 Oct 2026, 14:00 in Paris (UTC+2): the range starts Sun 27 Sep 00:00 local. */
+const base: Omit<SessionsInput, 'records' | 'snapshots'> = {
+  limitThreshold: 95,
+  now: Date.parse('2026-10-03T12:00:00Z'),
+  timeZone: 'Europe/Paris',
+};
+function sessions(records: UsageRecord[], snapshots: Snapshot[] = [], extra: Partial<SessionsInput> = {}) {
+  return buildSessions({ ...base, records, snapshots, ...extra });
+}
+
+describe('reading windows', () => {
+  it('builds one window per 5-hour reset, its peak the highest reading', () => {
+    const { windows } = sessions([], [
+      snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 30),
+      snap('2026-10-02T11:00:00Z', '2026-10-02T12:50:00.000Z', 60),
+      snap('2026-10-02T10:00:00Z', '2026-10-02T12:50:00.000Z', 45),
+    ]);
+    expect(windows).toHaveLength(1);
+    expect(windows[0]).toMatchObject({ cost: 0, end: '2026-10-02T12:50:00.000Z', messages: 0, peak: 60, source: 'reading', start: '2026-10-02T07:50:00.000Z' });
+    expect(windows[0]!.capped).toBeUndefined();
+  });
+
+  it('has no peak without a 5-hour %, and manual readings anchor nothing', () => {
+    const { windows } = sessions([], [
+      snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z'),
+      { fiveHour: 80, source: 'manual', ts: '2026-10-01T09:00:00Z', weekly: 10, weeklyResetsAt: '2026-10-08T00:00:00.000Z' },
+    ]);
+    expect(windows).toHaveLength(1);
+    expect(windows[0]!.peak).toBeUndefined();
+  });
+
+  it('counts the limit as hit from the threshold up, from readings only', () => {
+    const readings = [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 96)];
+    expect(sessions([], readings).windows[0]!.capped).toBe(true);
+    expect(sessions([], readings, { limitThreshold: 100 }).windows[0]!.capped).toBeUndefined();
+    // An estimate at 100% is not a reading.
+    expect(sessions([rec('2026-10-01T09:00:00Z')], [], { k: 10 }).windows[0]).toMatchObject({ peak: 100, peakEstimated: true });
+    expect(sessions([rec('2026-10-01T09:00:00Z')], [], { k: 10 }).windows[0]!.capped).toBeUndefined();
+  });
+});
+
+describe('estimated windows', () => {
+  it('opens a window at a message outside every window, for 5 hours', () => {
+    const { windows } = sessions([
+      rec('2026-10-02T01:00:00Z'),
+      rec('2026-10-02T05:59:00Z'),
+      rec('2026-10-02T06:30:00Z'),
+    ]);
+    expect(windows.map(w => [w.start, w.end, w.messages, w.source])).toEqual([
+      ['2026-10-02T06:30:00.000Z', '2026-10-02T11:30:00.000Z', 1, 'estimated'],
+      ['2026-10-02T01:00:00.000Z', '2026-10-02T06:00:00.000Z', 2, 'estimated'],
+    ]);
+    expect(windows[1]!.cost).toBeCloseTo(40);
+  });
+
+  it('ends where the next reading window starts, and messages inside a reading window join it', () => {
+    const { windows } = sessions(
+      [rec('2026-10-02T06:00:00Z'), rec('2026-10-02T08:00:00Z'), rec('2026-10-02T12:00:00Z')],
+      [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 50)],
+    );
+    expect(windows.map(w => [w.start, w.end, w.messages, w.source])).toEqual([
+      ['2026-10-02T07:50:00.000Z', '2026-10-02T12:50:00.000Z', 2, 'reading'],
+      ['2026-10-02T06:00:00.000Z', '2026-10-02T07:50:00.000Z', 1, 'estimated'],
+    ]);
+  });
+
+  it('estimates the peak from the 5-hour calibration, without one leaves it out', () => {
+    expect(sessions([rec('2026-10-01T09:00:00Z')], [], { k: 2 }).windows[0]).toMatchObject({ peak: 40, peakEstimated: true });
+    const [window] = sessions([rec('2026-10-01T09:00:00Z')]).windows;
+    expect(window!.peak).toBeUndefined();
+    expect(window!.peakEstimated).toBeUndefined();
+  });
+});
+
+describe('range and details', () => {
+  it('keeps the windows overlapping the last 7 local days, newest first, and marks the one in progress', () => {
+    const result = sessions([
+      rec('2026-09-26T15:00:00Z'), // ends 20:00 UTC, before Sun 27 Sep 00:00 Paris (26 Sep 22:00 UTC)
+      rec('2026-09-26T20:00:00Z'), // runs past the range start
+      rec('2026-10-03T11:00:00Z'), // in progress
+    ]);
+    expect(result.days).toEqual(['2026-10-03', '2026-10-02', '2026-10-01', '2026-09-30', '2026-09-29', '2026-09-28', '2026-09-27']);
+    expect(result.windows.map(w => [w.start, w.inProgress])).toEqual([
+      ['2026-10-03T11:00:00.000Z', true],
+      ['2026-09-26T20:00:00.000Z', undefined],
+    ]);
+  });
+
+  it('lists projects by cost, each conversation under the directory it started in', () => {
+    const { windows } = sessions([
+      rec('2026-10-02T01:00:00Z', { cwd: 'S:\\Dev\\app' }),
+      rec('2026-10-02T01:10:00Z', { cwd: 'S:\\Dev\\app\\src' }),
+      rec('2026-10-02T01:20:00Z', { cwd: 'S:\\Dev\\tool', output: 500_000, sessionId: 's2' }),
+    ]);
+    expect(windows[0]!.projects).toEqual([
+      { name: 'app', cost: 40, path: 's:\\Dev\\app' },
+      { name: 'tool', cost: 10, path: 's:\\Dev\\tool' },
+    ]);
+  });
+
+  it('summarizes the windows, medians leaving out the one in progress', () => {
+    const { stats } = sessions(
+      [
+        rec('2026-09-30T08:00:00Z'), // $20, estimated
+        rec('2026-10-01T08:00:00Z', { output: 3_000_000 }), // $60, inside the reading window below
+        rec('2026-10-03T11:00:00Z', { output: 10_000_000 }), // in progress
+      ],
+      [
+        snap('2026-10-01T09:00:00Z', '2026-10-01T12:00:00.000Z', 97),
+        snap('2026-10-02T09:00:00Z', '2026-10-02T12:00:00.000Z', 41), // claude.ai only
+        snap('2026-10-03T11:30:00Z', '2026-10-03T15:00:00.000Z', 99), // in progress
+      ],
+    );
+    // Windows: 30 Sep estimated, 1 Oct reading (97%), 2 Oct reading (41%, no message), 3 Oct reading in progress (99%).
+    expect(stats).toEqual({ capped: 2, count: 4, medianCost: 40, medianPeak: 69 });
+  });
+
+  it('has no medians without windows', () => {
+    expect(sessions([]).stats).toEqual({ capped: 0, count: 0, medianCost: undefined, medianPeak: undefined });
+  });
+});

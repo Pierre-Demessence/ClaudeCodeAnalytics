@@ -79,12 +79,17 @@ function validTimeZone(value: string | null): string {
 
 /** Validates a settings update; only known fields with valid values are kept. */
 export function parseSettingsUpdate(body: unknown, current: Settings): Settings {
-  const update = body as { endpointEnabled?: unknown; planHistory?: unknown } | null;
+  const update = body as { endpointEnabled?: unknown; limitThreshold?: unknown; planHistory?: unknown } | null;
   const next = { ...current };
   if (update?.endpointEnabled !== undefined) {
     if (typeof update.endpointEnabled !== 'boolean')
       throw new HttpError(400, 'endpointEnabled must be a boolean');
     next.endpointEnabled = update.endpointEnabled;
+  }
+  if (update?.limitThreshold !== undefined) {
+    if (!Number.isInteger(update.limitThreshold) || (update.limitThreshold as number) < 50 || (update.limitThreshold as number) > 100)
+      throw new HttpError(400, 'limitThreshold must be a whole percentage from 50 to 100');
+    next.limitThreshold = update.limitThreshold as number;
   }
   if (update?.planHistory !== undefined) {
     if (!Array.isArray(update.planHistory))
@@ -146,6 +151,7 @@ async function summary(store: Store, timeZone: string) {
   return {
     ...buildSummary({
       endpointEnabled: settings.endpointEnabled,
+      limitThreshold: settings.limitThreshold,
       now: Date.now(),
       planHistory: settings.planHistory,
       records: [...records.values()],

@@ -216,3 +216,18 @@ A message is an outlier from $1, a fixed amount rather than a percentile,
 because it reads plainly and matches what the data shows: the costliest
 messages are 1-hour cache rewrites of 200k–550k tokens after a pause. The cause
 names the largest cost component and the pause when it outlived that cache.
+
+## Sessions tab: windows anchored on readings, peaks kept apart
+
+A reading's `fiveHourResetsAt` places its 5-hour window exactly; messages
+outside every reading window open estimated windows (first message + 5 h), cut
+short where a reading window starts. Real data showed why: readings put windows
+at 07:50, 12:50… UTC back to back, while the transcript rebuild starts them at
+the first message. A reading window's peak is the highest % read in it, never
+topped up with an estimate; an estimated window's peak is `k × cost` from the
+5-hour calibration, shown with "~". Rejected: the transcript-only rebuild alone.
+
+A window "hit the limit" when a reading reached the limit threshold (setting,
+95% by default, 50–100), not only 100%: close to the limit a new agent run
+stops almost at once, so the window is as good as spent. Estimates never count.
+The weekly views keep 100%.

@@ -32,10 +32,14 @@ Everything stays on your machine. Data comes from two places:
 - Where the usage goes, this week, the last 4 weeks or all time: by project
   (with the model mix and cache share), main agent vs subagents, effort level,
   thinking share and surface, and the most expensive conversations.
+- Past 5-hour sessions of the last 7 days, on a day × hour timeline and in a
+  list: cost, messages, projects and peak %, each window placed by a reading
+  or estimated from transcript times, and the ones that hit the limit (from a
+  configurable threshold, 95% by default).
 - Plan setting with history; the plan is also detected from Claude Code's login.
 - Tabs: Overview (limits, pacing and past weeks), Usage (charts by model, heatmap, cache, message costs),
-  Breakdown (projects, conversations, agents) and Calibration (plan, readings,
-  collection status).
+  Breakdown (projects, conversations, agents), Sessions (past 5-hour windows)
+  and Calibration (plan, 5-hour limit threshold, readings, collection status).
 - Light and dark themes: follows the OS until you pick one in the header.
 - Colorblind-friendly: every series has a texture and a label, not just a color.
 

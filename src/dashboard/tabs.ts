@@ -4,6 +4,7 @@ export const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'usage', label: 'Usage' },
   { id: 'breakdown', label: 'Breakdown' },
+  { id: 'sessions', label: 'Sessions' },
   { id: 'calibration', label: 'Calibration' },
 ] as const;
 

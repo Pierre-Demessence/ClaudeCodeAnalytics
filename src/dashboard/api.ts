@@ -26,6 +26,12 @@ export const loadSummary = () => request('/summary');
 /** Imports transcripts and calls the endpoint now, ignoring the throttle. */
 export const refreshNow = () => request('/collect', {});
 
-export const saveSettings = (settings: { endpointEnabled?: boolean; planHistory?: readonly PlanPeriod[] }) => request('/settings', settings);
+export interface SettingsUpdate {
+  endpointEnabled?: boolean;
+  limitThreshold?: number;
+  planHistory?: readonly PlanPeriod[];
+}
+
+export const saveSettings = (settings: SettingsUpdate) => request('/settings', settings);
 
 export const addReading = (reading: ManualReading) => request('/readings', reading);

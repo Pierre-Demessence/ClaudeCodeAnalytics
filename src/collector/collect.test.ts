@@ -121,7 +121,7 @@ describe('collect', () => {
   it('skips the endpoint when it is disabled', async () => {
     const store = new Store(dataDir);
     await store.ensureDir();
-    await store.saveSettings({ endpointEnabled: false, planHistory: [], throttleMinutes: 15 });
+    await store.saveSettings({ endpointEnabled: false, limitThreshold: 95, planHistory: [], throttleMinutes: 15 });
     await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
     expect(fetchImpl).not.toHaveBeenCalled();
   });

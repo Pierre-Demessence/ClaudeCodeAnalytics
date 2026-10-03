@@ -4,7 +4,7 @@ import { CircleAlert, CircleCheck, CircleX } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Plan, PlanPeriod } from '@/core/types';
-import type { ManualReading, Summary } from '@/dashboard/api';
+import type { ManualReading, SettingsUpdate, Summary } from '@/dashboard/api';
 
 import { PLAN_LABELS, PLANS } from '@/core/plans';
 import { endpointResultText } from '@/dashboard/endpoint';
@@ -14,7 +14,7 @@ interface Props {
   busy: boolean;
   summary: Summary;
   onAddReading: (reading: ManualReading) => Promise<void>;
-  onSaveSettings: (settings: { endpointEnabled?: boolean; planHistory?: readonly PlanPeriod[] }) => Promise<void>;
+  onSaveSettings: (settings: SettingsUpdate) => Promise<void>;
 }
 
 /** `datetime-local` value for an instant, in local time. */
@@ -51,6 +51,9 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
   const [planFrom, setPlanFrom] = useState(today);
   const [weekly, setWeekly] = useState('');
   const [fiveHour, setFiveHour] = useState('');
+  // Empty until edited, so the field follows the saved value.
+  const [editedThreshold, setEditedThreshold] = useState('');
+  const threshold = editedThreshold || String(summary.limitThreshold);
   // Empty until edited, so the default follows the latest reading across weekly resets.
   const [editedResetsAt, setEditedResetsAt] = useState('');
   const resetsAt = editedResetsAt || (summary.current ? toLocalInput(summary.current.resetsAt) : '');
@@ -77,6 +80,11 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
       setFiveHour('');
       setEditedResetsAt('');
     });
+  };
+
+  const saveThreshold = (event: FormEvent) => {
+    event.preventDefault();
+    void onSaveSettings({ limitThreshold: Number(threshold) }).then(() => setEditedThreshold(''));
   };
 
   return (
@@ -162,6 +170,20 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
               <input onChange={e => setEditedResetsAt(e.target.value)} required type="datetime-local" value={resetsAt} />
             </label>
             <button disabled={busy} type="submit">Add reading</button>
+          </form>
+        </div>
+
+        <div>
+          <h3>5-hour limit</h3>
+          <p className="note">
+            A past 5-hour window counts as having hit the limit when a reading reached this %: close to 100%, a new agent run stops almost at once.
+          </p>
+          <form className="inline-form" onSubmit={saveThreshold}>
+            <label>
+              Hit the limit from (%)
+              <input max="100" min="50" onChange={e => setEditedThreshold(e.target.value)} required step="1" type="number" value={threshold} />
+            </label>
+            <button disabled={busy} type="submit">Save</button>
           </form>
         </div>
 

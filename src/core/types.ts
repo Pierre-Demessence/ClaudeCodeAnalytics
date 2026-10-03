@@ -69,6 +69,8 @@ export type EndpointError = 'no-token' | 'expired' | 'bad-shape' | 'network' | `
 
 export interface Settings {
   endpointEnabled: boolean;
+  /** 5-hour % from which a past window counts as having hit the limit. */
+  limitThreshold: number;
   planHistory: PlanPeriod[];
   throttleMinutes: number;
 }

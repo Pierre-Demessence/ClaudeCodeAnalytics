@@ -5,7 +5,7 @@ import type { Settings } from '../core/types.ts';
 
 import { parseManualReading, parseSettingsUpdate } from './api.ts';
 
-const SETTINGS: Settings = { endpointEnabled: true, planHistory: [], throttleMinutes: 15 };
+const SETTINGS: Settings = { endpointEnabled: true, limitThreshold: 95, planHistory: [], throttleMinutes: 15 };
 const NOW = Date.parse('2026-10-02T10:00:00Z');
 
 describe('parseSettingsUpdate', () => {
@@ -26,6 +26,13 @@ describe('parseSettingsUpdate', () => {
     expect(() => parseSettingsUpdate({ endpointEnabled: 'yes' }, SETTINGS)).toThrow();
     expect(() => parseSettingsUpdate({ planHistory: [{ from: 'x', plan: 'pro', source: 'manual' }] }, SETTINGS)).toThrow();
     expect(() => parseSettingsUpdate({ planHistory: [{ from: '2026-01-01', plan: 'team', source: 'manual' }] }, SETTINGS)).toThrow();
+  });
+
+  it('accepts a whole limit threshold from 50 to 100', () => {
+    expect(parseSettingsUpdate({ limitThreshold: 98 }, SETTINGS).limitThreshold).toBe(98);
+    expect(parseSettingsUpdate({ limitThreshold: 100 }, SETTINGS).limitThreshold).toBe(100);
+    for (const bad of [49, 101, 97.5, '95', null])
+      expect(() => parseSettingsUpdate({ limitThreshold: bad }, SETTINGS)).toThrow();
   });
 
   it('ignores unknown fields', () => {

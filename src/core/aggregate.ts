@@ -26,6 +26,15 @@ export function dayKey(ms: number, timeZone: string): string {
   return format.format(ms);
 }
 
+/** First instant of a local day (`YYYY-MM-DD`) in a time zone. */
+export function startOfDay(day: string, timeZone: string): number {
+  const utcMidnight = Date.parse(`${day}T00:00:00Z`);
+  const parts = new Intl.DateTimeFormat('en-CA', { day: '2-digit', hour: '2-digit', hourCycle: 'h23', minute: '2-digit', month: '2-digit', timeZone, year: 'numeric' }).formatToParts(utcMidnight);
+  const part = (type: string) => parts.find(p => p.type === type)!.value;
+  const wallClock = Date.parse(`${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:00Z`);
+  return utcMidnight - (wallClock - utcMidnight);
+}
+
 /** Totals per (bucket, model), sorted by bucket then model. */
 export function aggregate(records: readonly UsageRecord[], bucketOf: (ms: number) => string): UsageRow[] {
   const rows = new Map<string, UsageRow>();

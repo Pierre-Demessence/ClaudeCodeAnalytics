@@ -47,6 +47,15 @@ describe('settingsPanel', () => {
     expect(onAddReading).toHaveBeenCalledWith({ fiveHour: 12, weekly: 44, weeklyResetsAt: new Date(Math.floor(Date.parse(RESET) / 60_000) * 60_000).toISOString() });
   });
 
+  it('saves the 5-hour limit threshold, prefilled with the saved one', () => {
+    const { onSaveSettings } = renderPanel();
+    const input = screen.getByLabelText('Hit the limit from (%)') as HTMLInputElement;
+    expect(input.value).toBe('95');
+    fireEvent.change(input, { target: { value: '98' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSaveSettings).toHaveBeenCalledWith({ limitThreshold: 98 });
+  });
+
   it('keeps the plan assumed so far when setting the first plan period', () => {
     const { onSaveSettings } = renderPanel();
     fireEvent.change(screen.getByLabelText('Plan'), { target: { value: 'max5' } });

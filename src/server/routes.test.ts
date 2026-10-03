@@ -1,7 +1,7 @@
 // @vitest-environment node
 import type { AddressInfo } from 'node:net';
 
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,7 +26,7 @@ describe('api routes', () => {
     // Endpoint off: these tests never touch the network or credentials.
     const store = new Store(process.env.CCA_DATA_DIR);
     await store.ensureDir();
-    await store.saveSettings({ endpointEnabled: false, planHistory: [], throttleMinutes: 15 });
+    await store.saveSettings({ endpointEnabled: false, limitThreshold: 95, planHistory: [], throttleMinutes: 15 });
 
     const server = createServer(createApiMiddleware({ lockWaitMs: 200 }));
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -55,6 +55,12 @@ describe('api routes', () => {
     const resetsAt = new Date(Date.now() + 86_400_000).toISOString();
     const reading = await post('/readings', { weekly: 40, weeklyResetsAt: resetsAt });
     expect(await reading.json()).toMatchObject({ current: { source: 'manual', weekly: 40 } });
+  });
+
+  it('saves the limit threshold, 95 when settings.json predates it', async () => {
+    expect(await (await post('/settings', { limitThreshold: 98 })).json()).toMatchObject({ limitThreshold: 98 });
+    await writeFile(join(process.env.CCA_DATA_DIR!, 'settings.json'), JSON.stringify({ endpointEnabled: false, planHistory: [], throttleMinutes: 15 }));
+    expect(await (await fetch(`${base}/summary`)).json()).toMatchObject({ limitThreshold: 95 });
   });
 
   it('rejects writes that are not same-origin JSON', async () => {

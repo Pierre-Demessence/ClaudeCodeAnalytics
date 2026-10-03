@@ -25,10 +25,9 @@ that completes it.
 - Treat a `seven_day.resets_at` of null (if the endpoint ever returns it) as "no usage yet" rather than `bad-shape`.
 - Per-model weekly limits (`seven_day_opus` / `seven_day_sonnet` in the endpoint response) if a plan ever reports them.
 - Weekday-aware daily usage (weekends differ) for the forecast.
-- Past 5-hour sessions: timeline of rebuilt sessions (`aggregate.ts` `sessionCosts`) with cost and the peak 5-hour % where a reading exists.
 - Cost per git branch (`UsageRecord.gitBranch`); the Breakdown tab only shows each conversation's main branch.
 - Git worktrees (`X.worktrees\<branch>`) count as separate projects in the Breakdown (`core/breakdown.ts` `projectOf`), named after the branch folder; they could merge into their main repository.
 - Calibration drift: plan % per dollar per week, to detect a silent limit change and test the price-scaling assumption.
 - claude.ai vs Claude Code split per week from `claudeCodeShare` (only feeds the fit today).
 - What-if simulator: final % of a week with another model mix (e.g. Opus as Sonnet) or another plan, from pricing and calibration.
-- 5-hour sessions are rebuilt from transcript times only (`aggregate.ts` `sessionCosts`); the real windows (e.g. 07:50 for a first message at 07:59) start earlier, likely from claude.ai use or some rounding. Readings' `fiveHourResetsAt` could anchor past sessions.
+- The 5-hour forecast's session pace (`summary.ts` `sessionPaces`) still uses the transcript-only `sessionCosts`; the reading-anchored windows of `core/sessions.ts` would give truer boundaries.

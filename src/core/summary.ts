@@ -4,17 +4,19 @@ import type { Breakdown } from './breakdown.ts';
 import type { Calibration } from './calibration.ts';
 import type { WindowForecast } from './forecast.ts';
 import type { WeekPacing } from './pacing.ts';
+import type { Sessions } from './sessions.ts';
 import type { TypicalWeek, WeekShare } from './share.ts';
 import type { Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
 
 import { buildActivity } from './activity.ts';
-import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts } from './aggregate.ts';
+import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts, startOfDay } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { forecastWindow } from './forecast.ts';
 import { weekPacing } from './pacing.ts';
 import { convertPercent, planAt, planFromSubscription, PLANS } from './plans.ts';
 import { priceFor } from './pricing.ts';
+import { buildSessions, DEFAULT_LIMIT_THRESHOLD } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
 
 /** Days of daily cost and 5-hour sessions used as "typical" for forecasts. */
@@ -26,6 +28,8 @@ const STALE_READING_MS = 30 * 60_000;
 
 export interface SummaryInput {
   endpointEnabled: boolean;
+  /** 5-hour % from which a window counts as having hit the limit; 95 by default. */
+  limitThreshold?: number;
   now: number;
   planHistory: readonly PlanPeriod[];
   records: readonly UsageRecord[];
@@ -74,8 +78,12 @@ export interface DashboardSummary {
   /** % of the 5-hour limit per dollar. */
   fiveHourCalibration?: Calibration;
   generatedAt: string;
+  /** 5-hour % from which a window counts as having hit the limit. */
+  limitThreshold: number;
   plan: Plan;
   planHistory: readonly PlanPeriod[];
+  /** Past 5-hour windows of the last 7 days. */
+  sessions: Sessions;
   timeZone: string;
   /** Typical week on the current plan, and its equivalent on every plan. */
   typical?: TypicalWeek & { byPlan: Record<Plan, number> };
@@ -116,15 +124,6 @@ function isoWeekStart(ms: number, timeZone: string): string {
   const date = new Date(`${day}T12:00:00Z`);
   const offset = (date.getUTCDay() + 6) % 7;
   return dayKey(date.getTime() - offset * DAY_MS, 'UTC');
-}
-
-/** First instant of a local day (`YYYY-MM-DD`) in a time zone. */
-function startOfDay(day: string, timeZone: string): number {
-  const utcMidnight = Date.parse(`${day}T00:00:00Z`);
-  const parts = new Intl.DateTimeFormat('en-CA', { day: '2-digit', hour: '2-digit', hourCycle: 'h23', minute: '2-digit', month: '2-digit', timeZone, year: 'numeric' }).formatToParts(utcMidnight);
-  const part = (type: string) => parts.find(p => p.type === type)!.value;
-  const wallClock = Date.parse(`${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:00Z`);
-  return utcMidnight - (wallClock - utcMidnight);
 }
 
 /** Everything the dashboard shows, computed from collector data. */
@@ -267,6 +266,8 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();
 
   const activity = buildActivity({ chartFrom, now, records, timeZone, weekStart });
+  const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
+  const sessions = buildSessions({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots, timeZone });
 
   return {
     activity,
@@ -278,8 +279,10 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     endpointEnabled: input.endpointEnabled,
     fiveHourCalibration,
     generatedAt: nowIso,
+    limitThreshold,
     plan,
     planHistory,
+    sessions,
     timeZone,
     typical,
     unknownModels,

@@ -156,6 +156,22 @@ describe('buildSummary', () => {
     expect(summary.current?.fiveHourForecast?.median).toBeCloseTo(36);
   });
 
+  it('lists the 5-hour windows, estimated peaks from the 5-hour calibration', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';
+    // 10 % for $20, 20 % for $40: k = 0.5 %/$.
+    const snapshots = [['10:30', 10], ['11:30', 20], ['11:50', 20]].map(([time, fiveHour]) =>
+      snap(at(time as string), 30, RESET, { fiveHour: fiveHour as number, fiveHourResetsAt }));
+    const input = { endpointEnabled: true, now: NOW, planHistory: [], records: [...records, rec(at('10:00')), rec(at('11:00'))], snapshots, timeZone: 'UTC' };
+
+    const summary = buildSummary(input);
+    expect(summary.limitThreshold).toBe(95);
+    expect(summary.sessions.windows[0]).toMatchObject({ inProgress: true, peak: 20, source: 'reading', start: '2026-10-20T10:00:00.000Z' });
+    // Yesterday's $20 at k = 0.5 %/$.
+    expect(summary.sessions.windows[1]).toMatchObject({ peak: 10, peakEstimated: true, source: 'estimated' });
+    expect(buildSummary({ ...input, limitThreshold: 20 }).sessions.stats.capped).toBe(1);
+  });
+
   it('keeps a manual 5-hour reading for 5 hours', () => {
     const manual = (age: number) => buildSummary({
       endpointEnabled: false,
