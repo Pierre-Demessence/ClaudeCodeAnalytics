@@ -1,4 +1,5 @@
 :root {
+  scrollbar-gutter: stable;
   color-scheme: light;
   --surface-0: #f4f3f0;
   --surface-1: #fcfcfb;
