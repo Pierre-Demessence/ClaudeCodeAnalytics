@@ -40,9 +40,9 @@ Everything stays on your machine. Data comes from two places:
   (estimated from transcripts when no reading ends the week), cost per 24 h
   block, sessions, messages, projects, and the weeks that hit the limit.
 - Plan setting with history; the plan is also detected from Claude Code's login.
-- Tabs: Overview (limits, pacing and the typical week on each plan), Usage (charts by model, heatmap, cache, message costs),
+- Tabs: Overview (limits and pacing), Usage (charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents), Sessions (past 5-hour windows),
-  Weeks (past weekly windows) and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
+  Weeks (past weekly windows), Plans (which plan would have fit the last 12 weeks, an Opus-to-Sonnet what-if, and how far the advertised plan multipliers match your own weeks) and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
 - Light and dark themes: follows the OS until you pick one in the header.
 - Colorblind-friendly: every series has a texture and a label, not just a color.
 

@@ -9,6 +9,7 @@ import { Calibration } from '@/dashboard/Calibration';
 import { Header } from '@/dashboard/Header';
 import { Overview } from '@/dashboard/Overview';
 import { PatternDefs } from '@/dashboard/Patterns';
+import { Plans } from '@/dashboard/Plans';
 import { Sessions } from '@/dashboard/Sessions';
 import { useTab } from '@/dashboard/tabs';
 import { useTheme } from '@/dashboard/theme';
@@ -80,6 +81,7 @@ export function App() {
                 {tab === 'breakdown' && <Breakdown summary={summary} />}
                 {tab === 'sessions' && <Sessions summary={summary} />}
                 {tab === 'weeks' && <Weeks summary={summary} />}
+                {tab === 'plans' && <Plans summary={summary} />}
                 {tab === 'calibration' && (
                   <Calibration
                     busy={busy}

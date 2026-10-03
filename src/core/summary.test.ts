@@ -48,18 +48,28 @@ describe('buildSummary', () => {
     expect(summary.calibration?.k).toBeCloseTo(0.5, 1);
     expect(summary.current?.forecast?.method).toBe('calibrated');
     expect(summary.weeks).toEqual([]);
-    expect(summary.typical).toBeUndefined();
   });
 
-  it('summarises completed weeks on every plan', () => {
+  it('lists the completed weeks', () => {
     const snapshots = [
       snap(Date.parse('2026-10-07T19:00:00Z'), 40, '2026-10-07T20:00:00.000Z'),
       snap(Date.parse('2026-10-14T19:00:00Z'), 60, '2026-10-14T20:00:00.000Z'),
     ];
     const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' });
     expect(summary.weeks.map(w => w.percent)).toEqual([40, 60]);
-    expect(summary.typical).toMatchObject({ byPlan: { max20: 2.5, max5: 10, pro: 50 }, median: 50 });
     expect(summary.current).toBeUndefined();
+  });
+
+  it('feeds the Plans tab with the completed weeks and the multiplier checks', () => {
+    const snapshots = [
+      snap(Date.parse('2026-10-07T19:00:00Z'), 40, '2026-10-07T20:00:00.000Z'),
+      snap(Date.parse('2026-10-14T19:00:00Z'), 60, '2026-10-14T20:00:00.000Z'),
+    ];
+    const { multipliers, planFit } = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' });
+    expect(planFit.plan).toBe('pro');
+    expect(planFit.weeks.map(w => w.demand)).toEqual([40, 60]);
+    expect(planFit.weeklyBudget).toBeUndefined();
+    expect(multipliers.map(m => [m.from, m.to, m.measured])).toEqual([['pro', 'max5', undefined], ['max5', 'max20', undefined]]);
   });
 
   it('buckets weekly usage on the reset anchor and daily usage by local day', () => {

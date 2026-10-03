@@ -1,49 +1,24 @@
 import type { ReactNode } from 'react';
 
-import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { useId, useState } from 'react';
 
 import type { WindowForecast } from '@/core/forecast';
 import type { Summary } from '@/dashboard/api';
-import type { VerdictKind } from '@/dashboard/verdict';
 
 import { FIVE_HOURS_MS } from '@/core/calibration';
 import { endpointResultText } from '@/dashboard/endpoint';
 import { formatCountdown, formatDateTime, formatPercent, formatRelative } from '@/dashboard/format';
 import { Meter } from '@/dashboard/Meter';
 import { PacingChart } from '@/dashboard/PacingChart';
-import { PlanEquivalents } from '@/dashboard/PlanEquivalents';
 import { InfoTip } from '@/dashboard/Tip';
 import { useNow } from '@/dashboard/useNow';
 import { useTip } from '@/dashboard/useTip';
 import { limitVerdict } from '@/dashboard/verdict';
+import { VerdictBox } from '@/dashboard/VerdictBox';
 
 /** Readings older than this get a warning icon by the number. */
 const STALE_WARNING_MS = 6 * 3_600_000;
-
-const VERDICT_ICONS: Record<VerdictKind, ReactNode> = {
-  cap: <TriangleAlert aria-hidden="true" className="icon-critical" size={18} />,
-  good: <CircleCheck aria-hidden="true" className="icon-good" size={18} />,
-  info: <Info aria-hidden="true" className="icon-info" size={18} />,
-  tight: <CircleAlert aria-hidden="true" className="icon-warning" size={18} />,
-};
-
-function VerdictBox({ detail, kind, title }: { detail?: ReactNode; kind: VerdictKind; title: string }) {
-  return (
-    <p className={`verdict verdict-${kind}`}>
-      {VERDICT_ICONS[kind]}
-      <span>
-        <strong>{title}</strong>
-        {detail && (
-          <>
-            {' '}
-            {detail}
-          </>
-        )}
-      </span>
-    </p>
-  );
-}
 
 /** Warning icon by an estimated number; its explanation shows on hover, focus or click (touch), and closes on leave, blur or Escape. */
 function EstimateWarning({ children }: { children: ReactNode }) {
@@ -209,7 +184,6 @@ export function Overview({ summary }: { summary: Summary }) {
             )}
       </div>
       {current && <PacingChart forecast={current.forecast} now={now} pacing={current.pacing} usedNow={current.estimatedNow ?? current.weekly} />}
-      <PlanEquivalents summary={summary} />
     </>
   );
 }

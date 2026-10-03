@@ -13,6 +13,7 @@ describe('tabFromHash', () => {
     expect(tabFromHash('#/usage')).toBe('usage');
     expect(tabFromHash('#/breakdown')).toBe('breakdown');
     expect(tabFromHash('#/weeks')).toBe('weeks');
+    expect(tabFromHash('#/plans')).toBe('plans');
     expect(tabFromHash('#calibration')).toBe('calibration');
   });
 

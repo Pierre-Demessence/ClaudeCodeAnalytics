@@ -5,7 +5,7 @@ import type { Plan, Snapshot, UsageRecord } from './types.ts';
 import { sessionProjects } from './breakdown.ts';
 import { DAY_MS, WEEK_MS } from './calibration.ts';
 import { convertPercent } from './plans.ts';
-import { messageCost } from './pricing.ts';
+import { messageCost, sonnetSaving } from './pricing.ts';
 import { median } from './stats.ts';
 
 /** Weekly windows listed. */
@@ -33,6 +33,8 @@ export interface WeekRow {
   /** By cost, highest first. */
   projects: { name: string; path: string; cost: number }[];
   sessions: number;
+  /** Share of the cost saved if all Opus ran on Sonnet; absent without cost. */
+  shift?: number;
   /** `estimated`: no reading in the window, the % comes from transcripts. */
   source: 'reading' | 'estimated';
   /** ISO. */
@@ -69,6 +71,7 @@ interface Building {
   days: number[];
   messages: number;
   projects: Map<string, { name: string; path: string; cost: number }>;
+  saving: number;
 }
 
 /** The last 12 weekly windows: final %, cost per day, sessions and projects. */
@@ -83,7 +86,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     starts.add(start);
   const shown = [...starts].sort((a, b) => b - a).slice(0, HISTORY_WEEKS);
 
-  const building = new Map<number, Building>(shown.map(start => [start, { cost: 0, days: Array.from<number>({ length: 7 }).fill(0), messages: 0, projects: new Map() }]));
+  const building = new Map<number, Building>(shown.map(start => [start, { cost: 0, days: Array.from<number>({ length: 7 }).fill(0), messages: 0, projects: new Map(), saving: 0 }]));
   const projectOf = sessionProjects(records);
   for (const { record, start } of recordStarts) {
     const week = building.get(start);
@@ -91,6 +94,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       continue;
     const cost = messageCost(record).cost;
     week.cost += cost;
+    week.saving += sonnetSaving(record);
     week.messages++;
     const day = Math.min(6, Math.floor((Date.parse(record.ts) - start) / DAY_MS));
     week.days[day]! += cost;
@@ -140,6 +144,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       projectCount: projects.length,
       projects: projects.slice(0, TOP_PROJECTS),
       sessions: windows.length,
+      shift: week.cost > 0 ? week.saving / week.cost : undefined,
       source,
       start: new Date(start).toISOString(),
     };

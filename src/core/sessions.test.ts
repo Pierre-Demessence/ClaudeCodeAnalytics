@@ -156,3 +156,18 @@ describe('sessionPaces', () => {
     expect(sessionPaces(windows, 0)).toEqual([4]);
   });
 });
+
+describe('shift', () => {
+  it('is the share of the cost saved if Opus ran on Sonnet', () => {
+    const { windows } = sessions([
+      rec('2026-10-02T09:00:00Z'),
+      rec('2026-10-02T09:30:00Z', { model: 'claude-sonnet-5-5' }),
+    ]);
+    // $20 of Opus would cost $10 on Sonnet; the $10 Sonnet message stays.
+    expect(windows[0]!.shift).toBeCloseTo(10 / 30);
+  });
+
+  it('is absent for a window without cost', () => {
+    expect(sessions([], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 30)]).windows[0]!.shift).toBeUndefined();
+  });
+});

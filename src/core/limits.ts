@@ -58,7 +58,8 @@ export interface LimitsInput {
 
 export const isOff = (ratio: number, usual: number): boolean => Math.abs(ratio - usual) / usual > OFF_THRESHOLD;
 
-function driftWindows({ costBetween, dataStart, now, plan, planHistory, snapshots }: LimitsInput): DriftWindow[] {
+/** The last 12 windows taken on `plan` (the current one by default), oldest first. */
+export function driftWindows({ costBetween, dataStart, now, plan, planHistory, snapshots }: LimitsInput, onPlan: Plan = plan): DriftWindow[] {
   const lastByWindow = new Map<string, Snapshot>();
   for (const snapshot of snapshots) {
     const last = lastByWindow.get(snapshot.weeklyResetsAt);
@@ -66,7 +67,7 @@ function driftWindows({ costBetween, dataStart, now, plan, planHistory, snapshot
       lastByWindow.set(snapshot.weeklyResetsAt, snapshot);
   }
   return [...lastByWindow.values()]
-    .filter(last => last.weekly >= MIN_PERCENT_FOR_DRIFT && planAt(planHistory, last.ts) === plan && windowStart(last) >= dataStart)
+    .filter(last => last.weekly >= MIN_PERCENT_FOR_DRIFT && planAt(planHistory, last.ts) === onPlan && windowStart(last) >= dataStart)
     .sort((a, b) => Date.parse(a.weeklyResetsAt) - Date.parse(b.weeklyResetsAt))
     .flatMap((last): DriftWindow[] => {
       const cost = costBetween(windowStart(last), Date.parse(last.ts));

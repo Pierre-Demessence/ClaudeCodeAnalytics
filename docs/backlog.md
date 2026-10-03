@@ -15,6 +15,7 @@ that completes it.
 - Per-model weekly limits (`seven_day_opus` / `seven_day_sonnet` in the endpoint response) if a plan ever reports them.
 - Weekday-aware daily usage (weekends differ) for the forecast.
 - Cost per git branch (`UsageRecord.gitBranch`); the Breakdown tab only shows each conversation's main branch.
-- Test the advertised plan multipliers (5×, 20×): the same ratio as the Calibration tab's drift chart, compared across a plan switch (a week before and after). Drift itself covers only the current plan.
 - claude.ai vs Claude Code split per week from `claudeCodeShare` (only feeds the fit today). Design board: `Split.dc.html`.
-- What-if simulator: final % of a week with another model mix (e.g. Opus as Sonnet) or another plan, from pricing and calibration. Design board: `WhatIf.dc.html`.
+- Convert between plans with the measured multipliers (Plans tab, "How far to trust the conversions") when both plans have enough weeks, instead of the advertised ones.
+- A week or session that reached its limit uses `k × cost` as its demand, which leaves out claude.ai usage (understated); the endpoint's `claudeCodeShare` could scale it up.
+- The what-if only moves Opus work to Sonnet; other shifts (Sonnet to Haiku, a lower effort) would reuse the same linear `shift` per week and session.

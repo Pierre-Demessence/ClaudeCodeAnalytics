@@ -4,9 +4,11 @@ import type { Breakdown } from './breakdown.ts';
 import type { Calibration } from './calibration.ts';
 import type { WindowForecast } from './forecast.ts';
 import type { Limits } from './limits.ts';
+import type { MultiplierCheck } from './multipliers.ts';
 import type { WeekPacing } from './pacing.ts';
+import type { PlanFitInput } from './planFit.ts';
 import type { Sessions } from './sessions.ts';
-import type { TypicalWeek, WeekShare } from './share.ts';
+import type { WeekShare } from './share.ts';
 import type { Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
 import type { WeekHistory } from './weekHistory.ts';
 
@@ -16,8 +18,10 @@ import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { forecastWindow } from './forecast.ts';
 import { buildLimits } from './limits.ts';
+import { buildMultipliers } from './multipliers.ts';
 import { weekPacing } from './pacing.ts';
-import { convertPercent, planAt, planFromSubscription, PLANS } from './plans.ts';
+import { buildPlanFitInput } from './planFit.ts';
+import { planAt, planFromSubscription } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
@@ -100,7 +104,11 @@ export interface DashboardSummary {
   limitThreshold: number;
   /** Limit drift and the readings table. */
   limits: Limits;
+  /** Measured against advertised multipliers between neighbouring plans. */
+  multipliers: MultiplierCheck[];
   plan: Plan;
+  /** The last weeks and 5-hour sessions on the current plan, for the Plans tab. */
+  planFit: PlanFitInput;
   planHistory: readonly PlanPeriod[];
   /** How the active plan period was set; absent without history. */
   planSource?: PlanPeriod['source'];
@@ -109,8 +117,6 @@ export interface DashboardSummary {
   /** Minutes between endpoint calls. */
   throttleMinutes: number;
   timeZone: string;
-  /** Typical week on the current plan, and its equivalent on every plan. */
-  typical?: TypicalWeek & { byPlan: Record<Plan, number> };
   /** Models without a known price; their cost counts as zero. */
   unknownModels: string[];
   /** Usage per weekly window (bucket = window start, ISO) and model. */
@@ -182,10 +188,6 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
 
   const weeks = weeklyShares(snapshots, costBetween, calibration && { k: calibration.k, plan }, planHistory, now);
   const typicalBase = typicalWeek(weeks, plan);
-  const typical = typicalBase && {
-    ...typicalBase,
-    byPlan: Object.fromEntries(PLANS.map(p => [p, convertPercent(typicalBase.median, plan, p)])) as Record<Plan, number>,
-  };
 
   let current: CurrentWeek | undefined;
   let fiveHourSession: FiveHourSession | undefined;
@@ -304,6 +306,8 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     weekStartOf: ms => (resets.length === 0 ? startOfDay(isoWeekStart(ms, timeZone), timeZone) : weekStartFor(ms, resets)),
   });
 
+  const limitsInput = { costBetween, dataStart: first, now, plan, planHistory, snapshots };
+
   return {
     activity,
     breakdown,
@@ -316,15 +320,16 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     fiveHourCalibration,
     fiveHourSession,
     generatedAt: nowIso,
-    limits: buildLimits({ costBetween, dataStart: first, now, plan, planHistory, snapshots }),
+    limits: buildLimits(limitsInput),
     limitThreshold,
+    multipliers: buildMultipliers(limitsInput),
     plan,
+    planFit: buildPlanFitInput({ calibrationK: calibration?.k, fiveHourK: fiveHourCalibration?.k, plan, planHistory, sessionWindows, weekHistory }),
     planHistory,
     planSource: (planHistory.findLast(period => Date.parse(period.from) <= now) ?? planHistory[0])?.source,
     sessions,
     throttleMinutes: input.throttleMinutes ?? 15,
     timeZone,
-    typical,
     unknownModels,
     weekHistory,
     weekly,

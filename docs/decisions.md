@@ -261,6 +261,31 @@ are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,
 and fixed blocks ignore DST. The Overview's "Past weeks" card was removed: the
 tab shows the same windows with more.
 
+## Plans tab: best plan by verdict, Opus as Sonnet at today's price
+
+Each plan gets one verdict from the finished weeks among the last 12 windows
+and the 5-hour sessions that started in them, converted with the advertised multipliers: **fits** (never at 100%,
+busiest week at least half the limit), **close** (1 or 2 weeks over, and at most
+a tenth of the sessions), **too small**, **too big** (never over, busiest week
+under half). The best plan ranks fits, close, too big, too small, then fewer
+weeks over, fewer sessions over, lower price: a plan that fits everything but
+is too big is only suggested when nothing better exists, and close beats too
+big because paying double to avoid one week at the limit is rarely right. The
+50% bound and the other thresholds are named constants in `core/planFit.ts`.
+
+The Opus-to-Sonnet what-if re-prices each message's tokens at the newest Sonnet
+price (the work as it would run today, not on the Sonnet of its own
+generation). Each week and session carries `shift`, the share of its cost saved
+if all Opus ran on Sonnet, so any share between 0 and 1 is linear and the
+browser recomputes it without a server round trip. It assumes limits scale with
+API price across models, the least certain for Opus versus Sonnet.
+
+A week that reached 100% on the current plan, or a session whose reading hit the
+limit threshold, only shows 100: its demand is `max(100, k × cost)` when
+calibrated, otherwise the capped 100 as a lower bound. A week that was capped on
+a previous plan and a session estimated from transcripts (already capped at 100)
+are not lifted.
+
 ## Accepted risks: append-only transcripts, non-atomic lock on Docker
 
 The scan resumes each transcript from its stored byte offset and never checks

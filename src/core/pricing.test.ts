@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { UsageRecord } from './types.ts';
 
-import { costParts, messageCost, priceFor } from './pricing.ts';
+import { costParts, messageCost, priceFor, sonnetSaving } from './pricing.ts';
 
 const base: UsageRecord = {
   cacheRead: 1_000_000,
@@ -51,5 +51,22 @@ describe('costParts', () => {
 
   it('is undefined for unknown models', () => {
     expect(costParts({ ...base, model: 'claude-unknown-9' })).toBeUndefined();
+  });
+});
+
+describe('sonnetSaving', () => {
+  it('is the Opus cost minus the same tokens at the newest Sonnet price', () => {
+    // Sonnet 5.5: 2 input + 10 output + 2.5 (1.25× write) + 4 (2× write) + 0.2 read = 18.7, against Opus 5.5's 37.2.
+    expect(sonnetSaving(base)).toBeCloseTo(18.5);
+  });
+
+  it('drops the fast-mode surcharge, which Sonnet does not have', () => {
+    expect(sonnetSaving({ ...base, speed: 'fast' })).toBeCloseTo(74.4 - 18.7);
+  });
+
+  it('is zero for other families and unknown models', () => {
+    expect(sonnetSaving({ ...base, model: 'claude-sonnet-5-5' })).toBe(0);
+    expect(sonnetSaving({ ...base, model: 'claude-haiku-4-5-20251001' })).toBe(0);
+    expect(sonnetSaving({ ...base, model: 'claude-opus-9' })).toBe(0);
   });
 });

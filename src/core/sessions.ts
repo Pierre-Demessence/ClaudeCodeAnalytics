@@ -3,7 +3,7 @@ import type { Snapshot, UsageRecord } from './types.ts';
 import { dayKey, startOfDay } from './aggregate.ts';
 import { sessionProjects } from './breakdown.ts';
 import { DAY_MS, FIVE_HOURS_MS, HOUR_MS } from './calibration.ts';
-import { messageCost } from './pricing.ts';
+import { messageCost, sonnetSaving } from './pricing.ts';
 import { median } from './stats.ts';
 
 /** 5-hour % from which a window counts as spent: a new agent run would stop almost at once. */
@@ -24,6 +24,8 @@ export interface FiveHourWindow {
   peakEstimated?: true;
   /** By cost, highest first. */
   projects: { name: string; path: string; cost: number }[];
+  /** Share of the cost saved if all Opus ran on Sonnet; absent without cost. */
+  shift?: number;
   /** `reading`: placed by a reading's reset time; `estimated`: opened by the first message after the previous window. */
   source: 'reading' | 'estimated';
   /** ISO. */
@@ -55,12 +57,13 @@ interface Building {
   messages: number;
   peak?: number;
   projects: Map<string, { name: string; path: string; cost: number }>;
+  saving: number;
   source: FiveHourWindow['source'];
   start: number;
 }
 
 function newWindow(start: number, end: number, source: Building['source']): Building {
-  return { cost: 0, end, messages: 0, projects: new Map(), source, start };
+  return { cost: 0, end, messages: 0, projects: new Map(), saving: 0, source, start };
 }
 
 /** `SessionsInput` without the time zone: `fiveHourWindows` is not cut to the last 7 local days. */
@@ -115,6 +118,7 @@ export function fiveHourWindows({ k, limitThreshold, now, records, snapshots }: 
     entry.cost += cost;
     window.projects.set(project.path, entry);
     window.cost += cost;
+    window.saving += sonnetSaving(record);
     window.messages++;
   }
 
@@ -132,6 +136,7 @@ export function fiveHourWindows({ k, limitThreshold, now, records, snapshots }: 
         peak,
         peakEstimated: w.source === 'estimated' && peak !== undefined ? true : undefined,
         projects: [...w.projects.values()].sort((a, b) => b.cost - a.cost),
+        shift: w.cost > 0 ? w.saving / w.cost : undefined,
         source: w.source,
         start: new Date(w.start).toISOString(),
       };

@@ -45,12 +45,8 @@ export interface CostParts {
   output: number;
 }
 
-/** Cost per token kind; undefined when the model has no price. */
-export function costParts(record: UsageRecord): CostParts | undefined {
-  const price = priceFor(record.model);
-  if (!price)
-    return undefined;
-  const usd = (tokens: number, perMillion: number) => tokens * perMillion / 1_000_000 * (record.speed === 'fast' ? FAST_MODE : 1);
+function partsAt(record: UsageRecord, price: ModelPrice, fast: boolean): CostParts {
+  const usd = (tokens: number, perMillion: number) => tokens * perMillion / 1_000_000 * (fast ? FAST_MODE : 1);
   return {
     cacheRead: usd(record.cacheRead, price.cacheRead),
     cacheWrite1h: usd(record.cacheWrite1h, price.input * CACHE_WRITE_1H),
@@ -60,10 +56,33 @@ export function costParts(record: UsageRecord): CostParts | undefined {
   };
 }
 
+const totalOf = (parts: CostParts) => parts.input + parts.output + parts.cacheWrite5m + parts.cacheWrite1h + parts.cacheRead;
+
+/** Cost per token kind; undefined when the model has no price. */
+export function costParts(record: UsageRecord): CostParts | undefined {
+  const price = priceFor(record.model);
+  return price && partsAt(record, price, record.speed === 'fast');
+}
+
 /** API-equivalent cost in USD; `known` is false when the model has no price. */
 export function messageCost(record: UsageRecord): { cost: number; known: boolean } {
   const parts = costParts(record);
   if (!parts)
     return { cost: 0, known: false };
-  return { cost: parts.input + parts.output + parts.cacheWrite5m + parts.cacheWrite1h + parts.cacheRead, known: true };
+  return { cost: totalOf(parts), known: true };
+}
+
+/** The Sonnet an Opus message is re-priced at: what the same work costs today. */
+const SONNET_MODEL = 'claude-sonnet-5-5';
+
+/**
+ * API-equivalent dollars saved if an Opus message had run on Sonnet instead
+ * (same tokens, no fast-mode surcharge, which Sonnet lacks); 0 for any other model.
+ */
+export function sonnetSaving(record: UsageRecord): number {
+  const sonnet = priceFor(SONNET_MODEL);
+  if (!record.model.startsWith('claude-opus-') || !sonnet)
+    return 0;
+  const parts = costParts(record);
+  return parts ? totalOf(parts) - totalOf(partsAt(record, sonnet, false)) : 0;
 }

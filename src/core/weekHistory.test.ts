@@ -198,3 +198,19 @@ describe('stats', () => {
     expect(stats.medianCost).toBe(20);
   });
 });
+
+describe('shift', () => {
+  const sonnet = (ms: number) => rec(ms, { model: 'claude-sonnet-5-5' });
+
+  it('is the share of the cost saved if Opus ran on Sonnet', () => {
+    // $20 of Opus 5.5 output would cost $10 on Sonnet 5.5; a $10 Sonnet message stays.
+    const { weeks: rows } = weeks({ records: [rec(weekStart(1) + DAY_MS), sonnet(weekStart(1) + DAY_MS)], snapshots: [snap(1)] });
+    expect(rows[0]!.shift).toBeCloseTo(10 / 30);
+  });
+
+  it('is zero without Opus and absent without cost', () => {
+    const { weeks: rows } = weeks({ records: [sonnet(weekStart(2) + DAY_MS)], snapshots: [snap(1)] });
+    expect(rows.find(w => w.start === iso(weekStart(2)))!.shift).toBe(0);
+    expect(rows.find(w => w.start === iso(weekStart(1)))!.shift).toBeUndefined();
+  });
+});

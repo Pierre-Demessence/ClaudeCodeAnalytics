@@ -18,6 +18,9 @@ export function planAt(history: readonly PlanPeriod[], ts: string): Plan {
   return active;
 }
 
+/** List price in USD per month (monthly billing, checked 2026-10-03). */
+export const PLAN_PRICES: Record<Plan, number> = { max20: 200, max5: 100, pro: 20 };
+
 /** The same absolute usage, expressed as a % of another plan's limit. */
 export function convertPercent(percent: number, from: Plan, to: Plan): number {
   return percent * PLAN_MULTIPLIERS[from] / PLAN_MULTIPLIERS[to];

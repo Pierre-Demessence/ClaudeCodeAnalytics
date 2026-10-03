@@ -140,17 +140,3 @@ describe('overview', () => {
     expect(screen.getByRole('img', { name: /Weekly usage so far/ })).toBeTruthy();
   });
 });
-
-describe('plan equivalents', () => {
-  afterEach(cleanup);
-
-  const typical = { byPlan: { max20: 2.75, max5: 11, pro: 55 }, high: 60, low: 52, max: 100, median: 55, min: 50, weeks: 10 };
-
-  it('converts the typical week to each plan, striping plans it overflows', () => {
-    render(<Overview summary={summary(null, { plan: 'max5', typical: { ...typical, byPlan: { max20: 25, max5: 100 * 1.0, pro: 500 } } })} />, { wrapper: TipProvider });
-    expect(screen.getByText('(current)').closest('li')!.textContent).toContain('Max 5×');
-    expect(tipOf(screen.getByText('≈ 500%'))).toContain('ranged');
-    expect(document.querySelector('.plan-bar.over')).toBeTruthy();
-    expect(screen.getByText('over the limit (bar capped at 100%)')).toBeTruthy();
-  });
-});
