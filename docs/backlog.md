@@ -15,8 +15,6 @@ that completes it.
 - Per-model weekly limits (`seven_day_opus` / `seven_day_sonnet` in the endpoint response) if a plan ever reports them.
 - Weekday-aware daily usage (weekends differ) for the forecast.
 - Cost per git branch (`UsageRecord.gitBranch`); the Breakdown tab only shows each conversation's main branch.
-- Git worktrees (`X.worktrees\<branch>`) count as separate projects in the Breakdown (`core/breakdown.ts` `projectOf`), named after the branch folder; they could merge into their main repository.
 - Test the advertised plan multipliers (5×, 20×): the same ratio as the Calibration tab's drift chart, compared across a plan switch (a week before and after). Drift itself covers only the current plan.
 - claude.ai vs Claude Code split per week from `claudeCodeShare` (only feeds the fit today). Design board: `Split.dc.html`.
 - What-if simulator: final % of a week with another model mix (e.g. Opus as Sonnet) or another plan, from pricing and calibration. Design board: `WhatIf.dc.html`.
-- The 5-hour forecast's session pace (`summary.ts` `sessionPaces`) still uses the transcript-only `sessionCosts`; the reading-anchored windows of `core/sessions.ts` would give truer boundaries.

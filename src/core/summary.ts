@@ -11,7 +11,7 @@ import type { Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './typ
 import type { WeekHistory } from './weekHistory.ts';
 
 import { buildActivity } from './activity.ts';
-import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts, startOfDay } from './aggregate.ts';
+import { aggregate, createCostIndex, dailyCostSeries, dayKey, startOfDay } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { forecastWindow } from './forecast.ts';
@@ -19,7 +19,7 @@ import { buildLimits } from './limits.ts';
 import { weekPacing } from './pacing.ts';
 import { convertPercent, planAt, planFromSubscription, PLANS } from './plans.ts';
 import { priceFor } from './pricing.ts';
-import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows } from './sessions.ts';
+import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
 import { buildWeekHistory } from './weekHistory.ts';
 
@@ -176,8 +176,9 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const dailyCosts = typicalFrom <= yesterday
     ? dailyCostSeries(records, timeZone, typicalFrom, yesterday).map(d => d.cost)
     : [];
-  // Average $/hour of each recent session, idle time included, like the zero days in `dailyCosts`.
-  const sessionPaces = sessionCosts(records, now - TYPICAL_DAYS * DAY_MS, now, FIVE_HOURS_MS).map(cost => cost / 5);
+  const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
+  const sessionWindows = fiveHourWindows({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots });
+  const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
 
   const weeks = weeklyShares(snapshots, costBetween, calibration && { k: calibration.k, plan }, planHistory, now);
   const typicalBase = typicalWeek(weeks, plan);
@@ -202,7 +203,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
         fiveHourSession.forecast = forecastWindow({
           asOf: k !== undefined ? now : readAt,
           k,
-          paceSamples: sessionPaces,
+          paceSamples,
           resetsAt: Date.parse(latest.fiveHourResetsAt),
           sampleMs: HOUR_MS,
           used: fiveHourSession.estimatedNow ?? fiveHour,
@@ -290,7 +291,6 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();
 
   const activity = buildActivity({ chartFrom, now, records, timeZone, weekStart });
-  const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
   const sessions = buildSessions({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots, timeZone });
   const weekHistory = buildWeekHistory({
     calibrationK: calibration?.k,
@@ -298,7 +298,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     now,
     plan,
     records,
-    sessionWindows: fiveHourWindows({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots }),
+    sessionWindows,
     shares: weeks,
     snapshots,
     weekStartOf: ms => (resets.length === 0 ? startOfDay(isoWeekStart(ms, timeZone), timeZone) : weekStartFor(ms, resets)),

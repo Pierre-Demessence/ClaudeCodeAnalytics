@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { UsageRecord } from './types.ts';
 
-import { aggregate, createCostIndex, dailyCostSeries, dayKey, sessionCosts } from './aggregate.ts';
+import { aggregate, createCostIndex, dailyCostSeries, dayKey } from './aggregate.ts';
 
 function rec(ts: string, model = 'claude-opus-5-5', output = 1_000_000): UsageRecord {
   return { cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, input: 0, key: ts + model, model, output, project: 'p', ts };
@@ -51,21 +51,5 @@ describe('dailyCostSeries', () => {
       { cost: 0, day: '2026-10-02' },
       { cost: 20, day: '2026-10-03' },
     ]);
-  });
-});
-
-describe('sessionCosts', () => {
-  const H = 3_600_000;
-  const t = (iso: string) => Date.parse(iso);
-
-  it('groups messages into 5-hour sessions opened by the first message after the last one closed', () => {
-    const records = ['2026-10-01T08:00:00Z', '2026-10-01T12:59:00Z', '2026-10-01T13:00:00Z', '2026-10-01T20:00:00Z'].map(ts => rec(ts));
-    // 08:00–13:00 holds two messages; 13:00 opens a new session; 20:00 is still open at `to`.
-    expect(sessionCosts(records, t('2026-10-01T00:00:00Z'), t('2026-10-01T22:00:00Z'), 5 * H)).toEqual([40, 20]);
-  });
-
-  it('skips sessions that started before `from`', () => {
-    const records = [rec('2026-10-01T08:00:00Z'), rec('2026-10-01T10:00:00Z')];
-    expect(sessionCosts(records, t('2026-10-01T09:00:00Z'), t('2026-10-02T00:00:00Z'), 5 * H)).toEqual([]);
   });
 });

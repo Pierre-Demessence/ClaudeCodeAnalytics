@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { SessionsInput } from './sessions.ts';
 import type { Snapshot, UsageRecord } from './types.ts';
 
-import { buildSessions } from './sessions.ts';
+import { buildSessions, fiveHourWindows, sessionPaces } from './sessions.ts';
 
 /** $20 of Opus 5.5 output by default. */
 function rec(ts: string, extra: Partial<UsageRecord> = {}): UsageRecord {
@@ -133,5 +133,26 @@ describe('range and details', () => {
 
   it('has no medians without windows', () => {
     expect(sessions([]).stats).toEqual({ capped: 0, count: 0, medianCost: undefined, medianPeak: undefined });
+  });
+});
+
+describe('sessionPaces', () => {
+  const input = { limitThreshold: 95, now: Date.parse('2026-10-03T12:00:00Z') };
+
+  it('cuts sessions where the readings put the windows, not where messages suggest', () => {
+    // A reading says the window ran 12:00–17:00: the 11:00 message belongs to an earlier window.
+    const records = [rec('2026-10-02T11:00:00Z'), rec('2026-10-02T13:00:00Z')];
+    const snapshots = [snap('2026-10-02T14:00:00Z', '2026-10-02T17:00:00.000Z', 20)];
+    const windows = fiveHourWindows({ ...input, records, snapshots });
+    // $20 over 5 hours each; guessing from messages alone would give one $40 session.
+    expect(sessionPaces(windows, 0)).toEqual([4, 4]);
+  });
+
+  it('leaves out windows in progress, without messages, or before `from`', () => {
+    const records = [rec('2026-10-01T08:00:00Z'), rec('2026-10-03T10:00:00Z')];
+    const snapshots = [snap('2026-10-02T12:00:00Z', '2026-10-02T15:00:00.000Z', 5)];
+    const windows = fiveHourWindows({ ...input, records, snapshots });
+    expect(sessionPaces(windows, Date.parse('2026-10-02T00:00:00Z'))).toEqual([]);
+    expect(sessionPaces(windows, 0)).toEqual([4]);
   });
 });
