@@ -56,8 +56,13 @@ Run lint, test and build before considering work done.
 - Icons: Lucide (`lucide-react`), `aria-hidden` next to their text; never
   text symbols (✓ ! ▲ ⓘ) or emoji.
 - Charts: never color alone. Each model family has a fixed color slot and an
-  SVG pattern (`dashboard/models.ts`, `Patterns.tsx`); metrics carry `title`
-  tooltips.
+  SVG pattern (`dashboard/models.ts`, `Patterns.tsx`).
+- Tooltips: never the `title` attribute (slow to appear, absent on touch).
+  Use `useTip()` (`dashboard/useTip.ts`; `TipProvider` in `Tip.tsx` owns the
+  bubble), which works on hover, focus and tap, for chart value readouts and
+  the full text of shortened names. Explain a metric only when its meaning
+  isn't obvious, through visible helper text or an `InfoTip` icon; plain
+  labels, headers and subtitles get no tooltip.
 
 ## Invariants
 

@@ -8,10 +8,19 @@ import type { Bucket } from '@/dashboard/usageData';
 import { DAY_MS, HOUR_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
 import { formatUsd } from '@/dashboard/format';
+import { TipProvider } from '@/dashboard/Tip';
 import { Usage } from '@/dashboard/Usage';
 import { UsageTooltip } from '@/dashboard/UsageChart';
 
 const NOW = Date.now();
+
+/** The tooltip text `el` shows when focused. */
+function tipOf(el: Element): string {
+  fireEvent.focus(el);
+  const text = screen.getByRole('tooltip').textContent ?? '';
+  fireEvent.blur(el);
+  return text;
+}
 
 /** $20 of Opus 5.5 output by default. */
 function rec(ago: number, extra: Partial<UsageRecord> = {}): UsageRecord {
@@ -49,20 +58,22 @@ describe('usage tab', () => {
   it('names the busiest hour and gives every cell a tooltip', () => {
     const at = new Date(NOW - DAY_MS);
     at.setUTCHours(14, 30);
-    render(<Usage summary={summary([rec(NOW - at.getTime()), rec(2 * DAY_MS, { output: 100_000 })])} />);
+    render(<Usage summary={summary([rec(NOW - at.getTime()), rec(2 * DAY_MS, { output: 100_000 })])} />, { wrapper: TipProvider });
     const heatmap = card('When you work');
     const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][at.getUTCDay()];
-    expect(within(heatmap).getByTitle(/^Hour with the highest/).textContent).toBe(`Busiest: ${weekday} 14:00–15:00`);
-    expect(within(heatmap).getAllByTitle(/per day on average$/)).toHaveLength(7 * 24);
+    expect(heatmap.querySelector('.heatmap-busiest')!.textContent).toBe(`Busiest: ${weekday} 14:00–15:00`);
+    const cells = heatmap.querySelectorAll('.heatmap-cells .heat-cell');
+    expect(cells).toHaveLength(7 * 24);
+    expect(tipOf(cells[0]!)).toMatch(/^Mon 00:00 · .+ per day on average$/);
   });
 
   it('shows this week\'s cache figures and flags poor days', () => {
     // Whole days apart, so the two days never merge whatever the time of the run.
-    render(<Usage summary={summary([rec(DAY_MS, { cacheRead: 900_000, input: 100_000 }), rec(2 * DAY_MS, { cacheRead: 100, input: 900 })])} />);
+    render(<Usage summary={summary([rec(DAY_MS, { cacheRead: 900_000, input: 100_000 }), rec(2 * DAY_MS, { cacheRead: 100, input: 900 })])} />, { wrapper: TipProvider });
     const cache = card('Cache efficiency');
-    expect(within(cache).getByTitle(/^Share of input tokens/).textContent).toBe('90%input from cache');
-    const bars = within(cache).getAllByTitle(/of input from cache$/);
-    expect(bars.map(bar => [bar.title.endsWith(': 10% of input from cache'), bar.classList.contains('poor')])).toEqual([[true, true], [false, false]]);
+    expect(within(cache).getByText('input from cache').previousElementSibling!.textContent).toBe('90%');
+    const bars = [...cache.querySelectorAll('.cache-bars .mini-bar')].filter(bar => tipOf(bar).endsWith('of input from cache'));
+    expect(bars.map(bar => [tipOf(bar).endsWith(': 10% of input from cache'), bar.classList.contains('poor')])).toEqual([[true, true], [false, false]]);
   });
 
   it('lists the outliers with their cause, and the total count', () => {

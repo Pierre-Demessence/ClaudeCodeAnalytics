@@ -1169,7 +1169,8 @@ details .table {
 }
 
 /* Usage tab: the heatmap uses one hue in steps; flagged bars are hatched, not just recolored. */
-.chart-tooltip {
+.chart-tooltip,
+.tip {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1177,18 +1178,34 @@ details .table {
   font-size: 0.85rem;
 }
 
+/* The shared tooltip bubble (Tip.tsx), placed by script against the viewport. */
+.tip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  max-width: min(320px, calc(100vw - 16px));
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+  color: var(--text-primary);
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.tip ul,
 .chart-tooltip ul {
   margin: 4px 0 0;
   padding: 0;
   list-style: none;
 }
 
+.tip li,
 .chart-tooltip li {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
+.tip li span,
 .chart-tooltip li span {
   margin-left: auto;
   padding-left: 16px;
@@ -1468,4 +1485,21 @@ details .table {
   .outlier-table td:nth-child(3) {
     grid-column: 1 / -1;
   }
+}
+
+/* An info icon next to a label: opens a tooltip with its definition. */
+button.info-tip {
+  display: inline-grid;
+  place-items: center;
+  margin-left: 4px;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-secondary);
+  vertical-align: -2px;
+}
+
+button.info-tip:hover {
+  color: var(--text-primary);
 }

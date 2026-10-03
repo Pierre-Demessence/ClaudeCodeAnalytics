@@ -13,7 +13,9 @@ import { formatDateTime, formatPercent, formatRelative, formatResets } from '@/d
 import { Meter } from '@/dashboard/Meter';
 import { PacingChart } from '@/dashboard/PacingChart';
 import { PastWeeks, PlanEquivalents } from '@/dashboard/PastWeeks';
+import { InfoTip } from '@/dashboard/Tip';
 import { useNow } from '@/dashboard/useNow';
+import { useTip } from '@/dashboard/useTip';
 import { limitVerdict } from '@/dashboard/verdict';
 
 /** Readings older than this get a warning icon by the number. */
@@ -75,35 +77,32 @@ interface LimitCardProps {
   estimated: boolean;
   forecast?: WindowForecast;
   /** ISO time or ms. */
+  now: number;
   resetsAt: number | string;
   roomPerDay?: number;
   title: string;
   used: number;
   warning?: ReactNode;
-  /** Tooltip of the meter. */
-  meterTitle: string;
-  now: number;
   window: 'fiveHour' | 'week';
 }
 
-function LimitCard({ estimated, forecast, meterTitle, now, resetsAt, roomPerDay, title, used, warning, window }: LimitCardProps) {
+function LimitCard({ estimated, forecast, now, resetsAt, roomPerDay, title, used, warning, window }: LimitCardProps) {
+  const tip = useTip();
   const verdict = limitVerdict({ forecast, now, resetsAt, roomPerDay, used, window });
   return (
     <section className={`card limit-card card-${verdict.kind}`}>
       <div className="limit-head">
         <h2>{title}</h2>
-        <span className="limit-resets" title={`Resets ${formatDateTime(resetsAt)}`}>{`resets ${formatResets(resetsAt, now)}`}</span>
+        <span className="limit-resets" {...tip(`Resets ${formatDateTime(resetsAt)}`)}>{`resets ${formatResets(resetsAt, now)}`}</span>
       </div>
       <div className="limit-number-row">
-        <span
-          className={warning ? 'limit-number dim' : 'limit-number'}
-          title={estimated ? 'Last reading plus the usage seen in transcripts since.' : 'Usage at the last reading, as shown by /usage.'}
-        >
+        <span className={warning ? 'limit-number dim' : 'limit-number'}>
           {`${estimated ? '≈ ' : ''}${formatPercent(used)}`}
         </span>
+        {estimated && <InfoTip label="About this estimate">Last reading plus the usage seen in transcripts since.</InfoTip>}
         {warning && <EstimateWarning>{warning}</EstimateWarning>}
       </div>
-      <Meter estimated={estimated} forecast={forecast} title={meterTitle} used={used} />
+      <Meter estimated={estimated} forecast={forecast} used={used} />
       <VerdictBox detail={verdict.detail} kind={verdict.kind} title={verdict.title} />
     </section>
   );
@@ -166,7 +165,6 @@ export function Overview({ summary }: { summary: Summary }) {
               <LimitCard
                 estimated={current.estimatedNow !== undefined}
                 forecast={current.forecast}
-                meterTitle="Weekly limit used so far, the projection at reset with its likely range, and the 100 % limit."
                 now={now}
                 resetsAt={current.resetsAt}
                 roomPerDay={current.pacing.roomPerDay}
@@ -197,7 +195,6 @@ export function Overview({ summary }: { summary: Summary }) {
               <LimitCard
                 estimated={fiveHour.fiveHourEstimatedNow !== undefined}
                 forecast={fiveHour.fiveHourForecast}
-                meterTitle="5-hour session limit used so far, the projection at reset with its likely range, and the 100 % limit."
                 now={now}
                 resetsAt={fiveHourResetsAt!}
                 title="5-hour session"

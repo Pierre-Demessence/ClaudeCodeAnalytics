@@ -11,6 +11,7 @@ import { PatternDefs } from '@/dashboard/Patterns';
 import { SettingsPanel } from '@/dashboard/SettingsPanel';
 import { useTab } from '@/dashboard/tabs';
 import { useTheme } from '@/dashboard/theme';
+import { TipProvider } from '@/dashboard/Tip';
 import { Usage } from '@/dashboard/Usage';
 
 const RELOAD_MS = 5 * 60_000;
@@ -52,7 +53,7 @@ export function App() {
   }, [run]);
 
   return (
-    <>
+    <TipProvider>
       <PatternDefs />
       <Header
         busy={busy}
@@ -87,6 +88,6 @@ export function App() {
             )
           : !error && <p className="empty">Loading…</p>}
       </main>
-    </>
+    </TipProvider>
   );
 }

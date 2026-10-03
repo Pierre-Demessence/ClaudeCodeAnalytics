@@ -60,12 +60,7 @@ export function UsageChart({ summary }: { summary: Summary }) {
     <section className="card">
       <div className="card-head">
         <h2>{period === 'day' ? 'Daily usage by model' : 'Weekly usage by model'}</h2>
-        <span
-          className="card-subtitle"
-          title={metric === 'cost'
-            ? 'What this usage would cost at public API prices. It weights models and cache use the way plan limits roughly do.'
-            : 'All token kinds, including cache reads, which are cheap but numerous.'}
-        >
+        <span className="card-subtitle">
           {period === 'day' ? `last 35 days, ${unit}` : `per weekly window, ${unit}`}
         </span>
         <span className="card-head-spacer" />

@@ -2,6 +2,7 @@ import type { Activity } from '@/core/activity';
 
 import { formatDateTime, formatUsd } from '@/dashboard/format';
 import { causeText } from '@/dashboard/usageData';
+import { useTip } from '@/dashboard/useTip';
 
 const BIN_LABELS = ['<1¢', '1–3¢', '3–10¢', '10–30¢', '30¢–$1', '$1–3', '$3–10', '>$10'];
 
@@ -12,6 +13,7 @@ const logHeight = (count: number, max: number) => (count > 0 ? Math.max(2, Math.
 export function MessageCostCard({ messageCost }: { messageCost: Activity['messageCost'] }) {
   const { bins, outlierCount, outliers } = messageCost;
   const max = Math.max(...bins);
+  const tip = useTip();
 
   return (
     <section className="card">
@@ -25,7 +27,7 @@ export function MessageCostCard({ messageCost }: { messageCost: Activity['messag
             <>
               <div className="cost-bins" role="img" aria-label={`Messages per cost range this week: ${bins.map((n, i) => `${BIN_LABELS[i]} ${n}`).join(', ')}`}>
                 {bins.map((count, i) => (
-                  <div className="cost-bin" key={BIN_LABELS[i]} title={`${count} messages costing ${BIN_LABELS[i]}`}>
+                  <div className="cost-bin" key={BIN_LABELS[i]} {...tip(`${count} messages costing ${BIN_LABELS[i]}`)}>
                     <span>{count}</span>
                     <span className="mini-bar" style={{ height: `${logHeight(count, max) * 0.85}%` }} />
                   </div>
@@ -45,7 +47,7 @@ export function MessageCostCard({ messageCost }: { messageCost: Activity['messag
                           {outliers.map(o => (
                             <tr key={`${o.ts}|${o.path}|${o.cost}`}>
                               <td>{formatDateTime(o.ts)}</td>
-                              <td title={o.path}>{o.name}</td>
+                              <td {...tip(o.path)}>{o.name}</td>
                               <td className="secondary">{causeText(o)}</td>
                               <td><strong>{formatUsd(o.cost)}</strong></td>
                             </tr>

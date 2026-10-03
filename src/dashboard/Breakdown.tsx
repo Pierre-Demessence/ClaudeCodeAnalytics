@@ -6,8 +6,10 @@ import type { Series } from '@/dashboard/models';
 
 import { formatDateTime, formatDollars, formatDuration, formatPercent } from '@/dashboard/format';
 import { familyOf, SERIES } from '@/dashboard/models';
-import { Legend } from '@/dashboard/Patterns';
+import { Legend, Swatch } from '@/dashboard/Patterns';
+import { InfoTip } from '@/dashboard/Tip';
 import { Toggle } from '@/dashboard/Toggle';
+import { useTip } from '@/dashboard/useTip';
 
 const PERIODS: [BreakdownPeriod, string][] = [['week', 'This week'], ['fourWeeks', 'Last 4 weeks'], ['all', 'All time']];
 
@@ -33,10 +35,22 @@ function familySplit(byModel: Record<string, number>): { cost: number; series: S
 
 /** A bar split by model family, each part filled with its family's pattern. */
 function ModelBar({ byModel, width = 100 }: { byModel: Record<string, number>; width?: number }) {
+  const tip = useTip();
   const parts = familySplit(byModel);
   const description = parts.map(p => `${p.series.label} ${formatDollars(p.cost)}`).join(', ');
+  const details = (
+    <ul>
+      {parts.map(({ cost, series }) => (
+        <li key={series.family}>
+          <Swatch series={series} />
+          {series.label}
+          <span>{formatDollars(cost)}</span>
+        </li>
+      ))}
+    </ul>
+  );
   return (
-    <span className="model-bar" role="img" aria-label={description} style={{ width: `${width}%` }} title={description}>
+    <span className="model-bar" role="img" aria-label={description} style={{ width: `${width}%` }} {...tip(details)}>
       {parts.map(({ cost, series }) => (
         <svg aria-hidden="true" key={series.family} style={{ flexGrow: cost }}>
           <rect fill={`url(#${series.pattern})`} height="100%" width="100%" />
@@ -48,10 +62,11 @@ function ModelBar({ byModel, width = 100 }: { byModel: Record<string, number>; w
 
 /** Rows of label, bar and % of `total`. */
 function ShareBars({ rows, total }: { rows: { cost: number; label: string; title?: string }[]; total: number }) {
+  const tip = useTip();
   return (
     <ul className="share-bars">
       {rows.map(row => (
-        <li key={row.label} title={`${formatDollars(row.cost)}${row.title ? ` (${row.title})` : ''}`}>
+        <li key={row.label} {...tip(`${formatDollars(row.cost)}${row.title ? ` (${row.title})` : ''}`)}>
           <span>{row.label}</span>
           <span className="share-track"><span className="share-fill" style={{ width: `${percentOf(row.cost, total)}%` }} /></span>
           <strong>{formatPercent(percentOf(row.cost, total))}</strong>
@@ -69,13 +84,14 @@ export function Breakdown({ summary }: { summary: Summary }) {
   const weeklyPercent = period === 'week' && current ? current.estimatedNow ?? current.weekly : undefined;
   const effortTotal = effort.reduce((sum, e) => sum + e.cost, 0);
   const largestProject = projects[0]?.cost ?? 0;
+  const tip = useTip();
   const families = new Set(projects.flatMap(p => familySplit(p.byModel).map(part => part.series.family)));
 
   return (
     <>
       <div className="breakdown-controls">
         <Toggle label="Period" onChange={setPeriod} options={PERIODS} value={period} />
-        <span className="breakdown-total" title="API-equivalent cost of all Claude Code messages in the period">
+        <span className="breakdown-total">
           {'Total '}
           <strong>{formatDollars(total.cost)}</strong>
           {weeklyPercent !== undefined && ` · ${current?.estimatedNow !== undefined ? '≈ ' : ''}${formatPercent(weeklyPercent)} of the weekly limit`}
@@ -95,18 +111,18 @@ export function Breakdown({ summary }: { summary: Summary }) {
                         <th scope="col">Project</th>
                         <th scope="col">Cost by model</th>
                         <th scope="col">Cost</th>
-                        <th scope="col" title="Share of the period's total cost">Share</th>
-                        <th scope="col" title="Share of input tokens read from the prompt cache">Cache</th>
+                        <th scope="col">Share</th>
+                        <th scope="col">Cache</th>
                       </tr>
                     </thead>
                     <tbody>
                       {projects.map(project => (
                         <tr key={project.path}>
-                          <th scope="row" title={project.path}>{project.name}</th>
+                          <th scope="row" {...tip(project.path)}>{project.name}</th>
                           <td className="project-bar"><ModelBar byModel={project.byModel} width={percentOf(project.cost, largestProject)} /></td>
                           <td><strong>{formatDollars(project.cost)}</strong></td>
-                          <td title="Share of the period's total cost">{formatPercent(percentOf(project.cost, total.cost))}</td>
-                          <td className="secondary" title="Share of input tokens read from the prompt cache">{formatPercent(project.cacheShare * 100)}</td>
+                          <td>{formatPercent(percentOf(project.cost, total.cost))}</td>
+                          <td className="secondary">{formatPercent(project.cacheShare * 100)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -122,13 +138,13 @@ export function Breakdown({ summary }: { summary: Summary }) {
                       <span className="agent-sub" style={{ flexGrow: agents.subagents }} />
                     </span>
                     <p className="agent-labels">
-                      <span title="Cost of the messages written by the main conversation">
+                      <span>
                         <span className="legend-swatch agent-main" />
                         {'Main '}
                         <strong>{formatPercent(percentOf(agents.main, total.cost))}</strong>
                         {` · ${formatDollars(agents.main)}`}
                       </span>
-                      <span title="Cost of the messages written by subagents (Task, Explore, …)">
+                      <span>
                         <span className="legend-swatch agent-sub" />
                         {'Subagents '}
                         <strong>{formatPercent(percentOf(agents.subagents, total.cost))}</strong>
@@ -143,10 +159,10 @@ export function Breakdown({ summary }: { summary: Summary }) {
                     {effort.length === 0
                       ? <p className="note">No effort level recorded in this period.</p>
                       : <ShareBars rows={effort.map(e => ({ cost: e.cost, label: EFFORTS[e.level] ?? e.level }))} total={effortTotal} />}
-                    <p className="note" title="Share of output tokens spent on extended thinking, subagents included">
+                    <p className="note">
                       {'Thinking is '}
                       <strong>{formatPercent(breakdown.thinkingShare * 100)}</strong>
-                      {' of output tokens.'}
+                      {' of output tokens, subagents included.'}
                     </p>
                   </section>
 
@@ -171,10 +187,13 @@ export function Breakdown({ summary }: { summary: Summary }) {
                       <tr>
                         <th scope="col">Conversation</th>
                         <th scope="col">Started</th>
-                        <th scope="col" title="From the first to the last message in the period">Duration</th>
+                        <th scope="col">Duration</th>
                         <th scope="col">Messages</th>
-                        <th scope="col" title="Cost split by model family">Models</th>
-                        <th scope="col" title="Share of the conversation's cost spent by subagents">Subagents</th>
+                        <th scope="col">Models</th>
+                        <th scope="col">
+                          Subagents
+                          <InfoTip label="About subagents">Share of the conversation's cost spent by subagents.</InfoTip>
+                        </th>
                         <th scope="col">Cost</th>
                       </tr>
                     </thead>
@@ -183,7 +202,7 @@ export function Breakdown({ summary }: { summary: Summary }) {
                         const place = c.branch ? `${c.name} · ${c.branch}` : c.name;
                         return (
                           <tr key={c.sessionId}>
-                            <th scope="row" title={c.path}>
+                            <th scope="row" {...tip(c.path)}>
                               {c.title ?? place}
                               {c.title && <small>{place}</small>}
                             </th>

@@ -4,6 +4,7 @@ import type { WeekPacing } from '@/core/pacing';
 import { DAY_MS } from '@/core/calibration';
 import { formatDateTime, formatDollars, formatPercent, formatWeekday } from '@/dashboard/format';
 import { scaleMax } from '@/dashboard/scale';
+import { InfoTip } from '@/dashboard/Tip';
 
 // Plot area inside the 1000 × 240 view box; labels use the margins.
 const LEFT = 44;
@@ -35,6 +36,11 @@ export function PacingChart({ forecast, now, pacing, usedNow }: Props) {
   const nowY = y(usedNow);
   // Early in the week there is no room left of now for the "actual" label.
   const labelBefore = nowX - LEFT > 120;
+  // Usage only grows, so the actual line stays under the dot and the label above it is clear, except
+  // for the limit line when usage nears 100%: then the label goes just above that line. Its text spans
+  // about 14 units above its baseline.
+  const limitAboveDot = nowY - y(100);
+  const labelY = limitAboveDot > 2 && limitAboveDot < 26 ? y(100) - 6 : nowY - 8;
   const actual = points.map(p => `${x(p.at)},${y(p.percent)}`).join(' ');
   // "even pace" sits under its line three quarters of the way, clear of the limit line above.
   const evenAt = 0.75;
@@ -46,15 +52,15 @@ export function PacingChart({ forecast, now, pacing, usedNow }: Props) {
         <span className="card-subtitle">{`${formatDateTime(from)} → ${formatDateTime(to)}`}</span>
         <span className="card-head-spacer" />
         {roomPerDay !== undefined && usedNow < 100 && (
-          <span
-            className="pacing-room"
-            title={`API-equivalent dollars per day you can use from now on and still end the week at 100%.${spentPerDay === undefined ? '' : ` So far this week you used ${formatDollars(spentPerDay)}/day.`}`}
-          >
+          <span className="pacing-room">
             Room left:
             {' '}
             <strong>{`≈ ${formatDollars(roomPerDay)}/day`}</strong>
             {' '}
             to reach 100% at reset
+            <InfoTip label="About room left">
+              {`API-equivalent dollars per day you can use from now on and still end the week at 100%.${spentPerDay === undefined ? '' : ` So far this week you used ${formatDollars(spentPerDay)}/day.`}`}
+            </InfoTip>
           </span>
         )}
       </div>
@@ -81,7 +87,7 @@ export function PacingChart({ forecast, now, pacing, usedNow }: Props) {
           <line className="pacing-now" x1={nowX} x2={nowX} y1={TOP + 4} y2={BOTTOM} />
           <text className="pacing-label-strong" x={nowX + 4} y={BOTTOM - 4}>now</text>
           <circle className="pacing-dot" cx={nowX} cy={nowY} r="5" />
-          <text className="pacing-value" textAnchor={labelBefore ? 'end' : 'start'} x={labelBefore ? nowX - 8 : nowX + 8} y={nowY - 8}>{`actual ${formatPercent(usedNow)}`}</text>
+          <text className="pacing-value" textAnchor={labelBefore ? 'end' : 'start'} x={labelBefore ? nowX - 8 : nowX + 8} y={labelY}>{`actual ${formatPercent(usedNow)}`}</text>
           {forecast && <text className="pacing-value" x={RIGHT + 6} y={y(forecast.median) + 4}>{formatPercent(forecast.median)}</text>}
         </svg>
       </div>

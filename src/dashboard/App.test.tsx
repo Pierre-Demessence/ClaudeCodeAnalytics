@@ -56,7 +56,7 @@ describe('app', () => {
     expect(screen.getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
     // 95 % after 4 days: the trend fallback crosses the cap before reset.
     expect(screen.getByText(/^Likely to hit the limit/)).toBeTruthy();
-    expect(screen.getByTitle(/Plan in effect now/).textContent).toBe('Pro');
+    expect(document.querySelector('.plan-badge')!.textContent).toBe('Pro');
   });
 
   it('switches tabs with the URL hash', async () => {

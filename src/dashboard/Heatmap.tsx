@@ -2,6 +2,7 @@ import type { Activity } from '@/core/activity';
 
 import { formatUsd } from '@/dashboard/format';
 import { heatStep } from '@/dashboard/usageData';
+import { useTip } from '@/dashboard/useTip';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_MS = 86_400_000;
@@ -11,6 +12,7 @@ const hour = (h: number) => `${String(h % 24).padStart(2, '0')}:00`;
 /** Average cost per weekday and hour, in one hue so it reads without color vision. */
 export function Heatmap({ heatmap }: { heatmap: Activity['heatmap'] }) {
   const { cells, from, to } = heatmap;
+  const tip = useTip();
   let max = 0;
   let busiest: [number, number] | undefined;
   cells.forEach((row, day) => row.forEach((value, h) => {
@@ -29,7 +31,7 @@ export function Heatmap({ heatmap }: { heatmap: Activity['heatmap'] }) {
         <span className="card-subtitle">{`average cost per weekday and hour, ${days >= 28 ? 'last 4 weeks' : `last ${days} days`}`}</span>
         <span className="card-head-spacer" />
         {busiestText && (
-          <span className="heatmap-busiest" title={`Hour with the highest average cost over the last ${days >= 28 ? '4 weeks' : `${days} days`}`}>
+          <span className="heatmap-busiest">
             {'Busiest: '}
             <strong>{busiestText}</strong>
           </span>
@@ -46,7 +48,7 @@ export function Heatmap({ heatmap }: { heatmap: Activity['heatmap'] }) {
                     <div className="heatmap-cells">
                       {row.map((value, h) => (
                         // eslint-disable-next-line react/no-array-index-key -- the hour is the cell's identity
-                        <span className={`heat-cell heat-${heatStep(value, max)}`} key={h} title={`${WEEKDAYS[day]} ${hour(h)} · ${formatUsd(value)} per day on average`} />
+                        <span className={`heat-cell heat-${heatStep(value, max)}`} key={h} {...tip(`${WEEKDAYS[day]} ${hour(h)} · ${formatUsd(value)} per day on average`, { focusable: false })} />
                       ))}
                     </div>
                   </div>

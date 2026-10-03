@@ -104,22 +104,25 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
             </p>
           )}
           {planHistory.length > 0 && (
-            <ul className="plain-list" title="Each reading is judged against the plan active when it was taken.">
-              {planHistory.map((period, index) => (
-                <li key={period.from}>
-                  {`${PLAN_LABELS[period.plan]} ${periodStart(period.from)} (${period.source})`}
-                  {' '}
-                  <button
-                    aria-label={`Remove ${PLAN_LABELS[period.plan]} ${periodStart(period.from)}`}
-                    disabled={busy}
-                    onClick={() => void onSaveSettings({ planHistory: planHistory.filter((_, i) => i !== index) })}
-                    type="button"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="note">Each reading is judged against the plan active when it was taken.</p>
+              <ul className="plain-list">
+                {planHistory.map((period, index) => (
+                  <li key={period.from}>
+                    {`${PLAN_LABELS[period.plan]} ${periodStart(period.from)} (${period.source})`}
+                    {' '}
+                    <button
+                      aria-label={`Remove ${PLAN_LABELS[period.plan]} ${periodStart(period.from)}`}
+                      disabled={busy}
+                      onClick={() => void onSaveSettings({ planHistory: planHistory.filter((_, i) => i !== index) })}
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
           <form className="inline-form" onSubmit={addPlanPeriod}>
             <label>
@@ -169,13 +172,13 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
             <dd>
               <EndpointStatus summary={summary} />
             </dd>
-            <dt title="When the collector last ran (Claude Code hook or dashboard).">Last run</dt>
+            <dt>Last run</dt>
             <dd>{status.lastRunAt ? formatRelative(status.lastRunAt) : 'never'}</dd>
-            <dt title="Deduplicated assistant messages imported from Claude Code transcripts.">Messages imported</dt>
+            <dt>Messages imported</dt>
             <dd>{status.messages ?? 0}</dd>
             {(status.malformedLines ?? 0) > 0 && (
               <>
-                <dt title="Transcript lines that are not valid JSON; they are skipped.">Malformed lines</dt>
+                <dt>Malformed lines</dt>
                 <dd>{status.malformedLines}</dd>
               </>
             )}
@@ -202,17 +205,23 @@ export function SettingsPanel({ busy, onAddReading, onSaveSettings, summary }: P
           {calibration
             ? (
                 <dl className="facts">
-                  <dt title="How much of the weekly limit $1 of API-equivalent Claude Code usage consumes, fitted on your readings.">% per $1</dt>
+                  <dt>% per $1</dt>
                   <dd>{calibration.k.toFixed(2)}</dd>
-                  <dt title="Equivalently: API-equivalent dollars per 1 % of the weekly limit.">$ per 1 %</dt>
+                  <dt>$ per 1 %</dt>
                   <dd>{(1 / calibration.k).toFixed(2)}</dd>
-                  <dt title="Readings used for the fit (current plan only; readings under 5% are too coarse).">Readings</dt>
+                  <dt>Readings</dt>
                   <dd>{calibration.n}</dd>
-                  <dt title="Typical gap between the fit and the readings, in percentage points. Large values mean the projection is rough.">Typical error</dt>
+                  <dt>Typical error</dt>
                   <dd>{`±${calibration.rmse.toFixed(1)} pts`}</dd>
                 </dl>
               )
             : <p className="note">Needs at least 3 readings of 5% or more on the current plan.</p>}
+          {calibration && (
+            <p className="note">
+              Fitted on your readings of 5% or more on the current plan: % per $1 is how much of the weekly limit $1 of API-equivalent usage consumes.
+              Typical error is the usual gap between the fit and the readings; large values mean the projection is rough.
+            </p>
+          )}
           {summary.unknownModels.length > 0 && (
             <p className="status-bad">
               <CircleAlert aria-hidden="true" className="icon-inline" size={16} />

@@ -11,7 +11,7 @@ describe('meter', () => {
 
   it('labels segments inside and the range under its bracket', () => {
     const { container } = render(
-      <Meter estimated={false} forecast={{ high: 93, low: 76, median: 84, method: 'calibrated' }} measure={measure} title="t" used={62} />,
+      <Meter estimated={false} forecast={{ high: 93, low: 76, median: 84, method: 'calibrated' }} measure={measure} used={62} />,
     );
     expect(container.querySelector('.meter-fill')?.textContent).toBe('used 62%');
     expect(container.querySelector('.meter-projection')?.textContent).toBe('projected 84%');
@@ -21,14 +21,14 @@ describe('meter', () => {
 
   it('marks the part past the limit', () => {
     const { container } = render(
-      <Meter estimated={false} forecast={{ high: 131, low: 104, median: 118, method: 'calibrated' }} measure={measure} title="t" used={81} />,
+      <Meter estimated={false} forecast={{ high: 131, low: 104, median: 118, method: 'calibrated' }} measure={measure} used={81} />,
     );
     expect(container.querySelector('.meter-over')?.textContent).toBe('+18%');
     expect(container.querySelector('.meter-outside')?.textContent).toBe('projected 118%');
   });
 
   it('labels an empty used segment above the bar', () => {
-    const { container } = render(<Meter estimated={false} measure={measure} title="t" used={0} />);
+    const { container } = render(<Meter estimated={false} measure={measure} used={0} />);
     expect(container.querySelector('.meter-outside')?.textContent).toBe('used 0%');
   });
 });

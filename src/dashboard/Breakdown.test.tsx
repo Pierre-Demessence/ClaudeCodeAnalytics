@@ -7,8 +7,17 @@ import type { Summary } from '@/dashboard/api';
 import { DAY_MS, HOUR_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
 import { Breakdown } from '@/dashboard/Breakdown';
+import { TipProvider } from '@/dashboard/Tip';
 
 const NOW = Date.now();
+
+/** The tooltip text `el` shows when focused. */
+function tipOf(el: Element): string {
+  fireEvent.focus(el);
+  const text = screen.getByRole('tooltip').textContent ?? '';
+  fireEvent.blur(el);
+  return text;
+}
 
 /** $20 of Opus 5.5 output by default. */
 function rec(ago: number, extra: Partial<UsageRecord> = {}): UsageRecord {
@@ -45,12 +54,12 @@ describe('breakdown', () => {
   ];
 
   it('shows this week by default, with its share of the weekly limit', () => {
-    render(<Breakdown summary={summary(records)} />);
+    render(<Breakdown summary={summary(records)} />, { wrapper: TipProvider });
     expect(screen.getByRole('button', { name: 'This week' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByText(/^Total/).textContent).toBe('Total $45 · 42% of the weekly limit');
     const projects = within(card('By project')).getAllByRole('row').slice(1);
     expect(projects.map(row => row.querySelector('th')!.textContent)).toEqual(['app', 'other']);
-    expect(within(projects[0]!).getByTitle('s:\\Dev\\app')).toBeTruthy();
+    expect(tipOf(projects[0]!.querySelector('th')!)).toBe('s:\\Dev\\app');
   });
 
   it('switches period without the weekly limit', () => {

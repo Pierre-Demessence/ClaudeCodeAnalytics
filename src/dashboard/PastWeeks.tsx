@@ -5,6 +5,7 @@ import type { Summary } from '@/dashboard/api';
 import { WEEK_MS } from '@/core/calibration';
 import { convertPercent, PLAN_LABELS, PLANS } from '@/core/plans';
 import { formatDay, formatPercent } from '@/dashboard/format';
+import { useTip } from '@/dashboard/useTip';
 
 /** Weeks shown in "Past weeks", newest first. */
 const PAST_WEEKS = 8;
@@ -14,6 +15,7 @@ const HitIcon = () => <TriangleAlert aria-hidden="true" className="icon-inline i
 /** Final weekly % of the last completed weeks, on the current plan, against the typical week. */
 export function PastWeeks({ summary }: { summary: Summary }) {
   const { plan, typical, weeks } = summary;
+  const tip = useTip();
   const rows = weeks.slice(-PAST_WEEKS).reverse().map((week) => {
     const percent = convertPercent(week.percent, week.plan, plan);
     return { estimated: week.estimated, hit: percent >= 100, percent, start: Date.parse(week.resetsAt) - WEEK_MS };
@@ -40,13 +42,10 @@ export function PastWeeks({ summary }: { summary: Summary }) {
                         style={{ width: `${Math.min(row.percent, 100)}%` }}
                       />
                       {typical && (
-                        <span className="week-typical" style={{ left: `${Math.min(typical.median, 100)}%` }} title={`Typical week: ${formatPercent(typical.median)}`} />
+                        <span className="week-typical" style={{ left: `${Math.min(typical.median, 100)}%` }} {...tip(`Typical week: ${formatPercent(typical.median)}`)} />
                       )}
                     </span>
-                    <span
-                      className="week-value"
-                      title={row.estimated ? 'Extended from a reading taken more than 12 h before reset.' : 'Last reading before reset.'}
-                    >
+                    <span className="week-value">
                       <strong>{formatPercent(row.percent)}</strong>
                       {row.estimated && ' est.'}
                       {row.hit && <HitIcon />}
@@ -81,6 +80,7 @@ export function PastWeeks({ summary }: { summary: Summary }) {
 /** The typical week converted to each plan with the advertised multipliers. */
 export function PlanEquivalents({ summary }: { summary: Summary }) {
   const { plan, typical } = summary;
+  const tip = useTip();
   if (!typical)
     return null;
   const anyOver = PLANS.some(p => typical.byPlan[p] > 100);
@@ -99,7 +99,7 @@ export function PlanEquivalents({ summary }: { summary: Summary }) {
                   {PLAN_LABELS[p]}
                   {p === plan && <small> (current)</small>}
                 </span>
-                <strong title={`Typical week on ${PLAN_LABELS[p]}; your weeks ranged ${range}.`}>{`${p === plan ? '' : '≈ '}${formatPercent(percent)}`}</strong>
+                <strong {...tip(`Typical week on ${PLAN_LABELS[p]}; your weeks ranged ${range}.`)}>{`${p === plan ? '' : '≈ '}${formatPercent(percent)}`}</strong>
               </span>
               <span className="plan-track">
                 <span className={percent > 100 ? 'plan-bar over' : 'plan-bar'} style={{ width: `${Math.min(percent, 100)}%` }} />

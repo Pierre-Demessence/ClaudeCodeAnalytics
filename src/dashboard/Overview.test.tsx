@@ -7,9 +7,18 @@ import type { Summary } from '@/dashboard/api';
 import { DAY_MS, HOUR_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
 import { Overview } from '@/dashboard/Overview';
+import { TipProvider } from '@/dashboard/Tip';
 
 const NOW = Date.now();
 const RESETS = new Date(NOW + 3 * DAY_MS).toISOString();
+
+/** The tooltip text `el` shows when focused. */
+function tipOf(el: Element): string {
+  fireEvent.focus(el);
+  const text = screen.getByRole('tooltip').textContent ?? '';
+  fireEvent.blur(el);
+  return text;
+}
 
 /** A summary with a current week built from `current`; `null` for none. */
 function summary(current: Partial<CurrentWeek> | null = {}, extra: Partial<Summary> = {}): Summary {
@@ -98,9 +107,18 @@ describe('overview', () => {
   });
 
   it('shows the daily room left in the pacing chart when calibrated', () => {
-    render(<Overview summary={summary({ pacing: { from: NOW - 4 * DAY_MS, points: [], roomPerDay: 46, spentPerDay: 31, to: NOW + 3 * DAY_MS } })} />);
-    const room = screen.getByText('≈ $46/day').parentElement!;
-    expect(room.title).toContain('$31/day');
+    render(<Overview summary={summary({ pacing: { from: NOW - 4 * DAY_MS, points: [], roomPerDay: 46, spentPerDay: 31, to: NOW + 3 * DAY_MS } })} />, { wrapper: TipProvider });
+    expect(screen.getByText('≈ $46/day')).toBeTruthy();
+    expect(tipOf(screen.getByRole('button', { name: 'About room left' }))).toContain('$31/day');
+  });
+
+  it('moves the actual label above the limit line when that line would cross it', () => {
+    render(<Overview summary={summary({ weekly: 95 })} />);
+    const label = screen.getByText('actual 95%');
+    expect(Number(label.getAttribute('y'))).toBeLessThan(Number(document.querySelector('.pacing-limit')!.getAttribute('y1')));
+    cleanup();
+    render(<Overview summary={summary()} />);
+    expect(Number(screen.getByText('actual 40%').getAttribute('y'))).toBeLessThan(Number(document.querySelector('.pacing-dot')!.getAttribute('cy')));
   });
 
   it('hides the room left without a calibration', () => {
@@ -122,14 +140,16 @@ describe('past weeks', () => {
   const typical = { byPlan: { max20: 2.75, max5: 11, pro: 55 }, high: 60, low: 52, max: 100, median: 55, min: 50, weeks: 10 };
 
   it('lists the last 8 weeks, newest first, with the typical marker, hits and estimates', () => {
-    render(<Overview summary={summary(null, { typical, weeks })} />);
+    render(<Overview summary={summary(null, { typical, weeks })} />, { wrapper: TipProvider });
     const rows = screen.getAllByText(/^Week of /);
     expect(rows).toHaveLength(8);
     const values = [...document.querySelectorAll('.week-value strong')].map(el => el.textContent);
     expect(values.slice(0, 3)).toEqual(['59%', '100%', '57%']);
     expect(document.querySelector('.week-bar.hit')).toBeTruthy();
     expect(document.querySelector('.week-bar.estimated')).toBeTruthy();
-    expect(screen.getAllByTitle('Typical week: 55%')).toHaveLength(8);
+    const markers = document.querySelectorAll('.week-typical');
+    expect(markers).toHaveLength(8);
+    expect(tipOf(markers[0]!)).toBe('Typical week: 55%');
   });
 
   it('says when no week is complete', () => {
@@ -138,9 +158,9 @@ describe('past weeks', () => {
   });
 
   it('converts the typical week to each plan, striping plans it overflows', () => {
-    render(<Overview summary={summary(null, { plan: 'max5', typical: { ...typical, byPlan: { max20: 25, max5: 100 * 1.0, pro: 500 } } })} />);
+    render(<Overview summary={summary(null, { plan: 'max5', typical: { ...typical, byPlan: { max20: 25, max5: 100 * 1.0, pro: 500 } } })} />, { wrapper: TipProvider });
     expect(screen.getByText('(current)').closest('li')!.textContent).toContain('Max 5×');
-    expect(screen.getByText('≈ 500%').getAttribute('title')).toContain('ranged');
+    expect(tipOf(screen.getByText('≈ 500%'))).toContain('ranged');
     expect(document.querySelector('.plan-bar.over')).toBeTruthy();
     expect(screen.getByText('over the limit (bar capped at 100%)')).toBeTruthy();
   });

@@ -7,6 +7,7 @@ import type { WindowForecast } from '@/core/forecast';
 import type { Measure } from '@/dashboard/meterLayout';
 
 import { CAP_LABEL, meterLayout, meterTexts, overText } from '@/dashboard/meterLayout';
+import { useTip } from '@/dashboard/useTip';
 
 /** Track width and label widths, measured in the browser. */
 function useMeasure(texts: readonly string[]): { measure: Measure; measureRef: RefObject<HTMLDivElement | null>; trackRef: RefObject<HTMLDivElement | null> } {
@@ -40,7 +41,6 @@ interface MeterProps {
   forecast?: WindowForecast;
   /** Widths to use instead of measuring, for tests (jsdom has no layout). */
   measure?: Measure;
-  title: string;
   used: number;
 }
 
@@ -63,14 +63,15 @@ function LabelText({ over, text }: { over: boolean; text: string }) {
  * limit, bracket = likely range. Labels sit inside their segment or, when it
  * is too narrow, on the row above the bar.
  */
-export function Meter({ estimated, forecast, measure: fixed, title, used }: MeterProps) {
+export function Meter({ estimated, forecast, measure: fixed, used }: MeterProps) {
+  const tip = useTip();
   const input = { estimated, high: forecast?.high, low: forecast?.low, median: forecast?.median, used };
   const texts = meterTexts(input);
   const over = overText(forecast?.median);
   const measured = useMeasure(texts);
   const layout = meterLayout(input, fixed ?? measured.measure);
   return (
-    <div className="meter" title={title}>
+    <div className="meter">
       <div className="meter-labels">
         {layout.outside.map(label => (
           <span className={label.key === 'over' ? 'meter-outside meter-outside-over' : 'meter-outside'} key={label.key} style={{ left: label.left }}>
@@ -104,9 +105,14 @@ export function Meter({ estimated, forecast, measure: fixed, title, used }: Mete
               <div
                 className="meter-range"
                 style={{ left: pct(layout.range.left), width: pct(layout.range.width) }}
-                title="Likely range: projection with a quieter (25th percentile) and a busier (75th percentile) pace than usual."
               />
-              <span className="meter-range-label" style={{ left: layout.range.labelLeft }}>{layout.range.label}</span>
+              <span
+                className="meter-range-label"
+                style={{ left: layout.range.labelLeft }}
+                {...tip('Likely range: projection with a quieter (25th percentile) and a busier (75th percentile) pace than usual.')}
+              >
+                {layout.range.label}
+              </span>
             </>
           )}
           {layout.capLabel?.row === 'bottom' && <span className="meter-cap-label" style={{ left: layout.capLabel.left }}>{CAP_LABEL}</span>}
