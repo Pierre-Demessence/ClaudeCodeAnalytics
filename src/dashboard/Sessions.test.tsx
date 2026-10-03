@@ -53,6 +53,7 @@ describe('sessions tab', () => {
     const rows = within(card('Session list')).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(2);
     expect(rows[0]!.textContent).toContain('in progress');
+    expect(card('5-hour sessions, last 7 days').querySelectorAll('.session-label .wk-now')).toHaveLength(1);
     expect(rows[0]!.textContent).toContain('tool');
     expect(rows[1]!.textContent).toContain('97%');
     expect(rows[1]!.querySelector('.session-peak-bar.capped')).toBeTruthy();

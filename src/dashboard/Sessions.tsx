@@ -102,6 +102,7 @@ function Timeline({ summary }: { summary: Summary }) {
                             <span className="session-label">
                               {window.capped && <CappedIcon size={12} />}
                               {peakText(window)}
+                              {window.inProgress && <span className="wk-now">now</span>}
                             </span>
                           )}
                         </div>

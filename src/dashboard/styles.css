@@ -1593,6 +1593,12 @@ button.info-tip:hover {
   white-space: nowrap;
 }
 
+.session-label .wk-now {
+  margin-left: 5px;
+  padding: 0 5px;
+  font-size: 0.65rem;
+}
+
 .session-label .icon-inline {
   margin-right: 2px;
 }
