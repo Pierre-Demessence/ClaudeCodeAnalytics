@@ -539,8 +539,14 @@ small {
 .limit-number-row {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+.limit-active {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
 }
 
 .limit-number {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Snapshot, UsageRecord } from './types.ts';
 
-import { DAY_MS } from './calibration.ts';
+import { DAY_MS, HOUR_MS } from './calibration.ts';
 import { buildSummary, weekStartFor } from './summary.ts';
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
@@ -202,6 +202,26 @@ describe('buildSummary', () => {
     // Past sessions: one $20 record each, so $4/hour × 0.5 %/$ × 3 hours left = 6 points.
     expect(summary.fiveHourSession?.forecast).toMatchObject({ method: 'calibrated' });
     expect(summary.fiveHourSession?.forecast?.median).toBeCloseTo(36);
+  });
+
+  it('gives the active use left at the usual active pace', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    // $60 over 20 active minutes: $180 per active hour.
+    const today = [at('10:00'), at('10:10'), at('10:20')].map(ts => rec(ts));
+    const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';
+    // Both windows: 10 % per $20 record.
+    const snapshots = [['10:05', 10], ['10:15', 20], ['10:25', 30]].map(([time, percent]) =>
+      snap(at(time as string), percent as number, RESET, { fiveHour: percent as number, fiveHourResetsAt }));
+    // An old record, outside the 4-week pace, so the weekly window counts as fully imported.
+    const old = rec(NOW - 40 * DAY_MS);
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [old, ...today], snapshots, timeZone: 'UTC' });
+
+    const k = summary.fiveHourCalibration?.k;
+    expect(k).toBeDefined();
+    expect(summary.fiveHourSession?.activeLeftMs).toBeCloseTo((100 - 30) / k! / 180 * HOUR_MS);
+    const weeklyK = summary.calibration?.k;
+    expect(weeklyK).toBeDefined();
+    expect(summary.current?.activeLeftMs).toBeCloseTo((100 - 30) / weeklyK! / 180 * HOUR_MS);
   });
 
   it('lists the 5-hour windows, estimated peaks from the 5-hour calibration', () => {

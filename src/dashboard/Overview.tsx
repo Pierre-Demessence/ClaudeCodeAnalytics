@@ -8,7 +8,7 @@ import type { Summary } from '@/dashboard/api';
 
 import { FIVE_HOURS_MS } from '@/core/calibration';
 import { endpointResultText } from '@/dashboard/endpoint';
-import { formatCountdown, formatDateTime, formatPercent, formatRelative } from '@/dashboard/format';
+import { formatCountdown, formatDateTime, formatDuration, formatPercent, formatRelative } from '@/dashboard/format';
 import { Meter } from '@/dashboard/Meter';
 import { PacingChart } from '@/dashboard/PacingChart';
 import { InfoTip } from '@/dashboard/Tip';
@@ -48,6 +48,8 @@ function EstimateWarning({ children }: { children: ReactNode }) {
 }
 
 interface LimitCardProps {
+  /** Active use (ms) left before the limit, shown next to the number. */
+  activeLeftMs?: number;
   /** Number dimmed with a warning icon explaining why it is an estimate. */
   estimated: boolean;
   forecast?: WindowForecast;
@@ -61,7 +63,7 @@ interface LimitCardProps {
   window: 'fiveHour' | 'week';
 }
 
-function LimitCard({ estimated, forecast, now, resetsAt, roomPerDay, title, used, warning, window }: LimitCardProps) {
+function LimitCard({ activeLeftMs, estimated, forecast, now, resetsAt, roomPerDay, title, used, warning, window }: LimitCardProps) {
   const tip = useTip();
   const verdict = limitVerdict({ forecast, now, resetsAt, roomPerDay, used, window });
   return (
@@ -76,6 +78,7 @@ function LimitCard({ estimated, forecast, now, resetsAt, roomPerDay, title, used
         </span>
         {estimated && <InfoTip label="About this estimate">Last reading plus the usage seen in transcripts since.</InfoTip>}
         {warning && <EstimateWarning>{warning}</EstimateWarning>}
+        {activeLeftMs !== undefined && <span className="limit-active">{`≈ ${formatDuration(activeLeftMs)} of active use left`}</span>}
       </div>
       <Meter estimated={estimated} forecast={forecast} used={used} />
       <VerdictBox detail={verdict.detail} kind={verdict.kind} title={verdict.title} />
@@ -138,6 +141,7 @@ export function Overview({ summary }: { summary: Summary }) {
         {current
           ? (
               <LimitCard
+                activeLeftMs={current.activeLeftMs}
                 estimated={current.estimatedNow !== undefined}
                 forecast={current.forecast}
                 now={now}
@@ -168,6 +172,7 @@ export function Overview({ summary }: { summary: Summary }) {
         {fiveHour
           ? (
               <LimitCard
+                activeLeftMs={fiveHour.activeLeftMs}
                 estimated={fiveHour.estimatedNow !== undefined}
                 forecast={fiveHour.forecast}
                 now={now}

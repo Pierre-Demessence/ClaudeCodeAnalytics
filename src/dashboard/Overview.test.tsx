@@ -112,6 +112,16 @@ describe('overview', () => {
     expect(screen.getByText('No cap expected this session.')).toBeTruthy();
   });
 
+  it('shows the active use left next to each number, only when known', () => {
+    const fiveHourSession: FiveHourSession = { activeLeftMs: 50 * 60_000, percent: 30, readAt: new Date(NOW - HOUR_MS).toISOString(), resetsAt: new Date(NOW + 2 * HOUR_MS).toISOString() };
+    render(<Overview summary={summary({ activeLeftMs: 3.5 * HOUR_MS }, { fiveHourSession })} />);
+    expect(weeklyCard().textContent).toContain('≈ 3 h 30 min of active use left');
+    expect(screen.getByRole('heading', { name: '5-hour session' }).closest('section')!.textContent).toContain('≈ 50 min of active use left');
+    cleanup();
+    render(<Overview summary={summary()} />);
+    expect(screen.queryByText(/of active use left/)).toBeNull();
+  });
+
   it('shows the 5-hour session even without a current week', () => {
     const fiveHourSession: FiveHourSession = { percent: 30, readAt: new Date(NOW - HOUR_MS).toISOString(), resetsAt: new Date(NOW + 2 * HOUR_MS).toISOString() };
     render(<Overview summary={summary(null, { fiveHourSession })} />);

@@ -12,6 +12,7 @@ import type { WeekShare } from './share.ts';
 import type { Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
 import type { WeekHistory } from './weekHistory.ts';
 
+import { activeHourlyPace, activeTimeLeft } from './activePace.ts';
 import { buildActivity } from './activity.ts';
 import { aggregate, createCostIndex, dailyCostSeries, dayKey, startOfDay } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
@@ -53,6 +54,8 @@ export type BreakdownPeriod = 'week' | 'fourWeeks' | 'all';
 
 /** The 5-hour window of the latest reading, while that reading is still valid. */
 export interface FiveHourSession {
+  /** Active use (ms) left before the limit at the usual active pace; needs a 5-hour calibration. */
+  activeLeftMs?: number;
   /** % now, estimated from usage since the reading. */
   estimatedNow?: number;
   forecast?: WindowForecast;
@@ -65,6 +68,8 @@ export interface FiveHourSession {
 }
 
 export interface CurrentWeek {
+  /** Active use (ms) left before the limit at the usual active pace; needs a calibration. */
+  activeLeftMs?: number;
   /** Weekly % now, estimated from usage since a stale reading. */
   estimatedNow?: number;
   forecast?: WindowForecast;
@@ -185,6 +190,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
   const sessionWindows = fiveHourWindows({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots });
   const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
+  const activePace = activeHourlyPace(records, now - TYPICAL_DAYS * DAY_MS, now);
 
   const weeks = weeklyShares(snapshots, costBetween, calibration && { k: calibration.k, plan }, planHistory, now);
   const typicalBase = typicalWeek(weeks, plan);
@@ -212,6 +218,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
           windowMs: FIVE_HOURS_MS,
         });
       }
+      fiveHourSession.activeLeftMs = activeTimeLeft({ k: fiveHourCalibration?.k, pace: activePace, used: fiveHourSession.estimatedNow ?? fiveHour });
     }
 
     const latestReset = Date.parse(latest.weeklyResetsAt);
@@ -254,6 +261,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
 
       const resetsAtIso = new Date(resetsAt).toISOString();
       current = {
+        activeLeftMs: activeTimeLeft({ k: calibration?.k, pace: activePace, used: estimatedNow ?? used }),
         estimatedNow,
         forecast,
         readAt: latest.ts,

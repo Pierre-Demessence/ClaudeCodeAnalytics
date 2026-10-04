@@ -19,7 +19,8 @@ Everything stays on your machine. Data comes from two places:
 ## Features
 
 - Current weekly and 5-hour %, reset times, and for each window a projection
-  at reset with its likely range and the time the cap would be hit.
+  at reset with its likely range and the time the cap would be hit, plus the
+  active use left before the limit at your usual pace while working.
 - Budget pacing: this week's % against an even pace, and the daily spend left
   to reach 100% at reset.
 - The typical week, and its equivalent on Pro, Max 5× and Max 20×

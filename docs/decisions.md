@@ -93,6 +93,19 @@ rejected: a session only exists while working, so it would understate the
 pace. Every reading gets the usage since it added back, not only stale ones:
 15 minutes is 5% of a 5-hour window.
 
+## Active use left: pace per active hour, pauses over 15 minutes excluded
+
+The cap time of a forecast is wall-clock time at a pace that averages idle
+time in, so it does not say how much work is left. The limit cards also show
+the active use left: the % left, turned into dollars with the calibration,
+divided by the $ per active hour of the last 4 weeks. Active time is the sum of
+the gaps between consecutive messages up to 15 minutes, on one timeline across
+sessions since they share the limits; longer gaps are pauses. Counting every
+clock hour with a message was rejected: a single message would count a full
+hour and understate the pace. The cost of a burst's first message has no
+active time before it, which overstates the pace slightly; that errs toward
+less time left. Without a calibration, a % cannot become dollars: no value.
+
 ## Estimated weeks and stale readings
 
 A completed week whose last reading is more than 12 h before reset is extended
