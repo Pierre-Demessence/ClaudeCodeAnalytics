@@ -160,7 +160,11 @@ export function buildSessions({ timeZone, ...input }: SessionsInput): Sessions {
   const today = Date.parse(`${dayKey(input.now, timeZone)}T12:00:00Z`);
   const days = Array.from({ length: SESSION_DAYS }, (_, i) => new Date(today - i * DAY_MS).toISOString().slice(0, 10));
   const from = startOfDay(days.at(-1)!, timeZone);
-  const shown = fiveHourWindows(input).filter(w => Date.parse(w.end) > from);
+  // Drop windows where nothing happened: a reading recorded a reset time but no
+  // usage (0% or none) and no transcript message fell inside it.
+  const shown = fiveHourWindows(input)
+    .filter(w => Date.parse(w.end) > from)
+    .filter(w => w.messages > 0 || (w.peak ?? 0) > 0);
 
   const done = shown.filter(w => !w.inProgress);
   return {

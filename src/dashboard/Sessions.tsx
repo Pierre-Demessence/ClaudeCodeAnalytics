@@ -33,7 +33,7 @@ function Stats({ summary }: { summary: Summary }) {
         <strong>{stats.count}</strong>
         <span>
           sessions, last 7 days
-          <InfoTip label="About sessions">5-hour windows with a message or a reading in the last 7 days, the one in progress included.</InfoTip>
+          <InfoTip label="About sessions">5-hour windows with a message or a usage reading in the last 7 days, the one in progress included.</InfoTip>
         </span>
       </div>
       <div className="card">

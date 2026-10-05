@@ -37,7 +37,7 @@ describe('reading windows', () => {
   });
 
   it('has no peak without a 5-hour %, and manual readings anchor nothing', () => {
-    const { windows } = sessions([], [
+    const { windows } = sessions([rec('2026-10-02T08:00:00Z')], [
       snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z'),
       { fiveHour: 80, source: 'manual', ts: '2026-10-01T09:00:00Z', weekly: 10, weeklyResetsAt: '2026-10-08T00:00:00.000Z' },
     ]);
@@ -52,6 +52,19 @@ describe('reading windows', () => {
     // An estimate at 100% is not a reading.
     expect(sessions([rec('2026-10-01T09:00:00Z')], [], { k: 10 }).windows[0]).toMatchObject({ peak: 100, peakEstimated: true });
     expect(sessions([rec('2026-10-01T09:00:00Z')], [], { k: 10 }).windows[0]!.capped).toBeUndefined();
+  });
+});
+
+describe('empty windows', () => {
+  it('drops a reading window with no usage and no messages, keeps one with usage', () => {
+    // A reset time read at 0% with no transcript message inside is noise.
+    expect(sessions([], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 0)]).windows).toHaveLength(0);
+    // No 5-hour % at all and no message: also nothing happened.
+    expect(sessions([], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z')]).windows).toHaveLength(0);
+    // A reading with usage but no priced messages is claude.ai use: keep it.
+    expect(sessions([], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 40)]).windows).toHaveLength(1);
+    // A reading at 0% but with a message inside is real: keep it.
+    expect(sessions([rec('2026-10-02T08:00:00Z')], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 0)]).windows).toHaveLength(1);
   });
 });
 
