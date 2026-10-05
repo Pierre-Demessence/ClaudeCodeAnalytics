@@ -16,10 +16,27 @@ describe('timelineRows', () => {
     expect(rows.map(r => r.day)).toEqual(['2026-10-02', '2026-10-01']);
     const [after] = rows[0]!.parts;
     const [before] = rows[1]!.parts;
-    expect(before).toMatchObject({ isStart: true, left: 87.5 });
+    expect(before).toMatchObject({ continuesLeft: false, continuesRight: true, isStart: true, left: 87.5 });
     expect(before!.width).toBeCloseTo(12.5);
-    expect(after).toMatchObject({ isStart: false, left: 0 });
+    expect(after).toMatchObject({ continuesLeft: true, continuesRight: false, isStart: false, left: 0 });
     expect(after!.width).toBeCloseTo(100 / 12);
+  });
+
+  it('spreads one peak fill across a split window, filling pieces in order', () => {
+    // Paris is UTC+2: 19:25–00:25 local, a 5-hour window at 65%. The 3h15 fill
+    // lands inside the before-midnight piece, so the 25-minute one stays empty.
+    const window = win('2026-10-01T17:25:00.000Z', '2026-10-01T22:25:00.000Z', { peak: 65 });
+    const rows = timelineRows([window], ['2026-10-02', '2026-10-01'], 'Europe/Paris');
+    const [after] = rows[0]!.parts;
+    const [before] = rows[1]!.parts;
+    // Before-midnight piece is 275 of the 300 minutes; 195 min (65%) fill it 70.9%.
+    expect(before!.fillWidth).toBeCloseTo(195 / 275 * 100);
+    expect(after!.fillWidth).toBe(0);
+  });
+
+  it('carries no fill without a peak, and a same-day window is not cut', () => {
+    const rows = timelineRows([win('2026-10-01T08:00:00.000Z', '2026-10-01T13:00:00.000Z')], ['2026-10-01'], 'UTC');
+    expect(rows[0]!.parts[0]).toMatchObject({ continuesLeft: false, continuesRight: false, fillWidth: undefined });
   });
 
   it('leaves out windows outside the day', () => {

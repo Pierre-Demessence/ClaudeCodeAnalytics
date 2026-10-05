@@ -6,6 +6,12 @@ import { formatPercent } from '@/dashboard/format';
 
 /** One window's piece on a day row, in % of the day. */
 export interface TimelinePart {
+  /** The window continues from the previous day: this piece's left edge is mid-window. */
+  continuesLeft: boolean;
+  /** The window continues onto the next day: this piece's right edge is mid-window. */
+  continuesRight: boolean;
+  /** The peak fill clipped to this piece, as a % of its width; absent without a peak. */
+  fillWidth?: number;
   /** The piece holding the window's start, which carries its label. */
   isStart: boolean;
   left: number;
@@ -15,6 +21,19 @@ export interface TimelinePart {
 
 const nextDay = (day: string) => new Date(Date.parse(`${day}T12:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
 
+/**
+ * The peak fill, one continuous bar of `peak%` across the whole window, clipped
+ * to one piece and returned as a % of that piece; undefined without a peak. A
+ * window split at midnight keeps a single fill: the later piece stays empty
+ * until the fill reaches it.
+ */
+function fillWithin(window: FiveHourWindow, begin: number, end: number, start: number, finish: number): number | undefined {
+  if (window.peak === undefined)
+    return undefined;
+  const fillEnd = start + Math.min(window.peak, 100) / 100 * (finish - start);
+  return Math.max(0, Math.min(end, fillEnd) - begin) / (end - begin) * 100;
+}
+
 /** Each day's window pieces; a window crossing midnight is split over both rows. */
 export function timelineRows(windows: readonly FiveHourWindow[], days: readonly string[], timeZone: string): { day: string; parts: TimelinePart[] }[] {
   return days.map((day) => {
@@ -22,11 +41,12 @@ export function timelineRows(windows: readonly FiveHourWindow[], days: readonly 
     const to = startOfDay(nextDay(day), timeZone);
     const parts = windows.flatMap((window) => {
       const start = Date.parse(window.start);
+      const finish = Date.parse(window.end);
       const begin = Math.max(start, from);
-      const end = Math.min(Date.parse(window.end), to);
+      const end = Math.min(finish, to);
       if (end <= begin)
         return [];
-      return [{ isStart: start >= from, left: (begin - from) / (to - from) * 100, width: (end - begin) / (to - from) * 100, window }];
+      return [{ continuesLeft: start < from, continuesRight: finish > to, fillWidth: fillWithin(window, begin, end, start, finish), isStart: start >= from, left: (begin - from) / (to - from) * 100, width: (end - begin) / (to - from) * 100, window }];
     });
     return { day, parts };
   });

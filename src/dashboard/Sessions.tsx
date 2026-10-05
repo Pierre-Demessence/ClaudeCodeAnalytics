@@ -90,14 +90,14 @@ function Timeline({ summary }: { summary: Summary }) {
                   <div className="session-row" key={row.day}>
                     <span className="session-day">{formatSessionDay(row.day)}</span>
                     <div className="session-track">
-                      {row.parts.map(({ isStart, left, width, window }) => (
+                      {row.parts.map(({ continuesLeft, continuesRight, fillWidth, isStart, left, width, window }) => (
                         <div
-                          className={`session-block ${window.source}`}
+                          className={`session-block ${window.source}${continuesLeft ? ' cut-left' : ''}${continuesRight ? ' cut-right' : ''}`}
                           key={window.start}
                           style={{ left: `${left}%`, width: `${width}%` }}
                           {...tip(windowTip(window, timeZone))}
                         >
-                          {window.peak !== undefined && <span className={`session-fill${window.capped ? ' capped' : ''}`} style={{ width: `${Math.min(window.peak, 100)}%` }} />}
+                          {fillWidth !== undefined && <span className={`session-fill${window.capped ? ' capped' : ''}`} style={{ width: `${fillWidth}%` }} />}
                           {isStart && (
                             <span className="session-label">
                               {window.capped && <CappedIcon size={12} />}
