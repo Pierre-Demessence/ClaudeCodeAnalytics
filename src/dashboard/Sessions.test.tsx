@@ -77,6 +77,16 @@ describe('sessions tab', () => {
     expect(tipOf(block)).toBe('Fri 2 Oct · 06:00–11:00 · $20.00\n1 messages');
   });
 
+  it('dims the other windows while one is focused', () => {
+    renderTab(summary([rec(30 * HOUR_MS), rec(2 * HOUR_MS, { sessionId: 's2' })]));
+    const blocks = [...card('5-hour sessions, last 7 days').querySelectorAll('.session-block')];
+    expect(blocks).toHaveLength(2);
+    fireEvent.focus(blocks[0]!);
+    expect(blocks.map(block => block.classList.contains('dimmed'))).toEqual([false, true]);
+    fireEvent.blur(blocks[0]!);
+    expect(blocks.some(block => block.classList.contains('dimmed'))).toBe(false);
+  });
+
   it('shows more than two projects as "+n", all in the tooltip', () => {
     renderTab(summary(['a', 'b', 'c'].map((name, i) => rec(30 * HOUR_MS - i * 60_000, { cwd: `S:\\Dev\\${name}`, sessionId: name }))));
     const cell = within(card('Session list')).getByText(/\+1$/);

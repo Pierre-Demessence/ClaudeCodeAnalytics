@@ -1565,6 +1565,11 @@ button.info-tip:hover {
   border: 2px solid var(--series-1);
   border-radius: 4px;
   background: var(--surface-2);
+  transition: opacity 0.12s ease;
+}
+
+.session-block.dimmed {
+  opacity: 0.3;
 }
 
 .session-block.estimated {

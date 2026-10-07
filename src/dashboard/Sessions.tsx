@@ -1,4 +1,7 @@
+import type { FocusEvent, PointerEvent } from 'react';
+
 import { TriangleAlert } from 'lucide-react';
+import { useState } from 'react';
 
 import type { FiveHourWindow } from '@/core/sessions';
 import type { Summary } from '@/dashboard/api';
@@ -71,6 +74,8 @@ function Stats({ summary }: { summary: Summary }) {
 function Timeline({ summary }: { summary: Summary }) {
   const { sessions: { days, windows }, timeZone } = summary;
   const tip = useTip();
+  // The hovered or focused window's start; its block(s) stay lit while the rest dim.
+  const [active, setActive] = useState<string>();
   return (
     <section className="card">
       <div className="card-head">
@@ -90,23 +95,45 @@ function Timeline({ summary }: { summary: Summary }) {
                   <div className="session-row" key={row.day}>
                     <span className="session-day">{formatSessionDay(row.day)}</span>
                     <div className="session-track">
-                      {row.parts.map(({ continuesLeft, continuesRight, fillWidth, isStart, left, width, window }) => (
-                        <div
-                          className={`session-block ${window.source}${continuesLeft ? ' cut-left' : ''}${continuesRight ? ' cut-right' : ''}`}
-                          key={window.start}
-                          style={{ left: `${left}%`, width: `${width}%` }}
-                          {...tip(windowTip(window, timeZone))}
-                        >
-                          {fillWidth !== undefined && <span className={`session-fill${window.capped ? ' capped' : ''}`} style={{ width: `${fillWidth}%` }} />}
-                          {isStart && (
-                            <span className="session-label">
-                              {window.capped && <CappedIcon size={12} />}
-                              {peakText(window)}
-                              {window.inProgress && <span className="wk-now">now</span>}
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                      {row.parts.map(({ continuesLeft, continuesRight, fillWidth, isStart, left, width, window }) => {
+                        const tipProps = tip(windowTip(window, timeZone));
+                        const dimmed = active !== undefined && active !== window.start;
+                        return (
+                          <div
+                            className={`session-block ${window.source}${continuesLeft ? ' cut-left' : ''}${continuesRight ? ' cut-right' : ''}${dimmed ? ' dimmed' : ''}`}
+                            key={window.start}
+                            style={{ left: `${left}%`, width: `${width}%` }}
+                            {...tipProps}
+                            onBlur={(e: FocusEvent<Element>) => {
+                              tipProps.onBlur(e);
+                              setActive(undefined);
+                            }}
+                            onFocus={(e: FocusEvent<Element>) => {
+                              tipProps.onFocus(e);
+                              setActive(window.start);
+                            }}
+                            onPointerEnter={(e: PointerEvent<Element>) => {
+                              tipProps.onPointerEnter(e);
+                              if (e.pointerType === 'mouse')
+                                setActive(window.start);
+                            }}
+                            onPointerLeave={(e: PointerEvent<Element>) => {
+                              tipProps.onPointerLeave(e);
+                              if (e.pointerType === 'mouse')
+                                setActive(undefined);
+                            }}
+                          >
+                            {fillWidth !== undefined && <span className={`session-fill${window.capped ? ' capped' : ''}`} style={{ width: `${fillWidth}%` }} />}
+                            {isStart && (
+                              <span className="session-label">
+                                {window.capped && <CappedIcon size={12} />}
+                                {peakText(window)}
+                                {window.inProgress && <span className="wk-now">now</span>}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
