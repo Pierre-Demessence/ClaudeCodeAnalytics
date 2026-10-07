@@ -8,6 +8,8 @@ import { median } from './stats.ts';
 
 /** 5-hour % from which a window counts as spent: a new agent run would stop almost at once. */
 export const DEFAULT_LIMIT_THRESHOLD = 95;
+/** A window without Claude Code messages is shown from this 5-hour %: below it, stray usage from outside the transcripts. */
+const MIN_UNTRACKED_PEAK = 5;
 /** Local days shown, today included. */
 const SESSION_DAYS = 7;
 
@@ -160,11 +162,11 @@ export function buildSessions({ timeZone, ...input }: SessionsInput): Sessions {
   const today = Date.parse(`${dayKey(input.now, timeZone)}T12:00:00Z`);
   const days = Array.from({ length: SESSION_DAYS }, (_, i) => new Date(today - i * DAY_MS).toISOString().slice(0, 10));
   const from = startOfDay(days.at(-1)!, timeZone);
-  // Drop windows where nothing happened: a reading recorded a reset time but no
-  // usage (0% or none) and no transcript message fell inside it.
+  // Drop windows that are noise: no transcript message fell inside and the reading
+  // shows little or no usage. A bigger reading without messages is claude.ai use.
   const shown = fiveHourWindows(input)
     .filter(w => Date.parse(w.end) > from)
-    .filter(w => w.messages > 0 || (w.peak ?? 0) > 0);
+    .filter(w => w.messages > 0 || (w.peak ?? 0) >= MIN_UNTRACKED_PEAK);
 
   const done = shown.filter(w => !w.inProgress);
   return {

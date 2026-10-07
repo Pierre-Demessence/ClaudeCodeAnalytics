@@ -56,6 +56,14 @@ describe('reading windows', () => {
 });
 
 describe('empty windows', () => {
+  it('drops a message-less reading window under 5%, keeps it from 5%', () => {
+    const window = (peak: number) => sessions([], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', peak)]).windows;
+    expect(window(2)).toHaveLength(0);
+    expect(window(5)).toHaveLength(1);
+    // A message makes a low-% window real.
+    expect(sessions([rec('2026-10-02T08:00:00Z')], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 2)]).windows).toHaveLength(1);
+  });
+
   it('drops a reading window with no usage and no messages, keeps one with usage', () => {
     // A reset time read at 0% with no transcript message inside is noise.
     expect(sessions([], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 0)]).windows).toHaveLength(0);
