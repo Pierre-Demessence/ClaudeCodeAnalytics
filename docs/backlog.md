@@ -7,6 +7,14 @@ that completes it.
 
 ## Ideas
 
+- `[forensics]` Cache anomaly detection: flag cache-write tokens that follow no idle gap longer than the cache TTL, or follow one, excluding compaction rebuilds; chart flushes per day next to `CacheCard`. Explains days that burned more limit than the work justified.
+- `[forensics]` Observed rate-limit and server-overload hits from transcripts, placed in the 5-hour windows. Ground truth for Calibration and for the `k × cost` demand of limit-hit weeks; check whether stored messages keep error records (else a collector change and a `SCAN_FORMAT` bump).
+- `[forensics]` Output tokens by tool, plus a reasoning bucket, as a Breakdown card. Split each message's tokens across its tool calls with largest-remainder allocation so the parts sum to the total. Needs tool names per message.
+- `[forensics]` Output tokens and cost per skill or slash command, per session and overall. Builds on the tool split.
+- `[forensics]` Break "subagents" in Breakdown down by subagent type (Explore, Plan, general-purpose, …).
+- `[forensics]` Anonymize toggle (hotkey) masking project names, `cwd` and conversation titles for screenshots.
+- `[forensics]` Project drill-down page: a project's sessions, weekly cost and cache health, reached from Breakdown's "By project".
+- `[forensics]` API-equivalent value vs plan price ("you used $X of API value on a $Y plan"); check Plans first, since pricing already exists and part of it may be shown.
 - The Docker dashboard shares the `proxy` network with other containers, which can reach its API by IP (Vite always allows IP hosts, and a request without `Origin` passes the POST check). A dedicated network joined only by Traefik would close this; it needs a change in `S:\Dev\DockerInfra\compose.yml`.
 - `GET /api/summary` has no Origin/Host check: it relies on Vite's default `allowedHosts` and localhost-only CORS. Add an explicit check before ever exposing the server beyond loopback.
 - The calibrated range applies the 25th/75th percentile day to every remaining day, which overstates the spread of a multi-day total; a bootstrap over days would be tighter.
