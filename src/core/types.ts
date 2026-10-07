@@ -73,6 +73,8 @@ export interface Settings {
   limitThreshold: number;
   planHistory: PlanPeriod[];
   throttleMinutes: number;
+  /** Weekly % from which a past week counts as having hit the limit. */
+  weekLimitThreshold: number;
 }
 
 /** What the last collector run did. */

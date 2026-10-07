@@ -26,7 +26,7 @@ describe('api routes', () => {
     // Endpoint off: these tests never touch the network or credentials.
     const store = new Store(process.env.CCA_DATA_DIR);
     await store.ensureDir();
-    await store.saveSettings({ endpointEnabled: false, limitThreshold: 95, planHistory: [], throttleMinutes: 15 });
+    await store.saveSettings({ endpointEnabled: false, limitThreshold: 95, planHistory: [], throttleMinutes: 15, weekLimitThreshold: 98 });
 
     const server = createServer(createApiMiddleware({ lockWaitMs: 200 }));
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));

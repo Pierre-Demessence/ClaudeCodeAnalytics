@@ -36,6 +36,7 @@ const base: WeekHistoryInput = {
   sessionWindows: [],
   shares: [],
   snapshots: [],
+  weekLimitThreshold: 98,
   weekStartOf: ms => START + Math.floor((ms - START) / WEEK_MS) * WEEK_MS,
 };
 const weeks = (extra: Partial<WeekHistoryInput> = {}) => buildWeekHistory({ ...base, ...extra });
@@ -134,9 +135,11 @@ describe('final percent', () => {
 describe('hit', () => {
   const share = (percent: number) => ({ estimated: false, percent, plan: 'max5' as const, resetsAt: iso(weekStart(1) + WEEK_MS) });
 
-  it('marks a window whose reading reached 100%', () => {
+  it('marks a window whose reading reached the threshold', () => {
     expect(weeks({ shares: [share(100)], snapshots: [snap(1)] }).weeks[0]!.hit).toBe(true);
-    expect(weeks({ shares: [share(99)], snapshots: [snap(1)] }).weeks[0]!.hit).toBeUndefined();
+    expect(weeks({ shares: [share(98)], snapshots: [snap(1)] }).weeks[0]!.hit).toBe(true);
+    expect(weeks({ shares: [share(97)], snapshots: [snap(1)] }).weeks[0]!.hit).toBeUndefined();
+    expect(weeks({ shares: [share(97)], snapshots: [snap(1)], weekLimitThreshold: 90 }).weeks[0]!.hit).toBe(true);
   });
 
   it('never counts a reading extended from before the reset, nor the running estimate', () => {

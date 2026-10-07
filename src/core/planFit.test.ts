@@ -158,7 +158,7 @@ describe('buildPlanFitInput', () => {
   });
   // Newest first, as weekHistory has them.
   const history = (rows: WeekRow[]) => ({ stats: { hit: 0 }, weeks: rows });
-  const base = { limitThreshold: 95, plan: 'max5', planHistory: [{ from: iso(START - WEEK_MS), plan: 'max5', source: 'manual' }], sessionWindows: [] } as const;
+  const base = { limitThreshold: 95, plan: 'max5', planHistory: [{ from: iso(START - WEEK_MS), plan: 'max5', source: 'manual' }], sessionWindows: [], weekLimitThreshold: 98 } as const;
 
   it('keeps the finished weeks with a percent, oldest first', () => {
     const input = buildPlanFitInput({ ...base, weekHistory: history([row(3, { inProgress: true }), row(2), row(1, { percent: undefined }), row(0, { percent: 30, shift: undefined })]) });
@@ -174,6 +174,11 @@ describe('buildPlanFitInput', () => {
   it('replaces a capped week with the transcript estimate when that is higher', () => {
     const input = buildPlanFitInput({ ...base, calibrationK: 0.5, weekHistory: history([row(1, { cost: 300, hit: true, percent: 100 }), row(0, { cost: 100, hit: true, percent: 100 })]) });
     expect(input.weeks.map(w => [w.demand, w.estimated])).toEqual([[100, false], [150, true]]);
+  });
+
+  it('treats a final reading from the threshold as capped, and below it as the demand', () => {
+    const input = buildPlanFitInput({ ...base, calibrationK: 0.5, weekHistory: history([row(1, { cost: 300, percent: 97 }), row(0, { cost: 300, percent: 98 })]) });
+    expect(input.weeks.map(w => [w.demand, w.estimated])).toEqual([[150, true], [97, false]]);
   });
 
   it('keeps the capped 100 without a calibration', () => {

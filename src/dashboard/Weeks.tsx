@@ -19,7 +19,7 @@ function weekTip(week: WeekRow, timeZone: string): string {
 }
 
 function Stats({ summary }: { summary: Summary }) {
-  const { stats, weeks } = summary.weekHistory;
+  const { weekHistory: { stats, weeks }, weekLimitThreshold } = summary;
   return (
     <section aria-label="Weeks summary" className="session-stats">
       <div className="card">
@@ -35,8 +35,8 @@ function Stats({ summary }: { summary: Summary }) {
           {stats.hit}
         </strong>
         <span>
-          hit the weekly limit (100%)
-          <InfoTip label="About the limit">Weeks whose final reading reached 100%. A percent estimated from transcripts never counts.</InfoTip>
+          {`hit the weekly limit (≥ ${weekLimitThreshold}%)`}
+          <InfoTip label="About the limit">Weeks whose final reading reached that %. A percent estimated from transcripts never counts.</InfoTip>
         </span>
       </div>
       <div className="card">

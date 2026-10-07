@@ -5,7 +5,7 @@ import type { Settings } from '../core/types.ts';
 
 import { parseManualReading, parseSettingsUpdate } from './api.ts';
 
-const SETTINGS: Settings = { endpointEnabled: true, limitThreshold: 95, planHistory: [], throttleMinutes: 15 };
+const SETTINGS: Settings = { endpointEnabled: true, limitThreshold: 95, planHistory: [], throttleMinutes: 15, weekLimitThreshold: 98 };
 const NOW = Date.parse('2026-10-02T10:00:00Z');
 
 describe('parseSettingsUpdate', () => {
@@ -33,6 +33,14 @@ describe('parseSettingsUpdate', () => {
     expect(parseSettingsUpdate({ limitThreshold: 100 }, SETTINGS).limitThreshold).toBe(100);
     for (const bad of [49, 101, 97.5, '95', null])
       expect(() => parseSettingsUpdate({ limitThreshold: bad }, SETTINGS)).toThrow();
+  });
+
+  it('accepts a whole weekly limit threshold from 50 to 100', () => {
+    expect(parseSettingsUpdate({ weekLimitThreshold: 99 }, SETTINGS).weekLimitThreshold).toBe(99);
+    expect(parseSettingsUpdate({ weekLimitThreshold: 50 }, SETTINGS).weekLimitThreshold).toBe(50);
+    expect(parseSettingsUpdate({ limitThreshold: 90 }, SETTINGS).weekLimitThreshold).toBe(98);
+    for (const bad of [49, 101, 97.5, '98', null])
+      expect(() => parseSettingsUpdate({ weekLimitThreshold: bad }, SETTINGS)).toThrow();
   });
 
   it('accepts whole minutes from 15 to 1440 between endpoint calls', () => {

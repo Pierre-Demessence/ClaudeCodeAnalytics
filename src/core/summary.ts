@@ -26,7 +26,7 @@ import { planAt, planFromSubscription } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
-import { buildWeekHistory } from './weekHistory.ts';
+import { buildWeekHistory, DEFAULT_WEEK_LIMIT_THRESHOLD } from './weekHistory.ts';
 
 /** Days of daily cost and 5-hour sessions used as "typical" for forecasts. */
 const TYPICAL_DAYS = 28;
@@ -48,6 +48,8 @@ export interface SummaryInput {
   timeZone: string;
   /** Conversation titles by session id. */
   titles?: Readonly<Record<string, SessionInfo>>;
+  /** Weekly % from which a week counts as having hit the limit; 98 by default. */
+  weekLimitThreshold?: number;
 }
 
 export type BreakdownPeriod = 'week' | 'fourWeeks' | 'all';
@@ -128,6 +130,8 @@ export interface DashboardSummary {
   weekly: UsageRow[];
   /** The last 12 weekly windows: final %, cost per day, sessions and projects. */
   weekHistory: WeekHistory;
+  /** Weekly % from which a week counts as having hit the limit. */
+  weekLimitThreshold: number;
   /** Final % of every completed window with readings. */
   weeks: WeekShare[];
 }
@@ -188,6 +192,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     ? dailyCostSeries(records, timeZone, typicalFrom, yesterday).map(d => d.cost)
     : [];
   const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
+  const weekLimitThreshold = input.weekLimitThreshold ?? DEFAULT_WEEK_LIMIT_THRESHOLD;
   const sessionWindows = fiveHourWindows({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots });
   const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
   const activePace = activeHourlyPace(records, now - TYPICAL_DAYS * DAY_MS, now);
@@ -311,6 +316,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     sessionWindows,
     shares: weeks,
     snapshots,
+    weekLimitThreshold,
     weekStartOf: ms => (resets.length === 0 ? startOfDay(isoWeekStart(ms, timeZone), timeZone) : weekStartFor(ms, resets)),
   });
 
@@ -332,7 +338,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     limitThreshold,
     multipliers: buildMultipliers(limitsInput),
     plan,
-    planFit: buildPlanFitInput({ calibrationK: calibration?.k, fiveHourK: fiveHourCalibration?.k, plan, planHistory, sessionWindows, weekHistory }),
+    planFit: buildPlanFitInput({ calibrationK: calibration?.k, fiveHourK: fiveHourCalibration?.k, plan, planHistory, sessionWindows, weekHistory, weekLimitThreshold }),
     planHistory,
     planSource: (planHistory.findLast(period => Date.parse(period.from) <= now) ?? planHistory[0])?.source,
     sessions,
@@ -340,6 +346,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     timeZone,
     unknownModels,
     weekHistory,
+    weekLimitThreshold,
     weekly,
     weeks,
   };

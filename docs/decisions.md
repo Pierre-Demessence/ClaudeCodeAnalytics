@@ -243,7 +243,13 @@ topped up with an estimate; an estimated window's peak is `k × cost` from the
 A window "hit the limit" when a reading reached the limit threshold (setting,
 95% by default, 50–100), not only 100%: close to the limit a new agent run
 stops almost at once, so the window is as good as spent. Estimates never count.
-The weekly views keep 100%.
+
+A week has its own threshold (setting, 98% by default, 50–100): 5% of a week is
+hours of budget, so a run is not stopped at once at 95%, but a week read at 98%
+is as good as spent. Only the Weeks tab's "hit" and the Plans tab's demand
+estimate use it (`weekHistory.ts`, `planFit.ts`). The forecast, the "Limit
+reached" verdict and a plan's "weeks over" stay at 100%: they predict or compare
+against the real wall, not the user's behaviour near it.
 
 ## Calibration tab: drift against the median, not the fit
 
@@ -269,7 +275,7 @@ them (the first reset after a message), so its weeks match the Usage tab's
 weekly chart. A week's final % is its last reading, converted to the current
 plan like the Overview did; a completed week without a reading gets `k × cost`
 (capped at 100, shown with "~"). A week "hit the limit" only from a final reading at
-100%: a transcript estimate, or a reading extended from before the reset, never counts, as on the Sessions tab. The day cells
+the weekly threshold: a transcript estimate, or a reading extended from before the reset, never counts, as on the Sessions tab. The day cells
 are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,
 and fixed blocks ignore DST. The Overview's "Past weeks" card was removed: the
 tab shows the same windows with more.

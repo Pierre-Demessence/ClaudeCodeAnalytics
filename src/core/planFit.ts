@@ -124,21 +124,23 @@ export interface PlanFitSource {
   /** Every 5-hour window, as `fiveHourWindows` builds them. */
   sessionWindows: readonly FiveHourWindow[];
   weekHistory: WeekHistory;
+  /** Weekly % from which a week counts as capped. */
+  weekLimitThreshold: number;
 }
 
 /**
  * The finished weeks with a percent and the finished 5-hour windows with a
  * peak since the oldest of those weeks, on the current plan. A week or window
- * that reached its limit only shows 100: when the transcripts say it took
- * more, that estimate is its demand.
+ * that reached its limit threshold stopped there, so its percent is a lower
+ * bound: when the transcripts say it took more, that estimate is its demand.
  */
-export function buildPlanFitInput({ calibrationK, fiveHourK, plan, planHistory, sessionWindows, weekHistory }: PlanFitSource): PlanFitInput {
+export function buildPlanFitInput({ calibrationK, fiveHourK, plan, planHistory, sessionWindows, weekHistory, weekLimitThreshold }: PlanFitSource): PlanFitInput {
   const weeks = weekHistory.weeks
     .filter(week => !week.inProgress && week.percent !== undefined)
     .reverse()
     .map((week): FitWeek => {
       const percent = week.percent!;
-      const demand = percent >= LIMIT && calibrationK !== undefined ? Math.max(percent, calibrationK * week.cost) : percent;
+      const demand = percent >= weekLimitThreshold && calibrationK !== undefined ? Math.max(percent, calibrationK * week.cost) : percent;
       return { cost: week.cost, demand, estimated: week.percentEstimated === true || demand > percent, shift: week.shift ?? 0, start: week.start };
     });
 

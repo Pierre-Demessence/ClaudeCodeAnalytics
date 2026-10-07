@@ -82,7 +82,7 @@ function validTimeZone(value: string | null): string {
 
 /** Validates a settings update; only known fields with valid values are kept. */
 export function parseSettingsUpdate(body: unknown, current: Settings): Settings {
-  const update = body as { endpointEnabled?: unknown; limitThreshold?: unknown; planHistory?: unknown; throttleMinutes?: unknown } | null;
+  const update = body as { endpointEnabled?: unknown; limitThreshold?: unknown; planHistory?: unknown; throttleMinutes?: unknown; weekLimitThreshold?: unknown } | null;
   const next = { ...current };
   if (update?.endpointEnabled !== undefined) {
     if (typeof update.endpointEnabled !== 'boolean')
@@ -93,6 +93,11 @@ export function parseSettingsUpdate(body: unknown, current: Settings): Settings 
     if (!Number.isInteger(update.limitThreshold) || (update.limitThreshold as number) < 50 || (update.limitThreshold as number) > 100)
       throw new HttpError(400, 'limitThreshold must be a whole percentage from 50 to 100');
     next.limitThreshold = update.limitThreshold as number;
+  }
+  if (update?.weekLimitThreshold !== undefined) {
+    if (!Number.isInteger(update.weekLimitThreshold) || (update.weekLimitThreshold as number) < 50 || (update.weekLimitThreshold as number) > 100)
+      throw new HttpError(400, 'weekLimitThreshold must be a whole percentage from 50 to 100');
+    next.weekLimitThreshold = update.weekLimitThreshold as number;
   }
   if (update?.throttleMinutes !== undefined) {
     const minutes = update.throttleMinutes;
@@ -173,6 +178,7 @@ async function summary(store: Store, timeZone: string) {
       throttleMinutes: settings.throttleMinutes,
       timeZone,
       titles,
+      weekLimitThreshold: settings.weekLimitThreshold,
     }),
     status,
   };

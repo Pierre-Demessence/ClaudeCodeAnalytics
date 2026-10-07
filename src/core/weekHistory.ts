@@ -8,6 +8,8 @@ import { convertPercent } from './plans.ts';
 import { messageCost, sonnetSaving } from './pricing.ts';
 import { median } from './stats.ts';
 
+/** Weekly % from which a week counts as having hit the limit: at 5 % of the week left, a run is not stopped at once, but the week is as good as spent. */
+export const DEFAULT_WEEK_LIMIT_THRESHOLD = 98;
 /** Weekly windows listed. */
 const HISTORY_WEEKS = 12;
 /** Projects kept per week; `projectCount` has the total. */
@@ -21,7 +23,7 @@ export interface WeekRow {
   days: (number | null)[];
   /** ISO. */
   end: string;
-  /** The final reading, not an estimate, reached 100. */
+  /** The final reading, not an estimate, reached the weekly limit threshold. */
   hit?: true;
   inProgress?: true;
   messages: number;
@@ -62,6 +64,8 @@ export interface WeekHistoryInput {
   /** Final % of every completed window with readings. */
   shares: readonly WeekShare[];
   snapshots: readonly Snapshot[];
+  /** Weekly % from which a week counts as having hit the limit. */
+  weekLimitThreshold: number;
   /** Start of the weekly window holding a time. */
   weekStartOf: (ms: number) => number;
 }
@@ -76,7 +80,7 @@ interface Building {
 
 /** The last 12 weekly windows: final %, cost per day, sessions and projects. */
 export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
-  const { calibrationK, current, now, plan, records, sessionWindows, shares, snapshots, weekStartOf } = input;
+  const { calibrationK, current, now, plan, records, sessionWindows, shares, snapshots, weekLimitThreshold, weekStartOf } = input;
 
   const starts = new Set<number>(snapshots.map(s => Date.parse(s.weeklyResetsAt) - WEEK_MS));
   if (current)
@@ -136,7 +140,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       cost: week.cost,
       days: week.days.map((cost, i) => (start + i * DAY_MS > now ? null : cost)),
       end: new Date(end).toISOString(),
-      hit: source === 'reading' && !percentEstimated && percent !== undefined && percent >= 100 ? true : undefined,
+      hit: source === 'reading' && !percentEstimated && percent !== undefined && percent >= weekLimitThreshold ? true : undefined,
       inProgress: inProgress ? true : undefined,
       messages: week.messages,
       percent,

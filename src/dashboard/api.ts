@@ -34,6 +34,7 @@ export interface SettingsUpdate {
   planHistory?: readonly PlanPeriod[];
   /** Whole minutes from 15 to 1440. */
   throttleMinutes?: number;
+  weekLimitThreshold?: number;
 }
 
 export const saveSettings = (settings: SettingsUpdate) => request('/settings', settings);

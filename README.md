@@ -39,7 +39,8 @@ Everything stays on your machine. Data comes from two places:
   configurable threshold, 95% by default).
 - The last 12 weekly windows on a week × day timeline and in a list: final %
   (estimated from transcripts when no reading ends the week), cost per 24 h
-  block, sessions, messages, projects, and the weeks that hit the limit.
+  block, sessions, messages, projects, and the weeks that hit the limit (from a
+  configurable threshold, 98% by default).
 - Plan setting with history; the plan is also detected from Claude Code's login.
 - Tabs: Overview (limits and pacing), Usage (charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents), Sessions (past 5-hour windows),

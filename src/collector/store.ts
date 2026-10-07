@@ -7,6 +7,7 @@ import process from 'node:process';
 import type { SessionInfo, Settings, Snapshot, Status, UsageRecord } from '../core/types.ts';
 
 import { DEFAULT_LIMIT_THRESHOLD } from '../core/sessions.ts';
+import { DEFAULT_WEEK_LIMIT_THRESHOLD } from '../core/weekHistory.ts';
 
 /** Per transcript file: bytes already imported, mtime, and malformed lines seen. */
 export type ScanState = Record<string, { malformed?: number; mtimeMs: number; offset: number }>;
@@ -23,7 +24,7 @@ export interface StoredScanState {
   format: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { endpointEnabled: true, limitThreshold: DEFAULT_LIMIT_THRESHOLD, planHistory: [], throttleMinutes: 15 };
+export const DEFAULT_SETTINGS: Settings = { endpointEnabled: true, limitThreshold: DEFAULT_LIMIT_THRESHOLD, planHistory: [], throttleMinutes: 15, weekLimitThreshold: DEFAULT_WEEK_LIMIT_THRESHOLD };
 
 export function dataDir(): string {
   return process.env.CCA_DATA_DIR ?? join(homedir(), '.claude-code-analytics');

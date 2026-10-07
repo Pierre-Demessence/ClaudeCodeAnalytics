@@ -22,8 +22,10 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
   // Undefined until edited (an emptied field stays empty), so the fields follow the saved values.
   const [editedThrottle, setEditedThrottle] = useState<string>();
   const [editedThreshold, setEditedThreshold] = useState<string>();
+  const [editedWeekThreshold, setEditedWeekThreshold] = useState<string>();
   const throttle = editedThrottle ?? String(summary.throttleMinutes);
   const threshold = editedThreshold ?? String(summary.limitThreshold);
+  const weekThreshold = editedWeekThreshold ?? String(summary.weekLimitThreshold);
   const { detected, detectedPlan, plan, planHistory, planSource } = summary;
 
   const choosePlan = (value: string) => {
@@ -42,6 +44,11 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
   const saveThreshold = (event: FormEvent) => {
     event.preventDefault();
     void onSaveSettings({ limitThreshold: Number(threshold) }).then(() => setEditedThreshold(undefined));
+  };
+
+  const saveWeekThreshold = (event: FormEvent) => {
+    event.preventDefault();
+    void onSaveSettings({ weekLimitThreshold: Number(weekThreshold) }).then(() => setEditedWeekThreshold(undefined));
   };
 
   return (
@@ -104,6 +111,16 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
               <InfoTip label="About the 5-hour limit threshold">A past 5-hour window counts as having hit the limit when a reading reached this %: close to 100%, a new agent run stops almost at once.</InfoTip>
             </div>
             <input id="threshold-input" max="100" min="50" onChange={e => setEditedThreshold(e.target.value)} required step="1" type="number" value={threshold} />
+          </div>
+          <button disabled={busy} type="submit">Save</button>
+        </form>
+        <form className="inline-form" onSubmit={saveWeekThreshold}>
+          <div className="field">
+            <div className="field-label">
+              <label htmlFor="week-threshold-input">Weekly limit hit from (%)</label>
+              <InfoTip label="About the weekly limit threshold">A past week counts as having hit the limit when its final reading reached this %: close to 100%, the week is as good as spent.</InfoTip>
+            </div>
+            <input id="week-threshold-input" max="100" min="50" onChange={e => setEditedWeekThreshold(e.target.value)} required step="1" type="number" value={weekThreshold} />
           </div>
           <button disabled={busy} type="submit">Save</button>
         </form>

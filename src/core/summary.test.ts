@@ -234,6 +234,7 @@ describe('buildSummary', () => {
 
     const summary = buildSummary(input);
     expect(summary.limitThreshold).toBe(95);
+    expect(summary.weekLimitThreshold).toBe(98);
     expect(summary.sessions.windows[0]).toMatchObject({ inProgress: true, peak: 20, source: 'reading', start: '2026-10-20T10:00:00.000Z' });
     // Yesterday's $20 at k = 0.5 %/$.
     expect(summary.sessions.windows[1]).toMatchObject({ peak: 10, peakEstimated: true, source: 'estimated' });

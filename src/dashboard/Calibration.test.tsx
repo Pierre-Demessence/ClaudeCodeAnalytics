@@ -162,6 +162,15 @@ describe('calibration tab', () => {
       expect(onSaveSettings).toHaveBeenCalledWith({ limitThreshold: 98 });
     });
 
+    it('saves the weekly limit threshold, prefilled with the saved one', () => {
+      const { onSaveSettings } = renderTab();
+      const input = screen.getByLabelText('Weekly limit hit from (%)') as HTMLInputElement;
+      expect(input.value).toBe('98');
+      fireEvent.change(input, { target: { value: '99' } });
+      fireEvent.click(within(input.closest('form')!).getByRole('button', { name: 'Save' }));
+      expect(onSaveSettings).toHaveBeenCalledWith({ weekLimitThreshold: 99 });
+    });
+
     it('saves the throttle, and refuses values outside 15 to 1440', () => {
       const { onSaveSettings } = renderTab();
       const input = screen.getByLabelText('Minutes between endpoint calls') as HTMLInputElement;

@@ -62,7 +62,7 @@ describe('weeks tab', () => {
     const stats = screen.getByRole('region', { name: 'Weeks summary' });
     const value = (label: string) => within(stats).getByText(label).closest('.card')!.querySelector('strong')!.textContent;
     expect(value('weeks shown')).toBe('3');
-    expect(value('hit the weekly limit (100%)')).toBe('1');
+    expect(value('hit the weekly limit (≥ 98%)')).toBe('1');
     // Finished weeks: 100% ($40) and one without a percent ($20).
     expect(value('median final %')).toBe('100%');
     expect(value('median week cost')).toBe('$30');
