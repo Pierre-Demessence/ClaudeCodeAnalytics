@@ -28,7 +28,7 @@ export function Header({ busy, onRefresh, onToggleTheme, summary, tab, theme }: 
     <header className="app-header">
       <div className="app-header-inner">
         <div className="app-header-top">
-          <h1>Claude Code usage</h1>
+          <h1>Claude Code Analytics</h1>
           {summary && (
             <span className="plan-badge">
               {PLAN_LABELS[summary.plan]}
