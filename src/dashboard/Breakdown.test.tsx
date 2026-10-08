@@ -108,10 +108,10 @@ describe('breakdown', () => {
     it('splits cost and output tokens by skill, with the rest under No skill', () => {
       render(<Breakdown summary={summary(outputRecords)} />, { wrapper: TipProvider });
       expect(rowsOf('By skill or command')).toEqual([
-        'No skill' + 'no skill active' + '1m$20',
-        '/commit' + 'slash command' + '1m$20',
-        'superpowers:brainstorming' + 'skill' + '1m$20',
-        'All messages3m$60',
+        'No skill' + 'no skill active' + '1m$2033%',
+        '/commit' + 'slash command' + '1m$2033%',
+        'superpowers:brainstorming' + 'skill' + '1m$2033%',
+        'All messages3m$60100%',
       ]);
       expect(tipOf(screen.getByRole('button', { name: 'About tokens and cost' }))).toBe('Cost includes input and cache; tokens are output only.');
     });

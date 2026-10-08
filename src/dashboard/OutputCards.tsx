@@ -35,6 +35,7 @@ export function OutputCard({ output }: { output: Breakdown['output'] }) {
     ...tools.map(tool => ({ fill: 'tool' as const, label: tool.name, tokens: tool.tokens })),
     ...(otherTools.count > 0 ? [{ fill: 'tool' as const, label: `Other tools (${otherTools.count})`, tokens: otherTools.tokens }] : []),
   ];
+  const largest = Math.max(...rows.map(row => row.tokens));
   const description = shown.map(group => `${group.label} ${formatPercent(percentOf(group.tokens, total))}`).join(', ');
 
   return (
@@ -62,7 +63,7 @@ export function OutputCard({ output }: { output: Breakdown['output'] }) {
           <thead>
             <tr>
               <th scope="col">Bucket</th>
-              <th scope="col">Share of output</th>
+              <th scope="col">Relative size</th>
               <th scope="col">Tokens</th>
               <th scope="col">Share</th>
             </tr>
@@ -74,7 +75,7 @@ export function OutputCard({ output }: { output: Breakdown['output'] }) {
                   <Swatch fill={row.fill} />
                   {row.label}
                 </th>
-                <td className="output-bar-cell"><span className="share-track"><span className={`share-fill output-${row.fill}`} style={{ width: `${percentOf(row.tokens, total)}%` }} /></span></td>
+                <td className="output-bar-cell"><span className="share-track"><span className={`share-fill output-${row.fill}`} style={{ width: `${percentOf(row.tokens, largest)}%` }} /></span></td>
                 <td>{formatTokens(row.tokens)}</td>
                 <td><strong>{formatPercent(percentOf(row.tokens, total))}</strong></td>
               </tr>
@@ -99,6 +100,13 @@ export function SkillCard({ breakdown }: { breakdown: Breakdown }) {
   const tip = useTip();
   const { noSkill, otherSkills, skills, total } = breakdown;
   const hasSkills = skills.length > 0;
+  // "No skill" is most of the cost, so its bar would shrink every skill's: only the skills are drawn, scaled to the largest.
+  const rows = [
+    { name: 'No skill', cost: noSkill.cost, kind: 'no skill active', output: noSkill.output, scaled: false },
+    ...skills.map(skill => ({ ...skill, kind: skill.name.startsWith('/') ? 'slash command' : 'skill', scaled: true })),
+    ...(otherSkills.count > 0 ? [{ name: `Other (${otherSkills.count})`, cost: otherSkills.cost, kind: 'skills and commands', output: otherSkills.output, scaled: true }] : []),
+  ];
+  const largest = Math.max(...rows.filter(row => row.scaled).map(row => row.cost));
 
   return (
     <section className="card">
@@ -117,25 +125,25 @@ export function SkillCard({ breakdown }: { breakdown: Breakdown }) {
                 <thead>
                   <tr>
                     <th scope="col">Skill or command</th>
-                    <th scope="col">Share of cost</th>
+                    <th scope="col">Relative size</th>
                     <th scope="col">Output tokens</th>
                     <th scope="col">Cost</th>
+                    <th scope="col">Share</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    { name: 'No skill', cost: noSkill.cost, kind: 'no skill active', output: noSkill.output },
-                    ...skills.map(skill => ({ ...skill, kind: skill.name.startsWith('/') ? 'slash command' : 'skill' })),
-                    ...(otherSkills.count > 0 ? [{ name: `Other (${otherSkills.count})`, cost: otherSkills.cost, kind: 'skills and commands', output: otherSkills.output }] : []),
-                  ].map(row => (
+                  {rows.map(row => (
                     <tr key={row.name}>
                       <th scope="row" {...tip(row.name)}>
                         {row.name}
                         <small>{row.kind}</small>
                       </th>
-                      <td className="output-bar-cell"><span className="share-track"><span className={`share-fill ${row.name === 'No skill' ? 'output-noskill' : ''}`} style={{ width: `${percentOf(row.cost, total.cost)}%` }} /></span></td>
+                      <td className="output-bar-cell">
+                        {row.scaled && <span className="share-track"><span className="share-fill" style={{ width: `${percentOf(row.cost, largest)}%` }} /></span>}
+                      </td>
                       <td>{formatTokens(row.output)}</td>
                       <td><strong>{formatDollars(row.cost)}</strong></td>
+                      <td>{formatPercent(percentOf(row.cost, total.cost))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -144,6 +152,7 @@ export function SkillCard({ breakdown }: { breakdown: Breakdown }) {
                     <th colSpan={2} scope="row">All messages</th>
                     <td><strong>{formatTokens(breakdown.output.total)}</strong></td>
                     <td><strong>{formatDollars(total.cost)}</strong></td>
+                    <td><strong>100%</strong></td>
                   </tr>
                 </tfoot>
               </table>
