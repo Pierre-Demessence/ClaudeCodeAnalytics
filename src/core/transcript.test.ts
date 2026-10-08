@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { UsageRecord } from './types.ts';
 
-import { mergeRecord, parseSkillSignal, parseTitleLine, parseTranscriptLine } from './transcript.ts';
+import { mergeRecord, parseSkillSignal, parseTitleLine, parseToolCalls, parseToolResults, parseTranscriptLine } from './transcript.ts';
 
 function entry(overrides: { blocks?: unknown[]; model?: string; output?: number; requestId?: string; speed?: string; cacheCreation?: unknown } = {}) {
   return JSON.stringify({
@@ -313,5 +313,54 @@ describe('parseSkillSignal', () => {
     expect(parseSkillSignal(assistant([{ name: 'Skill', input: { skill: '' }, type: 'tool_use' }]))).toBeNull();
     expect(parseSkillSignal('{not json "type":"user"')).toBeNull();
     expect(parseSkillSignal(JSON.stringify({ type: 'ai-title' }))).toBeNull();
+  });
+});
+
+describe('parseToolCalls', () => {
+  it('lists the id and name of each tool call', () => {
+    const line = entry({ blocks: [{ text: 'hi', type: 'text' }, { id: 'toolu_1', name: 'Read', type: 'tool_use' }, { id: 'toolu_2', name: 'mcp__a__b', type: 'tool_use' }] });
+    expect(parseToolCalls(line)).toEqual([{ id: 'toolu_1', name: 'Read' }, { id: 'toolu_2', name: 'mcp__a__b' }]);
+  });
+
+  it('ignores lines without a call, calls without an id and malformed lines', () => {
+    expect(parseToolCalls(entry())).toEqual([]);
+    expect(parseToolCalls(entry({ blocks: [{ name: 'Read', type: 'tool_use' }] }))).toEqual([]);
+    expect(parseToolCalls('{"type":"tool_use" not json')).toEqual([]);
+    expect(parseToolCalls(JSON.stringify({ message: { content: [{ id: 'x', name: 'Read', type: 'tool_use' }] }, type: 'user' }))).toEqual([]);
+  });
+});
+
+describe('parseToolResults', () => {
+  const user = (content: unknown) => JSON.stringify({ message: { content, role: 'user' }, type: 'user' });
+
+  it('sizes a text result, an array of text blocks and images, never keeping the content', () => {
+    const line = user([
+      { content: 'twelve chars', tool_use_id: 'toolu_1', type: 'tool_result' },
+      { content: [{ text: 'abcde', type: 'text' }, { source: { data: 'x'.repeat(5000), type: 'base64' }, type: 'image' }, { text: 'fg', type: 'text' }, { tool_name: 'Read', type: 'tool_reference' }], tool_use_id: 'toolu_2', type: 'tool_result' },
+    ]);
+    const sizes = parseToolResults(line);
+    expect(sizes).toEqual([{ id: 'toolu_1', chars: 12, images: 0 }, { id: 'toolu_2', chars: 7, images: 1 }]);
+    expect(JSON.stringify(sizes)).not.toContain('twelve');
+  });
+
+  it('counts a result without content as empty', () => {
+    expect(parseToolResults(user([{ tool_use_id: 'toolu_1', type: 'tool_result' }]))).toEqual([{ id: 'toolu_1', chars: 0, images: 0 }]);
+  });
+
+  it('ignores other lines', () => {
+    expect(parseToolResults(user('plain prompt'))).toEqual([]);
+    expect(parseToolResults(user([{ text: 'a "tool_result" mention', type: 'text' }]))).toEqual([]);
+    expect(parseToolResults(entry({ blocks: [{ content: 'x', tool_use_id: 'toolu_1', type: 'tool_result' }] }))).toEqual([]);
+    expect(parseToolResults('{"type":"user","tool_result" not json')).toEqual([]);
+  });
+});
+
+describe('mergeRecord context', () => {
+  it('keeps the result sizes when a later copy of the message replaces the record', () => {
+    const records = new Map<string, UsageRecord>();
+    mergeRecord(records, parseTranscriptLine(entry({ output: 3 }), 'p')!);
+    records.get('msg_1|req_1')!.context = { Read: { chars: 10, images: 0, results: 1 } };
+    mergeRecord(records, parseTranscriptLine(entry({ output: 9 }), 'p')!);
+    expect(records.get('msg_1|req_1')).toMatchObject({ context: { Read: { chars: 10, images: 0, results: 1 } }, output: 9 });
   });
 });

@@ -3,10 +3,10 @@ import { open, readdir, readFile, stat } from 'node:fs/promises';
 import { basename, dirname, join, relative, sep } from 'node:path';
 
 import type { ApiEvent, SessionInfo, UsageRecord } from '../core/types.ts';
-import type { ScanState } from './store.ts';
+import type { OpenCall, ScanState } from './store.ts';
 
 import { parseEventLine } from '../core/events.ts';
-import { mergeRecord, parseSkillSignal, parseTitleLine, parseTranscriptLine } from '../core/transcript.ts';
+import { mergeRecord, parseSkillSignal, parseTitleLine, parseToolCalls, parseToolResults, parseTranscriptLine } from '../core/transcript.ts';
 import { compareVersions } from '../core/versions.ts';
 
 export interface ScanResult {
@@ -77,6 +77,8 @@ async function subagentType(file: string): Promise<string | undefined> {
   }
 }
 
+/** Calls kept per transcript while their result is awaited; calls never answered (an interrupted turn) would pile up. */
+const MAX_OPEN_CALLS = 500;
 const VERSION_PATTERN = /"version":"(\d+(?:\.\d+)*)"/;
 const NEWLINE = 0x0A;
 
@@ -120,16 +122,44 @@ export async function scanTranscripts(claudeDir: string, records: Map<string, Us
 
     const project = id.split(sep)[0]!;
     let skill = resume?.skill;
+    const calls: Record<string, OpenCall> = { ...resume?.calls };
+    // Messages whose stored result sizes this read from the start has replaced.
+    const fresh = new Set<string>();
     const agentType = await subagentType(file);
     for (const line of lines) {
       if (!line)
         continue;
+      const sizes = parseToolResults(line);
+      if (sizes.length > 0) {
+        for (const size of sizes) {
+          const call = calls[size.id];
+          if (!call)
+            continue;
+          delete calls[size.id];
+          const answered = records.get(call.key);
+          if (!answered)
+            continue;
+          // A transcript read from its start sizes its results again: drop what an earlier read stored.
+          if (!resume && !fresh.has(call.key)) {
+            answered.context = {};
+            fresh.add(call.key);
+          }
+          const tool = ((answered.context ??= {})[call.name] ??= { chars: 0, images: 0, results: 0 });
+          tool.chars += size.chars;
+          tool.images += size.images;
+          tool.results++;
+          result.changedMonths.add(answered.ts.slice(0, 7));
+        }
+        continue;
+      }
       const record = parseTranscriptLine(line, project, skill, agentType);
       // A skill applies to the messages after the line that starts it.
       const signal = parseSkillSignal(line);
       if (signal)
         skill = signal.kind === 'start' ? signal.name : undefined;
       if (record) {
+        for (const call of parseToolCalls(line))
+          calls[call.id] = { name: call.name, key: record.key };
         // Lines after the stored offset continue messages already stored: add their tools.
         if (resume)
           seen.add(record.key);
@@ -159,7 +189,10 @@ export async function scanTranscripts(claudeDir: string, records: Map<string, Us
         }
       }
     }
-    state[id] = { malformed, mtimeMs: info.mtimeMs, offset, ...(skill && { skill }) };
+    const open = Object.keys(calls);
+    for (const callId of open.slice(0, Math.max(0, open.length - MAX_OPEN_CALLS)))
+      delete calls[callId];
+    state[id] = { malformed, mtimeMs: info.mtimeMs, offset, ...(Object.keys(calls).length > 0 && { calls }), ...(skill && { skill }) };
     result.filesRead++;
   }
   return result;

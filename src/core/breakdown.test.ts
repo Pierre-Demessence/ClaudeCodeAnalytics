@@ -161,6 +161,28 @@ describe('buildBreakdown', () => {
     expect(output.otherTools).toEqual({ count: 4, tokens: 400 });
   });
 
+  it('estimates the context each tool added, an MCP server as one, within the period', () => {
+    const { context } = buildBreakdown([
+      rec('2026-10-01T10:00:00Z', { context: { Read: { chars: 4000, images: 0, results: 2 } } }),
+      rec('2026-10-01T10:01:00Z', { context: { mcp__plugin_playwright_playwright__browser_click: { chars: 40, images: 0, results: 1 }, mcp__plugin_playwright_playwright__browser_take_screenshot: { chars: 80, images: 2, results: 2 }, Read: { chars: 400, images: 0, results: 1 } } }),
+      rec('2026-10-01T10:02:00Z', {}),
+      rec('2026-09-01T10:03:00Z', { context: { Edit: { chars: 99_999, images: 9, results: 1 } } }),
+    ], {}, Date.parse('2026-09-28T00:00:00Z'));
+    expect(context.tools).toEqual([
+      { name: 'MCP playwright', images: 2, tokens: 3230 },
+      { name: 'Read', images: 0, tokens: 1100 },
+    ]);
+    expect(context).toMatchObject({ images: 2, otherTools: { count: 0, images: 0, tokens: 0 }, tokens: 4330 });
+  });
+
+  it('keeps the largest context tools and groups the rest', () => {
+    const context = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`Tool${String(i).padStart(2, '0')}`, { chars: 400 * (i + 1), images: i === 0 ? 1 : 0, results: 1 }]));
+    const split = buildBreakdown([rec('2026-10-01T10:00:00Z', { context })], {}).context;
+    expect(split.tools).toHaveLength(8);
+    expect(split.otherTools).toEqual({ count: 2, images: 0, tokens: 500 });
+    expect(split.tokens).toBe(5500 + 1600);
+  });
+
   it('splits cost and output tokens by skill, with the rest under no skill', () => {
     const breakdown = buildBreakdown([
       rec('2026-10-01T10:00:00Z', { output: 1_000_000, skill: '/commit' }),
@@ -232,6 +254,7 @@ describe('buildBreakdown', () => {
     const breakdown = buildBreakdown([rec('2026-09-01T10:00:00Z')], {}, Date.parse('2026-10-01T00:00:00Z'));
     expect(breakdown).toEqual({
       agents: { main: 0, subagents: 0 },
+      context: { images: 0, otherTools: { count: 0, images: 0, tokens: 0 }, tokens: 0, tools: [] },
       conversations: [],
       effort: [],
       noSkill: { cost: 0, output: 0 },

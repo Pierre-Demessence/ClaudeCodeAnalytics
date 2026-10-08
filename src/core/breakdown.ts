@@ -1,5 +1,6 @@
 import type { SessionInfo, UsageRecord } from './types.ts';
 
+import { contextTokens } from './contextAdded.ts';
 import { splitOutput, toolLabel } from './outputSplit.ts';
 import { messageCost } from './pricing.ts';
 
@@ -53,6 +54,17 @@ export interface OutputSplit {
   untracked: number;
 }
 
+/** What the tools' results added to the context in the period, estimated. */
+export interface ContextSplit {
+  /** Screenshots across all tools. */
+  images: number;
+  /** Tools beyond the largest ones. */
+  otherTools: { count: number; images: number; tokens: number };
+  /** Each tool (an MCP server's tools as one), largest first. */
+  tokens: number;
+  tools: { name: string; images: number; tokens: number }[];
+}
+
 /** What messages under one skill or slash command cost. */
 export interface SkillUsage {
   name: string;
@@ -71,6 +83,7 @@ export interface SubagentTypeCost {
 /** Where one period's usage went. Costs are API-equivalent USD. */
 export interface Breakdown {
   agents: { main: number; subagents: number };
+  context: ContextSplit;
   /** The 10 most expensive conversations. */
   conversations: ConversationCost[];
   /** Main agent only: subagent messages carry no effort. */
@@ -182,6 +195,7 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
   let thinking = 0;
   const split = { reply: 0, thinking: 0, untracked: 0 };
   const toolTokens = new Map<string, number>();
+  const toolContext = new Map<string, { chars: number; images: number }>();
   const noSkill = { cost: 0, output: 0 };
   const skills = new Map<string, SkillUsage>();
 
@@ -201,6 +215,13 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
         toolTokens.set(toolLabel(part.name!), (toolTokens.get(toolLabel(part.name!)) ?? 0) + part.tokens);
       else
         split[part.kind] += part.tokens;
+    }
+    for (const [name, size] of Object.entries(record.context ?? {})) {
+      const label = toolLabel(name);
+      const sum = toolContext.get(label) ?? { chars: 0, images: 0 };
+      sum.chars += size.chars;
+      sum.images += size.images;
+      toolContext.set(label, sum);
     }
     const skillName = skillFor(record);
     if (skillName) {
@@ -262,6 +283,10 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
 
   const tools = [...toolTokens].map(([name, tokens]) => ({ name, tokens })).sort((a, b) => b.tokens - a.tokens || a.name.localeCompare(b.name));
   const otherTools = tools.slice(TOP_TOOLS);
+  const contextTools = [...toolContext]
+    .map(([name, size]) => ({ name, images: size.images, tokens: contextTokens(size) }))
+    .sort((a, b) => b.tokens - a.tokens || a.name.localeCompare(b.name));
+  const otherContext = contextTools.slice(TOP_TOOLS);
   const rankedSkills = [...skills.values()].sort((a, b) => byCost(a, b) || a.name.localeCompare(b.name));
   const otherSkills = rankedSkills.slice(TOP_SKILLS);
 
@@ -274,6 +299,12 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
     surfaces: [...surfaces].map(([entrypoint, cost]) => ({ cost, entrypoint })).sort(byCost),
     thinkingShare: output > 0 ? thinking / output : 0,
     total,
+    context: {
+      images: contextTools.reduce((sum, tool) => sum + tool.images, 0),
+      otherTools: { count: otherContext.length, images: otherContext.reduce((sum, tool) => sum + tool.images, 0), tokens: otherContext.reduce((sum, tool) => sum + tool.tokens, 0) },
+      tokens: contextTools.reduce((sum, tool) => sum + tool.tokens, 0),
+      tools: contextTools.slice(0, TOP_TOOLS),
+    },
     conversations: [...conversations.values()].sort(byCost).slice(0, TOP_CONVERSATIONS).map(({ branches, ...conversation }) => {
       let branch: string | undefined;
       for (const [name, count] of branches) {

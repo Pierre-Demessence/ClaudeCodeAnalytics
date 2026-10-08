@@ -11,9 +11,12 @@ interface RawUsage {
 }
 
 interface RawBlock {
+  id?: string;
   name?: string;
+  content?: string | RawBlock[];
   input?: { skill?: unknown } | null;
   text?: string;
+  tool_use_id?: string;
   type?: string;
 }
 
@@ -53,6 +56,75 @@ function measureTools(entry: RawEntry): { toolInput: Record<string, number>; too
     }
   }
   return { toolInput, tools };
+}
+
+/** A tool call of an assistant line: its id, which the result of a later line names, and the tool. */
+export interface ToolCall {
+  id: string;
+  name: string;
+}
+
+/** The size of one tool result: its text length and its images. Never the content. */
+export interface ToolResultSize {
+  id: string;
+  chars: number;
+  images: number;
+}
+
+/** The tool calls of an assistant line, none for any other line. */
+export function parseToolCalls(line: string): ToolCall[] {
+  // Most lines call no tool: skip parsing them a second time.
+  if (!line.includes('"tool_use"'))
+    return [];
+  let entry: RawEntry;
+  try {
+    entry = JSON.parse(line) as RawEntry;
+  }
+  catch {
+    return [];
+  }
+  if (entry.type !== 'assistant')
+    return [];
+  const calls: ToolCall[] = [];
+  for (const block of blocksOf(entry)) {
+    if (block.type === 'tool_use' && typeof block.id === 'string' && block.id && typeof block.name === 'string' && block.name)
+      calls.push({ id: block.id, name: block.name });
+  }
+  return calls;
+}
+
+/** The size of each tool result of a user line, none for any other line. */
+export function parseToolResults(line: string): ToolResultSize[] {
+  if (!line.includes('"tool_result"'))
+    return [];
+  let entry: RawEntry;
+  try {
+    entry = JSON.parse(line) as RawEntry;
+  }
+  catch {
+    return [];
+  }
+  if (entry.type !== 'user')
+    return [];
+  const results: ToolResultSize[] = [];
+  for (const block of blocksOf(entry)) {
+    if (block.type !== 'tool_result' || typeof block.tool_use_id !== 'string' || !block.tool_use_id)
+      continue;
+    const size: ToolResultSize = { id: block.tool_use_id, chars: 0, images: 0 };
+    if (typeof block.content === 'string') {
+      size.chars = block.content.length;
+    }
+    else if (Array.isArray(block.content)) {
+      for (const part of block.content) {
+        if (part.type === 'image')
+          size.images++;
+        else if (part.type === 'text' && typeof part.text === 'string')
+          size.chars += part.text.length;
+      }
+    }
+    results.push(size);
+  }
+  return results;
 }
 
 /**
@@ -223,6 +295,8 @@ export function mergeRecord(records: Map<string, UsageRecord>, record: UsageReco
   const merged = { ...base };
   if (agentType)
     merged.agentType = agentType;
+  if (existing.context)
+    merged.context = existing.context;
   if (tools)
     merged.tools = tools;
   else

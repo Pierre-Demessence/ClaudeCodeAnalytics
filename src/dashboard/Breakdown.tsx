@@ -6,6 +6,7 @@ import type { Series } from '@/dashboard/models';
 
 import { familyOf } from '@/core/family';
 import { CardGrid, Cell } from '@/dashboard/CardGrid';
+import { ContextCard } from '@/dashboard/ContextCard';
 import { formatDateTime, formatDollars, formatDuration, formatPercent } from '@/dashboard/format';
 import { ModelRatiosCard } from '@/dashboard/ModelRatios';
 import { SERIES } from '@/dashboard/models';
@@ -107,7 +108,7 @@ export function Breakdown({ summary }: { summary: Summary }) {
         : (
             <>
               <CardGrid>
-                <Cell span={12}>
+                <Cell span={6}>
                   <section className="card">
                     <h2>By project</h2>
                     <table className="project-table">
@@ -134,6 +135,9 @@ export function Breakdown({ summary }: { summary: Summary }) {
                     </table>
                     <Legend series={SERIES.filter(s => families.has(s.family))} />
                   </section>
+                </Cell>
+                <Cell span={6}>
+                  <SkillCard breakdown={breakdown} />
                 </Cell>
 
                 <Cell span={4}>
@@ -195,7 +199,7 @@ export function Breakdown({ summary }: { summary: Summary }) {
                   <OutputCard output={breakdown.output} />
                 </Cell>
                 <Cell span={6}>
-                  <SkillCard breakdown={breakdown} />
+                  <ContextCard context={breakdown.context} />
                 </Cell>
               </CardGrid>
 
