@@ -10,6 +10,8 @@ transcripts and the plan-limit endpoint.
 - Always-on dashboard: `npm run docker:up` (rebuild + restart the container
   at `http://analytics.claudecode.localhost`, behind Traefik)
 - Collector: `npm run collect` (`-- --force` ignores the endpoint throttle)
+- Backtest: `npm run backtest` (`-- --weeks 8 --step-hours 6`) replays the
+  forecasts on the data dir, read-only, and scores them against the final %
 - Hook: `npm run hook:install` prints it; `-- --apply` edits `~/.claude/settings.json`
 - Build: `npm run build` (type-checks both tsconfigs, then `vite build`)
 - Lint: `npm run lint` / `npm run lint:fix`

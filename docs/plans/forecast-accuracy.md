@@ -133,9 +133,11 @@ cost are already in every record. No change to persisted data.
 behavior). No messages in the period: no profile, flat fallback. Pace 0 or `k`
 missing: no value, never an infinite time left.
 
-**Backtest ground truth.** Weekly: the last reading of the week (or the "est."
-value of `weekHistory.ts`). 5-hour: the window's peak (`sessions.ts`). A limit
-hit is as `weekHistory` and `sessions` already define it (thresholds 98 / 95).
+**Backtest ground truth.** Weekly: the last reading of a completed week, when
+taken within 12 h of its reset (`FINAL_READING_MS`); other weeks are left out
+rather than estimated. 5-hour: the highest reading of a completed window, final
+when the last reading is within 30 min of the reset or no message came after
+it. A limit hit uses the configured thresholds (98 weekly, 95 5-hour).
 
 **Risks.** Replaying `buildSummary` ~200 times over a year of records may be slow;
 if so, build the cost index once and pass it in. The schedule profile may not beat
@@ -145,10 +147,10 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 
 ### Stage 1: backtest
 
-- [ ] Baseline: run lint, test and build; note existing warnings
-- [ ] `core/backtest.ts` with tests (synthetic records and readings, known errors)
-- [ ] `collector/backtest/cli.ts` and the `backtest` npm script, read-only
-- [ ] Run on the real data; record the baseline scores in the final report
+- [x] Baseline: run lint, test and build; note existing warnings
+- [x] `core/backtest.ts` with tests (synthetic records and readings, known errors)
+- [x] `collector/backtest/cli.ts` and the `backtest` npm script, read-only
+- [x] Run on the real data; record the baseline scores in the final report
 
 ### Stage 2: pace per model
 
@@ -179,4 +181,7 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 - [ ] `docs/backlog.md`: delete "Weekday-aware daily usage" and the bootstrap item if stage 3 ships
 - [ ] Delete this plan in the final commit, naming its path in the message
 
-Status: not started; awaiting approval.
+Status: stage 1 done in the `forecast-backtest` worktree, uncommitted. The data
+dir holds about a week of readings, so the backtest has one completed weekly
+window and a dozen 5-hour windows: stage 3 cannot be judged yet (see its gate).
+Next: stage 2.
