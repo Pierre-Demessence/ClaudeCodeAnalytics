@@ -108,4 +108,6 @@ export interface Status {
   lastRunAt?: string;
   malformedLines?: number;
   messages?: number;
+  /** ISO. When the paid subscription started; it is billed on the same day each month. */
+  subscriptionStartedAt?: string;
 }

@@ -13,7 +13,6 @@ New capabilities.
 - `[multi-account]` Support several Claude accounts (e.g. a second Pro used when the first is limited). Not needed yet; brainstormed for when it is. Today everything assumes one: one `.credentials.json` read in `collect.ts:73`, snapshots and records carry no account, so a second account's readings would interleave with the first and corrupt calibration and forecasts. Design: one account per config folder (`CLAUDE_CONFIG_DIR`, the documented way; log out/in in one folder mixes transcripts, which carry no account id). Key each folder by `organizationUuid` from its `.credentials.json` (field exists; that it differs between two accounts is unverified until a second account is logged in). Tag records and snapshots with it, with a one-time migration tagging existing data as account 1 (back up the data dir first; `SCAN_FORMAT` bump last). Dashboard: an account picker scoping readings, windows, forecast and the Sessions calendar. Pool calibration (and the 5-hour fit) across accounts of the same plan, never across plans; each point's cost must come from its own account's transcripts. Active pace is a property of the user and is probably pooled too. Open points: the second folder starts empty (global settings, plugins, skills, statusline must be copied or linked); the analytics hook must be installed in it and told which folder it runs for; the Docker container mounts only `~/.claude` and needs the second folder read-only; how the VS Code extension picks a config dir (how to set `CLAUDE_CONFIG_DIR` there) is unchecked and must be verified, since the extension is used daily.
 - `[forensics]` Anonymize toggle (hotkey) masking project names, `cwd` and conversation titles for screenshots.
 - `[forensics]` Project drill-down page: a project's sessions, weekly cost and cache health, reached from Breakdown's "By project".
-- `[forensics]` API-equivalent value vs plan price ("you used $X of API value on a $Y plan"); check Plans first, since pricing already exists and part of it may be shown.
 - claude.ai vs Claude Code split per week from `claudeCodeShare` (only feeds the fit today). Design board: `Split.dc.html`.
 
 ## Enhancements
@@ -40,6 +39,8 @@ Improvements to something that exists.
 
 - `[forensics]` Calibration cross-check from observed limit hits: the median cost of limit-hit windows is a capacity estimate, floored by the highest cost of a window that did not hit the limit; compare with the `k × cost` demand of limit-hit weeks. Server overloads are stored (`events.jsonl`) but not shown anywhere.
 - A week or session that reached its limit uses `k × cost` as its demand, which leaves out claude.ai usage (understated); the endpoint's `claudeCodeShare` could scale it up.
+
+- `[forensics]` Test the credit scheme cached in `~/.claude.json` (`tengu_amber_tally`: 5-hour credits 10000 / 50000 / 200000 for Pro / Max 5× / Max 20×, and credits per million tokens per model) against the readings: replay the usage under it with the backtest and compare its error with the API-price model. Unverified: units, which token types count, whether the flag is live. Opus 5.5 : Sonnet 5.5 : Haiku 4.5 is 1833 : 1250 : 833 there, against 4 : 2 : 1 by API output price.
 
 ### Plans and what-if
 

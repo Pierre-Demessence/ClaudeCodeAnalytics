@@ -2,6 +2,7 @@ import type { Status } from '../core/types.ts';
 
 import { planFromSubscription, withDetectedPlan } from '../core/plans.ts';
 import { compareVersions } from '../core/versions.ts';
+import { readSubscriptionStart } from './account.ts';
 import { fetchUsage, readCredentials } from './endpoint.ts';
 import { acquireLock } from './lock.ts';
 import { malformedLineCount, scanTranscripts } from './scan.ts';
@@ -68,6 +69,11 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
     status.malformedLines = malformedLineCount(scanState.files);
     if (scan.claudeCodeVersion && (!status.claudeCodeVersion || compareVersions(scan.claudeCodeVersion, status.claudeCodeVersion) > 0))
       status.claudeCodeVersion = scan.claudeCodeVersion;
+
+    // Kept when unreadable: a container cannot see the live file the host's hook read.
+    const subscriptionStartedAt = await readSubscriptionStart(options.claudeDir);
+    if (subscriptionStartedAt)
+      status.subscriptionStartedAt = subscriptionStartedAt;
 
     const lastAttempt = status.lastEndpointAttemptAt ? Date.parse(status.lastEndpointAttemptAt) : 0;
     const due = options.force || now - lastAttempt >= settings.throttleMinutes * 60_000;

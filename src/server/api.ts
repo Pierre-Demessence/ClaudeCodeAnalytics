@@ -177,6 +177,7 @@ async function summary(store: Store, timeZone: string) {
       planHistory: settings.planHistory,
       records: [...records.values()],
       snapshots,
+      subscriptionStart: status.subscriptionStartedAt ? Date.parse(status.subscriptionStartedAt) : undefined,
       throttleMinutes: settings.throttleMinutes,
       timeZone,
       titles,

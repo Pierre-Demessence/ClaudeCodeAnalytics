@@ -372,3 +372,12 @@ Tool counts from the copies of one message are added when the line continues
 a message already met in the scan or lies after the stored offset; the first
 copy met when a transcript is read from its start replaces the stored count, so
 the re-read after a `SCAN_FORMAT` bump does not double them.
+
+## Subscription cost from the billing date, not prorated
+
+The Usage card sets what was charged against the usage of the same cycle: the
+list price on each billing date, the day of the month the subscription started
+(`oauthAccount.subscriptionCreatedAt` in `~/.claude.json`), at the plan active
+then. Rejected: prorating the price over the days with data, which reads $6 for a
+$20 Pro plan ten days into a cycle; it remains the fallback without the date.
+Assumes monthly billing and list prices, in dollars before VAT.

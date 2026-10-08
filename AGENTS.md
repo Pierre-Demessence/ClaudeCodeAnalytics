@@ -24,7 +24,7 @@ Run lint, test and build before considering work done.
 - `src/core/` — pure logic, no Node or DOM APIs: transcript parsing, events
   (rate-limit hits, overloads, compactions), output split by tool, pricing,
   aggregation, calibration, forecast, active pace, weekly share, week history,
-  cache anomalies, plans, plan fit, multipliers, breakdown, `buildSummary`.
+  cache anomalies, plans, plan fit, value for money, multipliers, breakdown, `buildSummary`.
 - `src/collector/` — Node: transcript scan, usage endpoint client, data-dir
   store, lock, hook installer; entry `cli.ts` (also run by the Claude Code hook).
 - `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview.
@@ -86,7 +86,9 @@ Run lint, test and build before considering work done.
   kept per session in `sessions.json`; `events.jsonl` keeps rate-limit hits,
   overloads and compactions (times and limit types, never their text). `deleted-readings.jsonl` keeps the manual readings deleted from the
   dashboard: keep it. `backup-format-<n>/` holds the message
-  files from before a scan-format re-read: keep it.
+  files from before a scan-format re-read: keep it. `status.json` keeps
+  `subscriptionStartedAt`, the one field the collector takes from `~/.claude.json`
+  (`oauthAccount.subscriptionCreatedAt`): never the email or the ids.
 - Bump `SCAN_FORMAT` (`collector/store.ts`) only when records gain fields that
   old messages need: the next run re-reads every transcript once. Make the bump
   the last edit, after the tests pass, since the hook runs it on the real data.

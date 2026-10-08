@@ -66,6 +66,16 @@ describe('collect', () => {
     await rm(root, { force: true, recursive: true });
   });
 
+  it('records when the subscription started, and keeps it when the file is out of sight', async () => {
+    await writeFile(join(root, '.claude.json'), JSON.stringify({ oauthAccount: { billingType: 'stripe_subscription', emailAddress: 'someone@example.com', subscriptionCreatedAt: '2026-09-28T19:26:39Z' } }));
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+    expect((await new Store(dataDir).loadStatus()).subscriptionStartedAt).toBe('2026-09-28T19:26:39.000Z');
+    await rm(join(root, '.claude.json'));
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW + 1000 });
+    expect((await new Store(dataDir).loadStatus()).subscriptionStartedAt).toBe('2026-09-28T19:26:39.000Z');
+    expect(JSON.stringify(await new Store(dataDir).loadStatus())).not.toContain('someone@example.com');
+  });
+
   it('imports deduplicated messages, including subagents, and takes a snapshot', async () => {
     const result = await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
     expect(result.skipped).toBeUndefined();

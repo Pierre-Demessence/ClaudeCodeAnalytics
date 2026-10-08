@@ -1518,6 +1518,21 @@ details .table {
   font-size: 0.85rem;
 }
 
+.stats .value-saved strong {
+  color: var(--accent);
+}
+
+.value-card .stats {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+@media (min-width: 900px) {
+  .value-card .stats {
+    column-gap: 56px;
+  }
+}
+
 .mini-bars,
 .cost-bins {
   position: relative;
