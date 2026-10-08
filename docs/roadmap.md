@@ -8,10 +8,10 @@ Order of the milestones. A milestone that needs design gets its own plan in
 
 Independent of each other; ordered by value for effort.
 
-1. **Skill per conversation**: the skill or command a conversation ran.
-2. **API-equivalent value vs plan price**.
-3. **Project drill-down**: a project's sessions, weekly cost and cache health.
-4. **Anonymize toggle**: last, so it also masks the views above.
+1. **API-equivalent value vs plan price**.
+2. **Context added per tool**: the size of each tool's results, to see which tools
+   fill the context (option 1 of "Input side per tool" in the backlog).
+3. **Anonymize toggle**: last, so it also masks the views above.
 
 ## Waiting for data
 
