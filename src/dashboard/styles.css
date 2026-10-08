@@ -1125,6 +1125,108 @@ details .table {
   gap: 6px;
 }
 
+/* Breakdown output cards: every bucket has its own texture as well as a label; hatching marks the tool estimate. */
+.breakdown-pair {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .breakdown-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.output-bar {
+  display: flex;
+  height: 28px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.output-thinking {
+  background: var(--text-primary);
+}
+
+.output-reply {
+  background-color: var(--grid);
+  background-image: radial-gradient(var(--text-secondary) 1.2px, transparent 1.5px);
+  background-size: 6px 6px;
+}
+
+.output-tool {
+  background: repeating-linear-gradient(45deg, var(--accent) 0 2px, var(--estimate-fill) 2px 6px);
+}
+
+.output-untracked,
+.output-noskill {
+  box-sizing: border-box;
+  border: 1px dashed var(--text-secondary);
+  background: var(--surface-0);
+}
+
+.output-swatch {
+  display: inline-block;
+  flex: none;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  border-radius: 3px;
+  vertical-align: -2px;
+}
+
+.output-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.output-table th,
+.output-table td {
+  padding: 5px 6px;
+  text-align: right;
+}
+
+.output-table thead th {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.output-table th:first-child {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 400;
+}
+
+.output-table thead th:nth-child(2),
+.output-table .output-bar-cell {
+  min-width: 80px;
+  width: 100%;
+  text-align: left;
+}
+
+.output-bar-cell .share-track {
+  display: block;
+}
+
+.output-table tfoot th,
+.output-table tfoot td {
+  border-top: 1px solid var(--grid);
+}
+
+.output-table tfoot th {
+  font-weight: 600;
+}
+
 .table-scroll {
   overflow-x: auto;
 }

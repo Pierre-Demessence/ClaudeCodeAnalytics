@@ -19,9 +19,10 @@ Run lint, test and build before considering work done.
 
 ## Layout
 
-- `src/core/` — pure logic, no Node or DOM APIs: transcript parsing, pricing,
-  aggregation, calibration, forecast, active pace, weekly share, week history, plans, plan fit,
-  multipliers, breakdown, `buildSummary`.
+- `src/core/` — pure logic, no Node or DOM APIs: transcript parsing, output
+  split by tool, pricing, aggregation, calibration, forecast, active pace,
+  weekly share, week history, plans, plan fit, multipliers, breakdown,
+  `buildSummary`.
 - `src/collector/` — Node: transcript scan, usage endpoint client, data-dir
   store, lock, hook installer; entry `cli.ts` (also run by the Claude Code hook).
 - `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview.
@@ -78,7 +79,8 @@ Run lint, test and build before considering work done.
 - The data dir (`~/.claude-code-analytics/`, or `CCA_DATA_DIR`) holds the
   user's history: never wipe it. Tests and manual runs use a temp
   `CCA_DATA_DIR`. Stored messages hold token counts and session metadata
-  (`sessionId`, `cwd`, `gitBranch`, …), never content; conversation titles are
+  (`sessionId`, `cwd`, `gitBranch`, …), tool names with call counts and the
+  skill or slash command name, never content or tool inputs; conversation titles are
   kept per session in `sessions.json`. `deleted-readings.jsonl` keeps the manual readings deleted from the
   dashboard: keep it. `backup-format-<n>/` holds the message
   files from before a scan-format re-read: keep it.

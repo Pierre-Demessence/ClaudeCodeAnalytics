@@ -6,6 +6,7 @@ import type { Series } from '@/dashboard/models';
 
 import { formatDateTime, formatDollars, formatDuration, formatPercent } from '@/dashboard/format';
 import { familyOf, SERIES } from '@/dashboard/models';
+import { OutputCard, SkillCard } from '@/dashboard/OutputCards';
 import { Legend, Swatch } from '@/dashboard/Patterns';
 import { InfoTip } from '@/dashboard/Tip';
 import { Toggle } from '@/dashboard/Toggle';
@@ -174,6 +175,11 @@ export function Breakdown({ summary }: { summary: Summary }) {
                     />
                   </section>
                 </div>
+              </div>
+
+              <div className="breakdown-pair">
+                <OutputCard output={breakdown.output} />
+                <SkillCard breakdown={breakdown} />
               </div>
 
               <section className="card">

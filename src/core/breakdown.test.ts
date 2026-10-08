@@ -135,13 +135,95 @@ describe('buildBreakdown', () => {
     expect(ids.at(-1)).toBe('s2');
   });
 
+  it('splits the output tokens by thinking, reply, tool and untracked, summing to the period total', () => {
+    const breakdown = buildBreakdown([
+      rec('2026-10-01T10:00:00Z', { output: 1000, thinking: 400, tools: { Bash: 1, Read: 1 } }),
+      rec('2026-10-01T10:01:00Z', { output: 500, thinking: 100, tools: { mcp__plugin_playwright_playwright__browser_click: 1, mcp__plugin_playwright_playwright__browser_navigate: 1 } }),
+      rec('2026-10-01T10:02:00Z', { output: 200, tools: {} }),
+      rec('2026-10-01T10:03:00Z', { output: 300, thinking: 50 }),
+      rec('2026-09-01T10:03:00Z', { output: 9999, tools: { Edit: 1 } }),
+    ], {}, Date.parse('2026-09-28T00:00:00Z'));
+    const { output } = breakdown;
+    expect(output).toMatchObject({ otherTools: { count: 0, tokens: 0 }, reply: 200, thinking: 550, total: 2000, untracked: 250 });
+    expect(output.tools).toEqual([
+      { name: 'MCP playwright', tokens: 400 },
+      { name: 'Bash', tokens: 300 },
+      { name: 'Read', tokens: 300 },
+    ]);
+    const sum = output.reply + output.thinking + output.untracked + output.otherTools.tokens + output.tools.reduce((s, t) => s + t.tokens, 0);
+    expect(sum).toBe(output.total);
+  });
+
+  it('keeps the largest tools and groups the rest', () => {
+    const tools = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`Tool${String(i).padStart(2, '0')}`, 1]));
+    const { output } = buildBreakdown([rec('2026-10-01T10:00:00Z', { output: 1200, tools })], {});
+    expect(output.tools).toHaveLength(8);
+    expect(output.otherTools).toEqual({ count: 4, tokens: 400 });
+  });
+
+  it('splits cost and output tokens by skill, with the rest under no skill', () => {
+    const breakdown = buildBreakdown([
+      rec('2026-10-01T10:00:00Z', { output: 1_000_000, skill: '/commit' }),
+      rec('2026-10-01T10:01:00Z', { output: 500_000, skill: '/commit' }),
+      rec('2026-10-01T10:02:00Z', { output: 200_000, skill: 'superpowers:brainstorming' }),
+      rec('2026-10-01T10:03:00Z', { output: 100_000 }),
+      rec('2026-10-01T10:04:00Z', { output: 300_000, sidechain: true }),
+    ], {});
+    expect(breakdown.skills).toEqual([
+      { name: '/commit', cost: 30, output: 1_500_000 },
+      { name: 'superpowers:brainstorming', cost: 4, output: 200_000 },
+    ]);
+    expect(breakdown.noSkill).toEqual({ cost: 8, output: 400_000 });
+    expect(breakdown.otherSkills).toEqual({ cost: 0, count: 0, output: 0 });
+    expect(breakdown.total.cost).toBe(42);
+  });
+
+  it('gives a subagent the skill its conversation was under when it ran', () => {
+    const breakdown = buildBreakdown([
+      rec('2026-10-01T10:00:00Z', { skill: '/commit' }),
+      rec('2026-10-01T10:01:00Z', { sidechain: true }),
+      rec('2026-10-01T10:01:30Z', { sidechain: true }),
+      // The next prompt ran without a skill: its subagents are not the skill's.
+      rec('2026-10-01T10:05:00Z'),
+      rec('2026-10-01T10:06:00Z', { sidechain: true }),
+      // Another conversation's skill does not leak, and neither does a subagent before any main message.
+      rec('2026-10-01T10:02:00Z', { sessionId: 's2', skill: 'other' }),
+      rec('2026-10-01T09:00:00Z', { sidechain: true }),
+      rec('2026-10-01T10:03:00Z', { sessionId: undefined, sidechain: true }),
+    ], {});
+    expect(breakdown.skills).toEqual([
+      { name: '/commit', cost: 60, output: 3_000_000 },
+      { name: 'other', cost: 20, output: 1_000_000 },
+    ]);
+    expect(breakdown.noSkill).toEqual({ cost: 80, output: 4_000_000 });
+  });
+
+  it('uses a main-agent message from before the period as the context of a subagent inside it', () => {
+    const breakdown = buildBreakdown([
+      rec('2026-09-20T10:00:00Z', { skill: '/commit' }),
+      rec('2026-10-01T10:00:00Z', { sidechain: true }),
+    ], {}, Date.parse('2026-09-28T00:00:00Z'));
+    expect(breakdown.skills).toEqual([{ name: '/commit', cost: 20, output: 1_000_000 }]);
+  });
+
+  it('keeps the costliest skills and groups the rest', () => {
+    const records = Array.from({ length: 11 }, (_, i) => rec(`2026-10-01T10:${String(i).padStart(2, '0')}:00Z`, { output: (i + 1) * 100_000, skill: `skill-${i}` }));
+    const { otherSkills, skills } = buildBreakdown(records, {});
+    expect(skills.map(s => s.name)).toEqual(['skill-10', 'skill-9', 'skill-8', 'skill-7', 'skill-6', 'skill-5', 'skill-4', 'skill-3']);
+    expect(otherSkills).toEqual({ cost: 12, count: 3, output: 600_000 });
+  });
+
   it('is empty without usage in the period', () => {
     const breakdown = buildBreakdown([rec('2026-09-01T10:00:00Z')], {}, Date.parse('2026-10-01T00:00:00Z'));
     expect(breakdown).toEqual({
       agents: { main: 0, subagents: 0 },
       conversations: [],
       effort: [],
+      noSkill: { cost: 0, output: 0 },
+      otherSkills: { cost: 0, count: 0, output: 0 },
+      output: { otherTools: { count: 0, tokens: 0 }, reply: 0, thinking: 0, tools: [], total: 0, untracked: 0 },
       projects: [],
+      skills: [],
       surfaces: [],
       thinkingShare: 0,
       total: { cost: 0, messages: 0 },
