@@ -22,7 +22,6 @@ Improvements to something that exists.
 
 ### Breakdown
 
-- `[forensics]` Break "subagents" in Breakdown down by subagent type (Explore, Plan, general-purpose, …).
 - `[forensics]` Skill or command per conversation: a column in "Most expensive conversations" or the skills a conversation ran. `UsageRecord.skill` already holds it.
 - Cost per git branch (`UsageRecord.gitBranch`); the Breakdown tab only shows each conversation's main branch.
 - Weight the per-tool output split by tool input size instead of evenly; needs the input sizes stored per tool call (`core/outputSplit.ts`).
@@ -60,5 +59,6 @@ Blocked until more history exists, so the result can be judged.
 ## Technical debt
 
 - `[forensics]` Cache flushes of subagents: detection skips them because parallel subagents interleave in a session; it needs `agentId` stored per record (a `SCAN_FORMAT` bump).
+- `[forensics]` A subagent whose `.meta.json` does not exist yet when its transcript is first scanned stays "Unknown": the scan reads the type once per file and later scans only read appended lines (`src/collector/scan.ts`). Not seen on the real data (0 of 125 files).
 - The Docker dashboard shares the `proxy` network with other containers, which can reach its API by IP (Vite always allows IP hosts, and a request without `Origin` passes the POST check). A dedicated network joined only by Traefik would close this; it needs a change in `S:\Dev\DockerInfra\compose.yml`.
 - `GET /api/summary` has no Origin/Host check: it relies on Vite's default `allowedHosts` and localhost-only CORS. Add an explicit check before ever exposing the server beyond loopback.

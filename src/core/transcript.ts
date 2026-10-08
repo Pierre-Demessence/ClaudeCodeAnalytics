@@ -54,9 +54,9 @@ function countTools(entry: RawEntry): Record<string, number> {
 /**
  * Turns one transcript line into a usage record, or null when the line is not
  * a real assistant response. Only token counts, tool names and the given
- * `skill` are kept, never content.
+ * `skill` and `agentType` are kept, never content.
  */
-export function parseTranscriptLine(line: string, project: string, skill?: string): UsageRecord | null {
+export function parseTranscriptLine(line: string, project: string, skill?: string, agentType?: string): UsageRecord | null {
   if (!line)
     return null;
   let entry: RawEntry;
@@ -94,10 +94,14 @@ export function parseTranscriptLine(line: string, project: string, skill?: strin
     if (typeof value === 'string' && value)
       record[field] = value;
   }
-  if (entry.isSidechain === true)
+  if (entry.isSidechain === true) {
     record.sidechain = true;
-  else if (skill)
+    if (agentType)
+      record.agentType = agentType;
+  }
+  else if (skill) {
     record.skill = skill;
+  }
   const thinking = usage.output_tokens_details?.thinking_tokens;
   if (typeof thinking === 'number')
     record.thinking = thinking;
@@ -191,7 +195,8 @@ function addTools(a: Record<string, number> | undefined, b: Record<string, numbe
  * Each copy holds one block, so its tool calls are added up, but only among
  * the copies already met (`seen` holds their keys): the first copy of a
  * message not met yet replaces the stored tools instead, so re-reading a
- * transcript does not count them twice. A skill, once set, is kept.
+ * transcript does not count them twice. A skill or agent type, once set, is
+ * kept, and a stored record without an agent type gets the one given.
  * Returns whether the map changed.
  */
 export function mergeRecord(records: Map<string, UsageRecord>, record: UsageRecord, seen = new Set<string>()): boolean {
@@ -206,9 +211,12 @@ export function mergeRecord(records: Map<string, UsageRecord>, record: UsageReco
   const skill = existing.skill ?? record.skill;
   const fills = !existing.sessionId && record.sessionId && record.output === existing.output;
   const base = record.output > existing.output || fills ? record : existing;
-  if (base === existing && sameTools(tools, existing.tools) && skill === existing.skill)
+  const agentType = existing.agentType ?? record.agentType;
+  if (base === existing && sameTools(tools, existing.tools) && skill === existing.skill && agentType === existing.agentType)
     return false;
   const merged = { ...base };
+  if (agentType)
+    merged.agentType = agentType;
   if (tools)
     merged.tools = tools;
   else

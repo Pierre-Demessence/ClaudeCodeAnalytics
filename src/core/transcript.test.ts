@@ -74,6 +74,13 @@ describe('parseTranscriptLine', () => {
     expect(parseTranscriptLine(entryWithMetadata(), 'proj')).not.toHaveProperty('sidechain');
   });
 
+  it('keeps the agent type on subagent lines only', () => {
+    const subagent = entryWithMetadata({ extra: { isSidechain: true } });
+    expect(parseTranscriptLine(subagent, 'proj', undefined, 'Explore')?.agentType).toBe('Explore');
+    expect(parseTranscriptLine(subagent, 'proj')).not.toHaveProperty('agentType');
+    expect(parseTranscriptLine(entryWithMetadata(), 'proj', undefined, 'Explore')).not.toHaveProperty('agentType');
+  });
+
   it('marks subagent lines, which have no effort', () => {
     const record = parseTranscriptLine(entryWithMetadata({ extra: { effort: undefined, isSidechain: true } }), 'proj');
     expect(record?.sidechain).toBe(true);
@@ -221,6 +228,15 @@ describe('mergeRecord tools and skill', () => {
     mergeRecord(records, parseTranscriptLine(entryWithMetadata(), 'p', '/commit')!, seen);
     mergeRecord(records, parseTranscriptLine(entryWithMetadata(), 'p', 'other')!, seen);
     expect(records.get('msg_1|req_1')?.skill).toBe('/commit');
+  });
+
+  it('adds the agent type to a stored subagent record that has none', () => {
+    const records = new Map<string, UsageRecord>();
+    const subagent = entryWithMetadata({ extra: { isSidechain: true } });
+    mergeRecord(records, parseTranscriptLine(subagent, 'p')!, new Set());
+    expect(mergeRecord(records, parseTranscriptLine(subagent, 'p', undefined, 'Explore')!, new Set())).toBe(true);
+    expect(records.get('msg_1|req_1')?.agentType).toBe('Explore');
+    expect(mergeRecord(records, parseTranscriptLine(subagent, 'p', undefined, 'Explore')!, new Set())).toBe(false);
   });
 
   it('adds the skill to a stored record that has none', () => {

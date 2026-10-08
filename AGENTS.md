@@ -56,6 +56,9 @@ Run lint, test and build before considering work done.
 - Theme: `data-theme` on `<html>`. Dark variables exist twice in `styles.css`
   (OS media query and `[data-theme='dark']`): change both. The storage key
   `cca-theme` is also read by the inline script in `index.html`.
+- Cards side by side go in `CardGrid`/`Cell` (`dashboard/CardGrid.tsx`, 12
+  columns, spans 4/6/12), never a bespoke grid: a row is as tall as its tallest
+  cell, so pair cards of similar height or the shorter one leaves a gap.
 - Icons: Lucide (`lucide-react`), `aria-hidden` next to their text; never
   text symbols (✓ ! ▲ ⓘ) or emoji.
 - Charts: never color alone. Each model family has a fixed color slot and an
@@ -82,7 +85,8 @@ Run lint, test and build before considering work done.
   user's history: never wipe it. Tests and manual runs use a temp
   `CCA_DATA_DIR`. Stored messages hold token counts and session metadata
   (`sessionId`, `cwd`, `gitBranch`, …), tool names with call counts and the
-  skill or slash command name, never content or tool inputs; conversation titles are
+  skill or slash command name and the subagent type (from its `.meta.json`,
+  never its description), never content or tool inputs; conversation titles are
   kept per session in `sessions.json`; `events.jsonl` keeps rate-limit hits,
   overloads and compactions (times and limit types, never their text). `deleted-readings.jsonl` keeps the manual readings deleted from the
   dashboard: keep it. `backup-format-<n>/` holds the message

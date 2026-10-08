@@ -20,6 +20,8 @@ export interface ApiEvent {
 
 /** One deduplicated assistant message, as stored by the collector. No content. */
 export interface UsageRecord {
+  /** The subagent's type (`Explore`, `general-purpose`, …); present only on a subagent's message, and not when its metadata file was missing. */
+  agentType?: string;
   cacheRead: number;
   cacheWrite1h: number;
   cacheWrite5m: number;

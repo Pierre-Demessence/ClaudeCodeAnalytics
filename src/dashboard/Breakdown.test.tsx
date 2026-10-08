@@ -48,7 +48,7 @@ describe('breakdown', () => {
 
   const records = [
     rec(HOUR_MS, { effort: 'high', entrypoint: 'claude-vscode', gitBranch: 'main', thinking: 250_000 }),
-    rec(2 * HOUR_MS, { entrypoint: 'claude-vscode', gitBranch: 'main', sidechain: true }),
+    rec(2 * HOUR_MS, { agentType: 'Explore', entrypoint: 'claude-vscode', gitBranch: 'main', sidechain: true }),
     rec(3 * HOUR_MS, { cwd: 'S:\\Dev\\other', effort: 'xhigh', entrypoint: 'cli', model: 'claude-haiku-4-5', sessionId: 's2' }),
     rec(10 * DAY_MS, { cwd: 'S:\\Dev\\old', sessionId: 's3' }),
   ];
@@ -72,6 +72,7 @@ describe('breakdown', () => {
   it('splits agents, effort and surfaces with labels', () => {
     render(<Breakdown summary={summary(records)} />);
     expect(card('Main agent vs subagents').textContent).toContain('Subagents 44%');
+    expect(within(card('Main agent vs subagents')).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Explore100%']);
     const effort = card('By effort level');
     expect(effort.textContent).toContain('High');
     expect(effort.textContent).toContain('Extra high');

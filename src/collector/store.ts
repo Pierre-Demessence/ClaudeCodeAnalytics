@@ -18,7 +18,7 @@ export type ScanState = Record<string, { malformed?: number; mtimeMs: number; of
  * that only a full re-read of the transcripts can fill in for what was already
  * imported (see `collect`).
  */
-export const SCAN_FORMAT = 4;
+export const SCAN_FORMAT = 5;
 
 /** Contents of `scan-state.json`. */
 export interface StoredScanState {

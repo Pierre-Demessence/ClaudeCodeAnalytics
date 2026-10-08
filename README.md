@@ -32,7 +32,7 @@ Everything stays on your machine. Data comes from two places:
   flushed and rewritten with their extra cost), and the cost per message with
   this week's outliers and their cause (e.g. a cache rewrite after a pause).
 - Where the usage goes, this week, the last 4 weeks or all time: by project
-  (with the model mix and cache share), main agent vs subagents, effort level,
+  (with the model mix and cache share), main agent vs subagents (with the subagents' types), effort level,
   thinking share and surface, and the most expensive conversations.
 - Past 5-hour sessions of the last 7 days, on a day × hour timeline and in a
   list: cost, messages, projects and peak %, each window placed by a reading
