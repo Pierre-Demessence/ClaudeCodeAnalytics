@@ -42,7 +42,7 @@ export function OutputCard({ output }: { output: Breakdown['output'] }) {
     <section className="card">
       <div className="card-head">
         <h2>Where output goes</h2>
-        <span class="card-head-spacer"></span>
+        <span className="card-head-spacer"></span>
         <span className="card-subtitle">{`${formatTokens(total)} output tokens`}</span>
       </div>
       <p className="note">Thinking and replies are counted exactly. Tool figures split each message's remaining tokens evenly across its tool calls, so they are estimates.</p>
