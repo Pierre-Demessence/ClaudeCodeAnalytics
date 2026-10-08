@@ -102,7 +102,7 @@ function Timeline({ summary }: { summary: Summary }) {
                   <div className="session-row" key={row.day}>
                     <span className="session-day">{formatSessionDay(row.day)}</span>
                     <div className="session-track">
-                      {row.parts.map(({ continuesLeft, continuesRight, fillWidth, isStart, left, width, window }) => {
+                      {row.parts.map(({ continuesLeft, continuesRight, fillWidth, hasLabel, left, width, window }) => {
                         const tipProps = tip(windowTip(window, timeZone));
                         const dimmed = active !== undefined && active !== window.start;
                         return (
@@ -131,7 +131,7 @@ function Timeline({ summary }: { summary: Summary }) {
                             }}
                           >
                             {fillWidth !== undefined && <span className={`session-fill${window.capped ? ' capped' : ''}`} style={{ width: `${fillWidth}%` }} />}
-                            {isStart && (
+                            {hasLabel && (
                               <span className="session-label">
                                 {window.capped && <CappedIcon size={12} />}
                                 {window.limitHits && <BlockedIcon size={12} />}

@@ -16,10 +16,24 @@ describe('timelineRows', () => {
     expect(rows.map(r => r.day)).toEqual(['2026-10-02', '2026-10-01']);
     const [after] = rows[0]!.parts;
     const [before] = rows[1]!.parts;
-    expect(before).toMatchObject({ continuesLeft: false, continuesRight: true, isStart: true, left: 87.5 });
+    expect(before).toMatchObject({ continuesLeft: false, continuesRight: true, hasLabel: true, left: 87.5 });
     expect(before!.width).toBeCloseTo(12.5);
-    expect(after).toMatchObject({ continuesLeft: true, continuesRight: false, isStart: false, left: 0 });
+    expect(after).toMatchObject({ continuesLeft: true, continuesRight: false, hasLabel: false, left: 0 });
     expect(after!.width).toBeCloseTo(100 / 12);
+  });
+
+  it('labels the wider piece of a window split near midnight', () => {
+    // Paris is UTC+2: 23:20–04:20 local, only 40 minutes before midnight.
+    const window = win('2026-10-01T21:20:00.000Z', '2026-10-02T02:20:00.000Z');
+    const [after, before] = timelineRows([window], ['2026-10-02', '2026-10-01'], 'Europe/Paris');
+    expect(before!.parts[0]!.hasLabel).toBe(false);
+    expect(after!.parts[0]!.hasLabel).toBe(true);
+  });
+
+  it('keeps the label on the start piece when the next day has no row', () => {
+    const window = win('2026-10-01T21:20:00.000Z', '2026-10-02T02:20:00.000Z');
+    const [row] = timelineRows([window], ['2026-10-01'], 'Europe/Paris');
+    expect(row!.parts[0]!.hasLabel).toBe(true);
   });
 
   it('spreads one peak fill across a split window, filling pieces in order', () => {

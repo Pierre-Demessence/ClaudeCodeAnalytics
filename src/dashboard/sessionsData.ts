@@ -12,14 +12,15 @@ export interface TimelinePart {
   continuesRight: boolean;
   /** The peak fill clipped to this piece, as a % of its width; absent without a peak. */
   fillWidth?: number;
-  /** The piece holding the window's start, which carries its label. */
-  isStart: boolean;
+  /** Whether this piece carries the window's label: the wider piece, so a window starting just before midnight is not labelled in a sliver. */
+  hasLabel: boolean;
   left: number;
   width: number;
   window: FiveHourWindow;
 }
 
-const nextDay = (day: string) => new Date(Date.parse(`${day}T12:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
+const shiftDay = (day: string, offset: number) => new Date(Date.parse(`${day}T12:00:00Z`) + offset * DAY_MS).toISOString().slice(0, 10);
+const nextDay = (day: string) => shiftDay(day, 1);
 
 /**
  * The peak fill, one continuous bar of `peak%` across the whole window, clipped
@@ -46,7 +47,12 @@ export function timelineRows(windows: readonly FiveHourWindow[], days: readonly 
       const end = Math.min(finish, to);
       if (end <= begin)
         return [];
-      return [{ continuesLeft: start < from, continuesRight: finish > to, fillWidth: fillWithin(window, begin, end, start, finish), isStart: start >= from, left: (begin - from) / (to - from) * 100, width: (end - begin) / (to - from) * 100, window }];
+      const share = (end - begin) / (finish - start);
+      // The other piece has no row when the window runs past the shown days.
+      const hasLabel = start >= from
+        ? share >= 0.5 || !days.includes(nextDay(day))
+        : share > 0.5 || !days.includes(shiftDay(day, -1));
+      return [{ continuesLeft: start < from, continuesRight: finish > to, fillWidth: fillWithin(window, begin, end, start, finish), hasLabel, left: (begin - from) / (to - from) * 100, width: (end - begin) / (to - from) * 100, window }];
     });
     return { day, parts };
   });
