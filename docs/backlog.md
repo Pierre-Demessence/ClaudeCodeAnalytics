@@ -28,3 +28,7 @@ that completes it.
 - Convert between plans with the measured multipliers (Plans tab, "How far to trust the conversions") when both plans have enough weeks, instead of the advertised ones.
 - A week or session that reached its limit uses `k × cost` as its demand, which leaves out claude.ai usage (understated); the endpoint's `claudeCodeShare` could scale it up.
 - The what-if only moves Opus work to Sonnet; other shifts (Sonnet to Haiku, a lower effort) would reuse the same linear `shift` per week and session.
+- `[forecast]` Fit `k` per model family instead of assuming limits scale with API price; needs enough readings per family.
+- `[forecast]` Carry the uncertainty of `k` into the forecast range, so a weakly calibrated plan shows a wider band.
+- `[forecast]` Pace by effort level and fast mode (`UsageRecord.effort`, `speed`), once the per-model pace shows how much the model alone explains.
+- `[forecast]` Say which limit binds first (5-hour or weekly) and show a probability of hitting each, once the scheduled forecast exists.
