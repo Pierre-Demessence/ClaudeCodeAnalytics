@@ -224,6 +224,23 @@ describe('buildSummary', () => {
     expect(summary.current?.activeLeftMs).toBeCloseTo((100 - 30) / weeklyK! / 180 * HOUR_MS);
   });
 
+  it('gives the active use left per model family and names the family in use', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    const today = [rec(at('10:00')), rec(at('10:10'), 'claude-sonnet-4-6'), rec(at('10:20'), 'claude-sonnet-4-6')];
+    const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';
+    const snapshots = [['10:05', 10], ['10:15', 20], ['10:25', 30]].map(([time, percent]) =>
+      snap(at(time as string), percent as number, RESET, { fiveHour: percent as number, fiveHourResetsAt }));
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [rec(NOW - 40 * DAY_MS), ...today], snapshots, timeZone: 'UTC' });
+
+    expect(summary.currentFamily).toBe('sonnet');
+    const weekly = summary.current!.activeLeftByFamily!;
+    expect(weekly.map(f => f.family)).toEqual(['opus', 'sonnet']);
+    // Little active time in either family: both are estimates, and Opus is the pricier one.
+    expect(weekly.every(f => f.lowConfidence)).toBe(true);
+    expect(weekly[0]!.ms).toBeLessThan(weekly[1]!.ms);
+    expect(summary.fiveHourSession!.activeLeftByFamily!.map(f => f.family)).toEqual(['opus', 'sonnet']);
+  });
+
   it('lists the 5-hour windows, estimated peaks from the 5-hour calibration', () => {
     const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
     const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';

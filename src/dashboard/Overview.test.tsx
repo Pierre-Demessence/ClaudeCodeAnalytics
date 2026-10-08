@@ -122,6 +122,15 @@ describe('overview', () => {
     expect(screen.queryByText(/of active use left/)).toBeNull();
   });
 
+  it('shows the active use left per model family on each card, with the family in use', () => {
+    const fiveHourSession: FiveHourSession = { activeLeftByFamily: [{ family: 'haiku', ms: 90 * 60_000 }], percent: 30, readAt: new Date(NOW - HOUR_MS).toISOString(), resetsAt: new Date(NOW + 2 * HOUR_MS).toISOString() };
+    render(<Overview summary={summary({ activeLeftByFamily: [{ family: 'opus', ms: 2 * HOUR_MS }, { family: 'sonnet', ms: 5 * HOUR_MS }] }, { currentFamily: 'opus', fiveHourSession })} />, { wrapper: TipProvider });
+    expect(weeklyCard().textContent).toContain('Sonnet');
+    expect(weeklyCard().textContent).toContain('5 h 0 min');
+    expect(weeklyCard().querySelector('li.current')!.textContent).toContain('Opus');
+    expect(screen.getByRole('heading', { name: '5-hour session' }).closest('section')!.textContent).toContain('1 h 30 min');
+  });
+
   it('shows the 5-hour session even without a current week', () => {
     const fiveHourSession: FiveHourSession = { percent: 30, readAt: new Date(NOW - HOUR_MS).toISOString(), resetsAt: new Date(NOW + 2 * HOUR_MS).toISOString() };
     render(<Overview summary={summary(null, { fiveHourSession })} />);

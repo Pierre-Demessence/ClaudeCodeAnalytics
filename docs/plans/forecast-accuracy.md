@@ -99,9 +99,9 @@ to the family's cost. Pace = cost / active hours. Measured rather than scaled by
 price: Opus can run slower per message, so the ratio of prices is not the ratio
 of paces. The price ratio is only the fallback for thin data.
 
-**Mix.** The "usual mix" headline uses each family's share of active time over
-the last 14 days: pace_mix = Σ share_f × pace_f. Per-family figures answer "if I
-only use X".
+**Mix.** The "usual mix" headline is the pooled pace of the last 28 days, which
+equals Σ share_f × pace_f with each family's share of active time over those
+days. Per-family figures answer "if I only use X".
 
 **Model ratios (2b).** The ratio of two families' paces from stage 2. Its
 price-per-token part comes from the price table (input/output blend at the
@@ -154,12 +154,12 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 
 ### Stage 2: pace per model
 
-- [ ] Move `familyOf` (and its test) to `core/`, update importers
-- [ ] `core/activeTime.ts`: active ms and cost per family, with tests (gaps, idle, parallel sessions, unpriced model)
-- [ ] Per-family pace, thin-data fallback and mix, with tests
-- [ ] `summary.ts`: expose per-family active time left on both limit cards
-- [ ] `Overview.tsx`: per-family hours, current family highlighted, pattern + label, `InfoTip` for the fallback; update `Overview.test.tsx`
-- [ ] Backtest unchanged or better; check in the browser
+- [x] Move `familyOf` (and its test) to `core/`, update importers
+- [x] `core/activeTime.ts`: active ms and cost per family, with tests (gaps, idle, parallel sessions, unpriced model)
+- [x] Per-family pace, thin-data fallback and mix, with tests
+- [x] `summary.ts`: expose per-family active time left on both limit cards
+- [x] `Overview.tsx`: per-family hours, current family highlighted, pattern + label, `InfoTip` for the fallback; update `Overview.test.tsx`
+- [x] Backtest unchanged or better; check in the browser
 
 ### Stage 2b: model ratios
 
@@ -181,7 +181,7 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 - [ ] `docs/backlog.md`: delete "Weekday-aware daily usage" and the bootstrap item if stage 3 ships
 - [ ] Delete this plan in the final commit, naming its path in the message
 
-Status: stage 1 done in the `forecast-backtest` worktree, uncommitted. The data
+Status: stage 1 committed, stage 2 done, both in the `forecast-backtest` worktree (stage 2 uncommitted). The data
 dir holds about a week of readings, so the backtest has one completed weekly
 window and a dozen 5-hour windows: stage 3 cannot be judged yet (see its gate).
-Next: stage 2.
+Next: stage 2b.

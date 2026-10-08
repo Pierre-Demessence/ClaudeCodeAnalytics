@@ -1,4 +1,4 @@
-export type Family = 'opus' | 'sonnet' | 'haiku' | 'fable' | 'other';
+import type { Family } from '@/core/family';
 
 export interface Series {
   family: Family;
@@ -17,14 +17,6 @@ export const SERIES: readonly Series[] = [
   { color: 'var(--series-4)', family: 'fable', label: 'Fable', pattern: 'pattern-fable' },
   { color: 'var(--series-5)', family: 'other', label: 'Other', pattern: 'pattern-other' },
 ];
-
-export function familyOf(model: string): Family {
-  for (const family of ['opus', 'sonnet', 'haiku', 'fable'] as const) {
-    if (model.includes(`-${family}-`))
-      return family;
-  }
-  return 'other';
-}
 
 /** `claude-opus-5-5` → `Opus 5.5`; unknown shapes are returned as is. */
 export function modelLabel(model: string): string {

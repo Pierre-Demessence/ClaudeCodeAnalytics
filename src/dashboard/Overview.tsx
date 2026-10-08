@@ -3,11 +3,14 @@ import type { ReactNode } from 'react';
 import { TriangleAlert } from 'lucide-react';
 import { useId, useState } from 'react';
 
+import type { FamilyActiveLeft } from '@/core/activePace';
+import type { Family } from '@/core/family';
 import type { WindowForecast } from '@/core/forecast';
 import type { Summary } from '@/dashboard/api';
 
 import { FIVE_HOURS_MS } from '@/core/calibration';
 import { endpointResultText } from '@/dashboard/endpoint';
+import { FamilyHours } from '@/dashboard/FamilyHours';
 import { formatCountdown, formatDateTime, formatDuration, formatPercent, formatRelative } from '@/dashboard/format';
 import { Meter } from '@/dashboard/Meter';
 import { PacingChart } from '@/dashboard/PacingChart';
@@ -48,8 +51,12 @@ function EstimateWarning({ children }: { children: ReactNode }) {
 }
 
 interface LimitCardProps {
+  /** Active use left if only one model family were used. */
+  activeLeftByFamily?: readonly FamilyActiveLeft[];
   /** Active use (ms) left before the limit, shown next to the number. */
   activeLeftMs?: number;
+  /** Family of the latest message. */
+  currentFamily?: Family;
   /** Number dimmed with a warning icon explaining why it is an estimate. */
   estimated: boolean;
   forecast?: WindowForecast;
@@ -63,7 +70,7 @@ interface LimitCardProps {
   window: 'fiveHour' | 'week';
 }
 
-function LimitCard({ activeLeftMs, estimated, forecast, now, resetsAt, roomPerDay, title, used, warning, window }: LimitCardProps) {
+function LimitCard({ activeLeftByFamily, activeLeftMs, currentFamily, estimated, forecast, now, resetsAt, roomPerDay, title, used, warning, window }: LimitCardProps) {
   const tip = useTip();
   const verdict = limitVerdict({ forecast, now, resetsAt, roomPerDay, used, window });
   return (
@@ -80,6 +87,7 @@ function LimitCard({ activeLeftMs, estimated, forecast, now, resetsAt, roomPerDa
         {warning && <EstimateWarning>{warning}</EstimateWarning>}
         {activeLeftMs !== undefined && <span className="limit-active">{`≈ ${formatDuration(activeLeftMs)} of active use left`}</span>}
       </div>
+      {activeLeftByFamily && <FamilyHours current={currentFamily} items={activeLeftByFamily} />}
       <Meter estimated={estimated} forecast={forecast} used={used} />
       <VerdictBox detail={verdict.detail} kind={verdict.kind} title={verdict.title} />
     </section>
@@ -141,7 +149,9 @@ export function Overview({ summary }: { summary: Summary }) {
         {current
           ? (
               <LimitCard
+                activeLeftByFamily={current.activeLeftByFamily}
                 activeLeftMs={current.activeLeftMs}
+                currentFamily={summary.currentFamily}
                 estimated={current.estimatedNow !== undefined}
                 forecast={current.forecast}
                 now={now}
@@ -172,7 +182,9 @@ export function Overview({ summary }: { summary: Summary }) {
         {fiveHour
           ? (
               <LimitCard
+                activeLeftByFamily={fiveHour.activeLeftByFamily}
                 activeLeftMs={fiveHour.activeLeftMs}
+                currentFamily={summary.currentFamily}
                 estimated={fiveHour.estimatedNow !== undefined}
                 forecast={fiveHour.forecast}
                 now={now}

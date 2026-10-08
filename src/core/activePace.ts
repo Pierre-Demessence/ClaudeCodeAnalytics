@@ -1,33 +1,39 @@
+import type { FamilyPace } from './activeTime.ts';
+import type { Family } from './family.ts';
 import type { UsageRecord } from './types.ts';
 
+import { activeByFamily } from './activeTime.ts';
 import { HOUR_MS } from './calibration.ts';
-import { messageCost } from './pricing.ts';
-
-/** A longer gap between two messages is a pause, not active use. */
-export const IDLE_GAP_MS = 15 * 60_000;
 
 /**
- * $ per hour of active use for records with `from <= ts < to`. Active time is
- * the sum of the gaps between consecutive messages up to `IDLE_GAP_MS`, on one
- * timeline across sessions, since parallel sessions share the same limits.
+ * $ per hour of active use for records with `from <= ts < to`, all models
+ * together (see `activeByFamily` for how active time is measured).
  */
 export function activeHourlyPace(records: readonly UsageRecord[], from: number, to: number): number | undefined {
-  const points = records
-    .map(r => ({ ms: Date.parse(r.ts), record: r }))
-    .filter(p => p.ms >= from && p.ms < to)
-    .map(p => ({ cost: messageCost(p.record).cost, ms: p.ms }))
-    .sort((a, b) => a.ms - b.ms);
-
   let cost = 0;
   let activeMs = 0;
-  for (const [i, point] of points.entries()) {
-    cost += point.cost;
-    const gap = i > 0 ? point.ms - points[i - 1]!.ms : Infinity;
-    if (gap <= IDLE_GAP_MS)
-      activeMs += gap;
+  for (const activity of activeByFamily(records, from, to).values()) {
+    cost += activity.cost;
+    activeMs += activity.activeMs;
   }
   // Unpriced models cost $0: no pace rather than an endless time left.
   return activeMs > 0 && cost > 0 ? cost / (activeMs / HOUR_MS) : undefined;
+}
+
+export interface FamilyActiveLeft {
+  family: Family;
+  /** From an estimated pace: the family has too little active time of its own. */
+  lowConfidence?: true;
+  /** Active time (ms) left if only this family is used. */
+  ms: number;
+}
+
+/** Active time left before the limit if only each family were used, at its own pace. */
+export function activeLeftByFamily({ k, paces, used }: { k?: number; paces: readonly FamilyPace[]; used: number }): FamilyActiveLeft[] {
+  return paces.flatMap(({ family, lowConfidence, pace }) => {
+    const ms = activeTimeLeft({ k, pace, used });
+    return ms === undefined ? [] : [{ family, ...lowConfidence && { lowConfidence }, ms }];
+  });
 }
 
 /** Active time (ms) until `used` reaches 100 % at `pace` $/hour, with `k` % per dollar. */
