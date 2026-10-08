@@ -45,7 +45,7 @@ export function OutputCard({ output }: { output: Breakdown['output'] }) {
         <span className="card-head-spacer"></span>
         <span className="card-subtitle">{`${formatTokens(total)} output tokens`}</span>
       </div>
-      <p className="note">Thinking and replies are counted exactly. Tool figures split each message's remaining tokens evenly across its tool calls, so they are estimates.</p>
+      <p className="note">Thinking and replies are counted exactly. Tool figures split each message's remaining tokens across its tool calls by the size of their input, so they are estimates.</p>
       <span aria-label={description} className="output-bar" role="img">
         {shown.map(group => <span className={`output-${group.fill}`} key={group.fill} style={{ flexGrow: group.tokens }} />)}
       </span>

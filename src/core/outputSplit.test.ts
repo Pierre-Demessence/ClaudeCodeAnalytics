@@ -18,6 +18,23 @@ describe('splitOutput', () => {
     expect(byName(parts)).toEqual({ Bash: 300, Read: 600, thinking: 100 });
   });
 
+  it('weights each call by its input size plus a fixed overhead, when the sizes are known', () => {
+    const parts = splitOutput({ output: 1100, thinking: 100, toolInput: { Bash: 50, Write: 850 }, tools: { Bash: 1, Write: 1 } });
+    // Weights: Bash 50 + 50, Write 850 + 50 → 100 : 900.
+    expect(byName(parts)).toEqual({ Bash: 100, thinking: 100, Write: 900 });
+  });
+
+  it('counts the overhead once per call and treats a missing size as empty input', () => {
+    const parts = splitOutput({ output: 900, toolInput: { Read: 100 }, tools: { Read: 2, Snapshot: 1 } });
+    // Read: 100 + 2 × 50 = 200; Snapshot: 0 + 50 = 50.
+    expect(byName(parts)).toEqual({ Read: 720, Snapshot: 180 });
+  });
+
+  it('spreads evenly when a record has no input sizes', () => {
+    const parts = splitOutput({ output: 1000, tools: { Bash: 1, Read: 1 } });
+    expect(byName(parts)).toEqual({ Bash: 500, Read: 500 });
+  });
+
   it('gives the leftover tokens to the largest remainders, so the parts always sum to the output', () => {
     const parts = splitOutput({ output: 10, tools: { Bash: 1, Edit: 1, Read: 1 } });
     expect(total(parts)).toBe(10);
