@@ -23,7 +23,6 @@ Improvements to something that exists.
 
 - `[forensics]` Skill or command per conversation: a column in "Most expensive conversations" or the skills a conversation ran. `UsageRecord.skill` already holds it.
 - Cost per git branch (`UsageRecord.gitBranch`); the Breakdown tab only shows each conversation's main branch.
-- Weight the per-tool output split by tool input size instead of evenly; needs the input sizes stored per tool call (`core/outputSplit.ts`).
 - `[forensics]` Carrying cost per tool ("where input goes"). Every API call is billed for the whole context, so a tool's input cost is an attribution, not a measurement: assume each result stays in the context for the rest of the conversation, so cost = tokens added × later turns × cache-read price, cut short by compaction. A dollar figure per tool, but a model, not an observation. The sizes per result are stored (`UsageRecord.context`, shown in "Where context grows"); the later turns and compactions are not tied to a result yet.
 
 ### Forecast
