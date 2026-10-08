@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
 
 import { DAY_MS, HOUR_MS } from './calibration.ts';
 import { buildSummary, weekStartFor } from './summary.ts';
@@ -239,6 +239,25 @@ describe('buildSummary', () => {
     // Yesterday's $20 at k = 0.5 %/$.
     expect(summary.sessions.windows[1]).toMatchObject({ peak: 10, peakEstimated: true, source: 'estimated' });
     expect(buildSummary({ ...input, limitThreshold: 20 }).sessions.stats.capped).toBe(1);
+  });
+
+  it('places the rate-limit hits of the transcripts in their 5-hour windows and weeks', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';
+    const snapshots = [snap(at('11:30'), 30, RESET, { fiveHour: 20, fiveHourResetsAt })];
+    const hit = (key: string, time: string, extra: Partial<ApiEvent> = {}): ApiEvent => ({ key, kind: 'limit', limitType: 'five_hour', ts: new Date(at(time)).toISOString(), ...extra });
+    const events = [
+      hit('a', '12:00', { resetsAt: fiveHourResetsAt }),
+      // The same banner in a parallel session, 5 minutes later: one hit.
+      hit('b', '12:05'),
+      hit('c', '12:10', { limitType: 'seven_day' }),
+      { key: 'o', kind: 'overload', ts: new Date(at('12:20')).toISOString() },
+    ] satisfies ApiEvent[];
+    const summary = buildSummary({ endpointEnabled: true, events, now: NOW, planHistory: [], records: [...records, rec(at('10:00'))], snapshots, timeZone: 'UTC' });
+
+    expect(summary.sessions.windows[0]!.limitHits).toEqual([new Date(at('12:00')).toISOString()]);
+    expect(summary.sessions.stats.blocked).toBe(1);
+    expect(summary.weekHistory.weeks[0]).toMatchObject({ blockedSessions: 1, limitHits: [new Date(at('12:10')).toISOString()] });
   });
 
   it('keeps a manual 5-hour reading for 5 hours', () => {

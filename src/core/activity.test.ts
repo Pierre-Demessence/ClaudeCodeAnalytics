@@ -65,6 +65,47 @@ describe('cache', () => {
   it('has no week figures without usage this week', () => {
     expect(activity([rec('2026-09-30T10:00:00Z', { cacheRead: 100 })]).cache.week).toBeUndefined();
   });
+
+  describe('flushes', () => {
+    /** Ten steady turns from `start`, then a turn after a 10-minute pause that rewrites 50k tokens. */
+    function flushAfterPause(start: string, sessionId: string): UsageRecord[] {
+      const first = Date.parse(start);
+      const steady = Array.from({ length: 10 }, (_, i) => rec(new Date(first + i * 30_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 200, sessionId }));
+      return [...steady, rec(new Date(first + 270_000 + 600_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 50_000, sessionId })];
+    }
+    // 50k tokens written at $5/M instead of read at $0.2/M.
+    const EXTRA = 50_000 * 4.8 / 1_000_000;
+
+    it('counts the flushes of each local day', () => {
+      const { cache } = activity([...flushAfterPause('2026-09-30T10:00:00Z', 's1'), ...flushAfterPause('2026-10-01T10:00:00Z', 's2'), ...flushAfterPause('2026-10-02T21:50:00Z', 's3')]);
+      const daily = (day: string) => cache.daily.find(d => d.day === day)?.flushes;
+      expect(daily('2026-09-30')).toEqual({ extra: expect.closeTo(EXTRA, 6), idleGap: 1, noGap: 0 });
+      expect(daily('2026-10-01')).toMatchObject({ idleGap: 1 });
+      // 22:00 UTC is 00:00 local on the 3rd.
+      expect(daily('2026-10-02')).toBeUndefined();
+      expect(daily('2026-10-03')).toMatchObject({ idleGap: 1 });
+    });
+
+    it('counts a day with only a read collapse separately from pauses', () => {
+      const steady = Array.from({ length: 10 }, (_, i) => rec(new Date(Date.parse('2026-10-01T10:00:00Z') + i * 30_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 200 }));
+      const { cache } = activity([...steady, rec('2026-10-01T10:05:00Z', { cacheRead: 4000, cacheWrite5m: 18_000 })]);
+      expect(cache.daily.find(d => d.day === '2026-10-01')!.flushes).toEqual({ extra: expect.closeTo(18_000 * 4.8 / 1_000_000, 6), idleGap: 0, noGap: 1 });
+    });
+
+    it('has none without flushes', () => {
+      const { cache } = activity([rec('2026-10-01T10:00:00Z', { cacheRead: 300, input: 100 })]);
+      expect(cache.daily.every(d => d.flushes === undefined)).toBe(true);
+    });
+
+    it('lets a compaction excuse a read drop', () => {
+      const steady = Array.from({ length: 10 }, (_, i) => rec(new Date(Date.parse('2026-10-01T10:00:00Z') + i * 30_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 200 }));
+      const drop = rec('2026-10-01T10:05:00Z', { cacheRead: 4000, cacheWrite5m: 18_000 });
+      const flushed = (extra: Partial<ActivityInput> = {}) => activity([...steady, drop], extra).cache.daily.some(d => d.flushes);
+      expect(flushed()).toBe(true);
+      const compaction = { key: 'c', kind: 'compaction' as const, sessionId: 's1', ts: '2026-10-01T10:04:30Z' };
+      expect(flushed({ events: [compaction] })).toBe(false);
+    });
+  });
 });
 
 describe('messageCost', () => {

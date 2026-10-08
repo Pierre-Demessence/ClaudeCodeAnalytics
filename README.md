@@ -28,19 +28,21 @@ Everything stays on your machine. Data comes from two places:
 - Daily and weekly usage by model family, in API-equivalent dollars or tokens,
   with Claude Code upgrades marked on the daily chart.
 - When you work (average cost per weekday and hour), cache efficiency (share
-  of input from cache, dollars saved, daily share), and the cost per message
-  with this week's outliers and their cause (e.g. a cache rewrite after a pause).
+  of input from cache, dollars saved, daily share, and the days the cache was
+  flushed and rewritten with their extra cost), and the cost per message with
+  this week's outliers and their cause (e.g. a cache rewrite after a pause).
 - Where the usage goes, this week, the last 4 weeks or all time: by project
   (with the model mix and cache share), main agent vs subagents, effort level,
   thinking share and surface, and the most expensive conversations.
 - Past 5-hour sessions of the last 7 days, on a day × hour timeline and in a
   list: cost, messages, projects and peak %, each window placed by a reading
-  or estimated from transcript times, and the ones that hit the limit (from a
-  configurable threshold, 95% by default).
-- The last 12 weekly windows on a week × day timeline and in a list: final %
+  or estimated from transcript times, the ones that hit the limit (from a
+  configurable threshold, 95% by default) and the ones a rate limit blocked
+  (the message Claude Code printed, read from the transcripts).
+- The last 12 weekly windows on a week × day timeline and in a list: peak %
   (estimated from transcripts when no reading ends the week), cost per 24 h
-  block, sessions, messages, projects, and the weeks that hit the limit (from a
-  configurable threshold, 98% by default).
+  block, sessions, messages, projects, the weeks that hit the limit (from a
+  configurable threshold, 98% by default) and the weeks a rate limit blocked.
 - Plan setting with history; the plan is also detected from Claude Code's login.
 - Tabs: Overview (limits and pacing), Usage (charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents), Sessions (past 5-hour windows),

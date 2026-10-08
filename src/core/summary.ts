@@ -9,7 +9,7 @@ import type { WeekPacing } from './pacing.ts';
 import type { PlanFitInput } from './planFit.ts';
 import type { Sessions } from './sessions.ts';
 import type { WeekShare } from './share.ts';
-import type { Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
 import type { WeekHistory } from './weekHistory.ts';
 
 import { activeHourlyPace, activeTimeLeft } from './activePace.ts';
@@ -17,6 +17,7 @@ import { buildActivity } from './activity.ts';
 import { aggregate, createCostIndex, dailyCostSeries, dayKey, startOfDay } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
+import { dedupeHits, hitScope } from './events.ts';
 import { forecastWindow } from './forecast.ts';
 import { buildLimits } from './limits.ts';
 import { buildMultipliers } from './multipliers.ts';
@@ -37,6 +38,8 @@ const STALE_READING_MS = 30 * 60_000;
 
 export interface SummaryInput {
   endpointEnabled: boolean;
+  /** Rate-limit hits, overloads and compactions seen in the transcripts. */
+  events?: readonly ApiEvent[];
   /** 5-hour % from which a window counts as having hit the limit; 95 by default. */
   limitThreshold?: number;
   now: number;
@@ -193,7 +196,10 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     : [];
   const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
   const weekLimitThreshold = input.weekLimitThreshold ?? DEFAULT_WEEK_LIMIT_THRESHOLD;
-  const sessionWindows = fiveHourWindows({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots });
+  const hits = dedupeHits(input.events ?? []).filter(event => event.kind === 'limit');
+  const sessionHits = hits.filter(hit => hitScope(hit) === 'session');
+  const weekHits = hits.filter(hit => hitScope(hit) === 'week');
+  const sessionWindows = fiveHourWindows({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots });
   const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
   const activePace = activeHourlyPace(records, now - TYPICAL_DAYS * DAY_MS, now);
 
@@ -305,11 +311,12 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const detected = latest && planFromSubscription(latest.subscriptionType, latest.rateLimitTier);
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();
 
-  const activity = buildActivity({ chartFrom, now, records, timeZone, weekStart });
-  const sessions = buildSessions({ k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots, timeZone });
+  const activity = buildActivity({ chartFrom, events: input.events, now, records, timeZone, weekStart });
+  const sessions = buildSessions({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots, timeZone });
   const weekHistory = buildWeekHistory({
     calibrationK: calibration?.k,
     current,
+    hits: weekHits,
     now,
     plan,
     records,

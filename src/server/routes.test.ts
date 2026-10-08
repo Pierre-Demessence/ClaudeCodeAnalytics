@@ -125,4 +125,13 @@ describe('api routes', () => {
     const summary = await (await fetch(`${base}/summary`)).json() as { breakdown: { week: { conversations: { title?: string }[] } } };
     expect(summary.breakdown.week.conversations[0]?.title).toBe('Plan the Breakdown tab');
   });
+
+  it('marks the 5-hour window of a stored rate-limit hit', async () => {
+    const store = new Store(process.env.CCA_DATA_DIR!);
+    const ts = new Date(Date.now() - 30_000).toISOString();
+    await store.saveEvents(new Map([['hit-1', { key: 'hit-1', kind: 'limit', limitType: 'five_hour', ts }]]));
+    const summary = await (await fetch(`${base}/summary`)).json() as { sessions: { stats: { blocked: number }; windows: { limitHits?: string[] }[] } };
+    expect(summary.sessions.windows[0]?.limitHits).toEqual([ts]);
+    expect(summary.sessions.stats.blocked).toBe(1);
+  });
 });

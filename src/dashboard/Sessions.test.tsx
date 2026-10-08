@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { Snapshot, UsageRecord } from '@/core/types';
+import type { ApiEvent, Snapshot, UsageRecord } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
 
 import { HOUR_MS } from '@/core/calibration';
@@ -29,11 +29,13 @@ function reading(ago: number, fiveHour: number, resetsIn: number): Snapshot {
   return { fiveHour, fiveHourResetsAt: new Date(NOW + resetsIn).toISOString(), source: 'endpoint', ts: new Date(NOW - ago).toISOString(), weekly: 30, weeklyResetsAt: new Date(NOW + 3 * 86_400_000).toISOString() };
 }
 
-function summary(records: UsageRecord[], snapshots: Snapshot[] = [], limitThreshold?: number): Summary {
-  return { ...buildSummary({ endpointEnabled: true, limitThreshold, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' }), status: {} };
+function summary(records: UsageRecord[], snapshots: Snapshot[] = [], limitThreshold?: number, events: ApiEvent[] = []): Summary {
+  return { ...buildSummary({ endpointEnabled: true, events, limitThreshold, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' }), status: {} };
 }
 
 const renderTab = (data: Summary) => render(<TipProvider><Sessions summary={data} /></TipProvider>);
+/** A label of the summary cards, not the legend that repeats it. */
+const stat = (label: string) => within(screen.getByRole('region', { name: 'Sessions summary' })).getByText(label);
 const card = (name: string) => screen.getByRole('heading', { name }).closest('section')!;
 
 describe('sessions tab', () => {
@@ -49,7 +51,7 @@ describe('sessions tab', () => {
   it('names the threshold and flags the windows that hit it', () => {
     // A finished window 30 h ago read at 97%, and the one in progress (resets in 2 h) at 40%.
     renderTab(summary([rec(30 * HOUR_MS), rec(2 * HOUR_MS, { cwd: 'S:\\Dev\\tool', sessionId: 's2' })], [reading(28 * HOUR_MS, 97, -27 * HOUR_MS), reading(HOUR_MS, 40, 2 * HOUR_MS)]));
-    expect(screen.getByText('hit the 5-hour limit (≥ 95%)')).toBeTruthy();
+    expect(stat('peak ≥ 95%')).toBeTruthy();
     const rows = within(card('Session list')).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(2);
     expect(rows[0]!.textContent).toContain('in progress');
@@ -64,7 +66,7 @@ describe('sessions tab', () => {
 
   it('follows a custom threshold', () => {
     renderTab(summary([rec(HOUR_MS)], [reading(HOUR_MS, 40, 2 * HOUR_MS)], 50));
-    expect(screen.getByText('hit the 5-hour limit (≥ 50%)')).toBeTruthy();
+    expect(stat('peak ≥ 50%')).toBeTruthy();
   });
 
   it('marks estimated windows and gives each block a tooltip', () => {
@@ -91,5 +93,35 @@ describe('sessions tab', () => {
     renderTab(summary(['a', 'b', 'c'].map((name, i) => rec(30 * HOUR_MS - i * 60_000, { cwd: `S:\\Dev\\${name}`, sessionId: name }))));
     const cell = within(card('Session list')).getByText(/\+1$/);
     expect(tipOf(cell)).toContain('s:\\Dev\\c');
+  });
+
+  describe('rate-limit hits seen in the transcripts', () => {
+    // The window in progress (resets in 2 h) was blocked 1 h ago, at 11:00.
+    const hit: ApiEvent = { key: 'hit-1', kind: 'limit', limitType: 'five_hour', resetsAt: new Date(NOW + 2 * HOUR_MS).toISOString(), ts: new Date(NOW - HOUR_MS).toISOString() };
+    const blockedTab = () => renderTab(summary([rec(2 * HOUR_MS)], [reading(HOUR_MS, 40, 2 * HOUR_MS)], undefined, [hit]));
+
+    it('counts the blocked windows apart from the ones that reached the threshold', () => {
+      blockedTab();
+      expect(screen.getByText('1 blocked by a rate limit')).toBeTruthy();
+      expect(stat('peak ≥ 95%').previousElementSibling!.textContent).toBe('0');
+    });
+
+    it('marks the block and the list row with an icon and the time, and names the hit in the tooltip', () => {
+      blockedTab();
+      const timeline = card('5-hour sessions, last 7 days');
+      expect(timeline.querySelectorAll('.session-label .icon-blocked')).toHaveLength(1);
+      expect(tipOf(timeline.querySelector('.session-block')!)).toContain('Rate limit hit at 11:00');
+      const [row] = within(card('Session list')).getAllByRole('row').slice(1);
+      const mark = row!.querySelector('.session-peak-cell .session-peak-blocked')!;
+      expect(mark.querySelector('.icon-blocked')).toBeTruthy();
+      expect(tipOf(mark)).toBe('Rate limit hit at 11:00');
+      // The text of the row no longer carries the hit.
+      expect(row!.querySelector('th')!.textContent).not.toContain('rate limit');
+    });
+
+    it('shows no mark without a hit', () => {
+      renderTab(summary([rec(2 * HOUR_MS)], [reading(HOUR_MS, 40, 2 * HOUR_MS)]));
+      expect(document.querySelectorAll('.session-block .icon-blocked, .session-peak-blocked')).toHaveLength(0);
+    });
   });
 });

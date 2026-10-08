@@ -1,6 +1,8 @@
-import type { UsageRecord } from './types.ts';
+import type { Flush } from './cacheAnomalies.ts';
+import type { ApiEvent, UsageRecord } from './types.ts';
 
 import { sessionProjects } from './breakdown.ts';
+import { detectFlushes } from './cacheAnomalies.ts';
 import { costParts, messageCost, priceFor } from './pricing.ts';
 import { compareVersions } from './versions.ts';
 
@@ -33,6 +35,14 @@ export interface Outlier {
   ts: string;
 }
 
+/** The cache flushes of one local day. */
+export interface DayFlushes {
+  /** USD the rewrites cost beyond reading the same tokens from the cache. */
+  extra: number;
+  idleGap: number;
+  noGap: number;
+}
+
 export interface CacheWeek {
   /** Share of input tokens read from the cache, 0–1. */
   readShare: number;
@@ -45,8 +55,8 @@ export interface CacheWeek {
 /** When and how the usage happens. Costs are API-equivalent USD. */
 export interface Activity {
   cache: {
-    /** The last 14 local days; `readShare` is absent on a day without usage. */
-    daily: { day: string; readShare?: number }[];
+    /** The last 14 local days; `readShare` is absent on a day without usage, `flushes` on a day without any. */
+    daily: { day: string; flushes?: DayFlushes; readShare?: number }[];
     /** The current weekly window; absent without usage. */
     week?: CacheWeek;
   };
@@ -67,6 +77,8 @@ export interface Activity {
 export interface ActivityInput {
   /** First local day of the daily chart. */
   chartFrom: string;
+  /** Compactions excuse a cache read drop; other events are ignored. */
+  events?: readonly ApiEvent[];
   now: number;
   records: readonly UsageRecord[];
   timeZone: string;
@@ -110,7 +122,7 @@ function addDays(day: string, offset: number): string {
 }
 
 /** Records older than `days` local days before `now` (plus a day of time zone margin) are skipped before the costlier local-time lookup. */
-const isRecent = (record: UsageRecord, now: number, days: number) => Date.parse(record.ts) >= now - (days + 1) * DAY_MS;
+const isRecent = (record: Pick<UsageRecord, 'ts'>, now: number, days: number) => Date.parse(record.ts) >= now - (days + 1) * DAY_MS;
 
 const inputTokens = (r: UsageRecord) => r.input + r.cacheRead + r.cacheWrite5m + r.cacheWrite1h;
 
@@ -139,7 +151,7 @@ function heatmapOf(records: readonly UsageRecord[], localTime: ReturnType<typeof
   return { cells: cells.map((row, weekday) => row.map(total => (dayCounts[weekday] ? total / dayCounts[weekday] : 0))), from, to };
 }
 
-function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], localTime: ReturnType<typeof localTimeOf>, now: number): Activity['cache'] {
+function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], flushes: readonly Flush[], localTime: ReturnType<typeof localTimeOf>, now: number): Activity['cache'] {
   let read = 0;
   let input = 0;
   let saved = 0;
@@ -172,11 +184,23 @@ function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], 
     perDay.set(day, totals);
   }
 
+  const flushesPerDay = new Map<string, DayFlushes>();
+  for (const flush of flushes) {
+    if (!isRecent(flush, now, CACHE_DAYS))
+      continue;
+    const day = localTime(Date.parse(flush.ts)).day;
+    const totals = flushesPerDay.get(day) ?? { extra: 0, idleGap: 0, noGap: 0 };
+    totals[flush.kind]++;
+    totals.extra += flush.extra;
+    flushesPerDay.set(day, totals);
+  }
+
   return {
     week: input > 0 ? { readShare: read / input, saved, writeCostShare: cost > 0 ? writeCost / cost : 0 } : undefined,
     daily: days.map((day) => {
       const totals = perDay.get(day);
-      return totals?.input ? { day, readShare: totals.read / totals.input } : { day };
+      const dayFlushes = flushesPerDay.get(day);
+      return { day, ...totals?.input ? { readShare: totals.read / totals.input } : {}, ...dayFlushes && { flushes: dayFlushes } };
     }),
   };
 }
@@ -229,11 +253,11 @@ function upgradesOf(records: readonly UsageRecord[], localTime: ReturnType<typeo
 }
 
 /** Heatmap, cache use, message costs and Claude Code upgrades. */
-export function buildActivity({ chartFrom, now, records, timeZone, weekStart }: ActivityInput): Activity {
+export function buildActivity({ chartFrom, events = [], now, records, timeZone, weekStart }: ActivityInput): Activity {
   const localTime = localTimeOf(timeZone);
   const week = records.filter(r => Date.parse(r.ts) >= weekStart);
   return {
-    cache: cacheOf(week, records, localTime, now),
+    cache: cacheOf(week, records, detectFlushes(records, events), localTime, now),
     heatmap: heatmapOf(records, localTime, now),
     messageCost: messageCostOf(week, records),
     upgrades: upgradesOf(records, localTime, chartFrom),

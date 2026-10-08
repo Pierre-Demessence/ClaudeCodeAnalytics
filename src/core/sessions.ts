@@ -1,4 +1,4 @@
-import type { Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
 
 import { dayKey, startOfDay } from './aggregate.ts';
 import { sessionProjects } from './breakdown.ts';
@@ -12,6 +12,8 @@ export const DEFAULT_LIMIT_THRESHOLD = 95;
 const MIN_UNTRACKED_PEAK = 5;
 /** Local days shown, today included. */
 const SESSION_DAYS = 7;
+/** A hit's reset time matches a window's end within this margin: readings round ends to the minute. */
+const RESET_MATCH_MS = 60_000;
 
 export interface FiveHourWindow {
   /** A reading in the window reached the limit threshold. */
@@ -20,6 +22,8 @@ export interface FiveHourWindow {
   /** ISO; for a window still running, its future end. */
   end: string;
   inProgress?: true;
+  /** ISO times of the rate-limit hits seen in the transcripts during the window; absent without any. */
+  limitHits?: string[];
   messages: number;
   /** Highest 5-hour % read in the window, or `k × cost` when `peakEstimated`. */
   peak?: number;
@@ -38,12 +42,14 @@ export interface Sessions {
   /** The local days shown, newest first. */
   days: string[];
   /** Medians leave out the window in progress; the cost median also leaves out windows without Claude Code messages. */
-  stats: { capped: number; count: number; medianCost?: number; medianPeak?: number };
+  stats: { blocked: number; capped: number; count: number; medianCost?: number; medianPeak?: number };
   /** Windows overlapping `days`, newest first. */
   windows: FiveHourWindow[];
 }
 
 export interface SessionsInput {
+  /** Rate-limit hits of the 5-hour kind, merged as `dedupeHits` does. */
+  hits?: readonly ApiEvent[];
   /** % of the 5-hour limit per dollar, when calibrated. */
   k?: number;
   limitThreshold: number;
@@ -71,13 +77,21 @@ function newWindow(start: number, end: number, source: Building['source']): Buil
 /** `SessionsInput` without the time zone: `fiveHourWindows` is not cut to the last 7 local days. */
 export type FiveHourWindowsInput = Omit<SessionsInput, 'timeZone'>;
 
+/** The window a hit belongs to: the one ending at its reset time, else the one holding its time. */
+function windowOfHit(windows: readonly Building[], hit: ApiEvent): Building | undefined {
+  const resetsAt = hit.resetsAt ? Date.parse(hit.resetsAt) : undefined;
+  const ms = Date.parse(hit.ts);
+  return (resetsAt === undefined ? undefined : windows.find(w => Math.abs(w.end - resetsAt) <= RESET_MATCH_MS))
+    ?? windows.find(w => w.start <= ms && ms < w.end);
+}
+
 /**
  * Every 5-hour window since the first reading or message, newest first.
  * Readings place their windows exactly (`fiveHourResetsAt` − 5 h); messages
  * outside them open estimated windows (the first message after the previous window), cut short where
  * a reading window starts.
  */
-export function fiveHourWindows({ k, limitThreshold, now, records, snapshots }: FiveHourWindowsInput): FiveHourWindow[] {
+export function fiveHourWindows({ hits = [], k, limitThreshold, now, records, snapshots }: FiveHourWindowsInput): FiveHourWindow[] {
   const anchored = new Map<number, Building>();
   for (const snapshot of snapshots) {
     if (!snapshot.fiveHourResetsAt)
@@ -124,9 +138,15 @@ export function fiveHourWindows({ k, limitThreshold, now, records, snapshots }: 
     window.messages++;
   }
 
-  return windows
-    .filter(w => w.start <= now)
-    .sort((a, b) => b.start - a.start)
+  const past = windows.filter(w => w.start <= now).sort((a, b) => b.start - a.start);
+  const hitsOf = new Map<Building, string[]>();
+  for (const hit of hits) {
+    const window = windowOfHit(past, hit);
+    if (window)
+      hitsOf.set(window, [...hitsOf.get(window) ?? [], hit.ts]);
+  }
+
+  return past
     .map((w): FiveHourWindow => {
       const peak = w.source === 'reading' ? w.peak : k !== undefined ? Math.min(100, k * w.cost) : undefined;
       return {
@@ -134,6 +154,7 @@ export function fiveHourWindows({ k, limitThreshold, now, records, snapshots }: 
         cost: w.cost,
         end: new Date(w.end).toISOString(),
         inProgress: now < w.end ? true : undefined,
+        limitHits: hitsOf.get(w),
         messages: w.messages,
         peak,
         peakEstimated: w.source === 'estimated' && peak !== undefined ? true : undefined,
@@ -173,6 +194,7 @@ export function buildSessions({ timeZone, ...input }: SessionsInput): Sessions {
     days,
     windows: shown,
     stats: {
+      blocked: shown.filter(w => w.limitHits).length,
       capped: shown.filter(w => w.capped).length,
       count: shown.length,
       medianCost: median(done.filter(w => w.messages > 0).map(w => w.cost)),

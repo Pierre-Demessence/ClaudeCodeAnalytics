@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { SessionInfo, UsageRecord } from '../core/types.ts';
+import type { ApiEvent, SessionInfo, UsageRecord } from '../core/types.ts';
 import type { ScanState } from './store.ts';
 
 import { malformedLineCount, scanTranscripts } from './scan.ts';
@@ -135,5 +135,29 @@ describe('scanTranscripts session titles', () => {
     expect((await scanTranscripts(claudeDir, new Map(), {}, { s1: { title: 'Same' } })).sessionsChanged).toBe(false);
     await writeFile(file, line('a'));
     expect((await scanTranscripts(claudeDir, new Map(), {}, {})).sessionsChanged).toBe(false);
+  });
+
+  it('collects rate-limit hits without counting them as malformed lines', async () => {
+    const hit = `${JSON.stringify({
+      error: 'rate_limit',
+      isApiErrorMessage: true,
+      message: { content: [{ text: 'You have hit your session limit', type: 'text' }], model: '<synthetic>' },
+      quotaLimits: { rateLimitType: 'five_hour', resetsAt: 1790999400 },
+      sessionId: 's1',
+      timestamp: '2026-10-03T01:51:56.989Z',
+      type: 'assistant',
+      uuid: 'hit-1',
+    })}
+`;
+    const events = new Map<string, ApiEvent>();
+    const state: ScanState = {};
+    await writeFile(file, line('a') + hit);
+    const result = await scanTranscripts(claudeDir, new Map(), state, {}, events);
+    expect(result.eventsChanged).toBe(true);
+    expect([...events.values()]).toEqual([expect.objectContaining({ key: 'hit-1', kind: 'limit', limitType: 'five_hour' })]);
+    expect(malformedLineCount(state)).toBe(0);
+
+    // The same entry read again changes nothing.
+    expect((await scanTranscripts(claudeDir, new Map(), {}, {}, events)).eventsChanged).toBe(false);
   });
 });

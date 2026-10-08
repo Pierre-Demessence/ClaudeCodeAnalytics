@@ -1,6 +1,23 @@
 // Keys are in lint-sorted order; each doc comment starts a sorting partition,
 // so a documented key must sort first among the keys that follow it.
 
+/**
+ * Something in a transcript besides a usage record: a rate-limit hit, a server
+ * overload or a conversation compaction. Never holds message text.
+ */
+export interface ApiEvent {
+  /** Transcript entry `uuid`; unique per event. */
+  key: string;
+  kind: 'compaction' | 'limit' | 'overload';
+  /** `quotaLimits.rateLimitType` of a limit hit (`five_hour`, …); absent when the entry has none. */
+  limitType?: string;
+  /** ISO end of the limited window, on a limit hit that reports it. */
+  resetsAt?: string;
+  sessionId?: string;
+  /** ISO timestamp. */
+  ts: string;
+}
+
 /** One deduplicated assistant message, as stored by the collector. No content. */
 export interface UsageRecord {
   cacheRead: number;

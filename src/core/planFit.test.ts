@@ -131,6 +131,7 @@ describe('bestPlan', () => {
 
 describe('buildPlanFitInput', () => {
   const row = (i: number, extra: Partial<WeekRow> = {}): WeekRow => ({
+    blockedSessions: 0,
     cappedSessions: 0,
     cost: 100,
     days: [],
@@ -157,7 +158,7 @@ describe('buildPlanFitInput', () => {
     ...extra,
   });
   // Newest first, as weekHistory has them.
-  const history = (rows: WeekRow[]) => ({ stats: { hit: 0 }, weeks: rows });
+  const history = (rows: WeekRow[]) => ({ stats: { blocked: 0, hit: 0 }, weeks: rows });
   const base = { limitThreshold: 95, plan: 'max5', planHistory: [{ from: iso(START - WEEK_MS), plan: 'max5', source: 'manual' }], sessionWindows: [], weekLimitThreshold: 98 } as const;
 
   it('keeps the finished weeks with a percent, oldest first', () => {

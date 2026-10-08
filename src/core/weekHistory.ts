@@ -1,6 +1,6 @@
 import type { FiveHourWindow } from './sessions.ts';
 import type { WeekShare } from './share.ts';
-import type { Plan, Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, Plan, Snapshot, UsageRecord } from './types.ts';
 
 import { sessionProjects } from './breakdown.ts';
 import { DAY_MS, WEEK_MS } from './calibration.ts';
@@ -16,6 +16,8 @@ const HISTORY_WEEKS = 12;
 const TOP_PROJECTS = 5;
 
 export interface WeekRow {
+  /** 5-hour sessions started in the week that a rate limit seen in the transcripts blocked. */
+  blockedSessions: number;
   /** 5-hour sessions started in the week that hit the limit threshold. */
   cappedSessions: number;
   cost: number;
@@ -26,6 +28,8 @@ export interface WeekRow {
   /** The final reading, not an estimate, reached the weekly limit threshold. */
   hit?: true;
   inProgress?: true;
+  /** ISO times of the weekly-limit hits seen in the transcripts during the week; absent without any. */
+  limitHits?: string[];
   messages: number;
   /** Final weekly %, on the current plan. */
   percent?: number;
@@ -45,12 +49,14 @@ export interface WeekRow {
 
 export interface WeekHistory {
   /** Medians leave out the window in progress; the cost median also leaves out windows without Claude Code messages. */
-  stats: { hit: number; medianCost?: number; medianPercent?: number };
+  stats: { blocked: number; hit: number; medianCost?: number; medianPercent?: number };
   /** The last 12 windows, newest first. */
   weeks: WeekRow[];
 }
 
 export interface WeekHistoryInput {
+  /** Rate-limit hits of the weekly kind, merged as `dedupeHits` does. */
+  hits?: readonly ApiEvent[];
   /** % of the weekly limit per dollar, when calibrated. */
   calibrationK?: number;
   /** The weekly window now, as in `CurrentWeek`. */
@@ -80,7 +86,7 @@ interface Building {
 
 /** The last 12 weekly windows: final %, cost per day, sessions and projects. */
 export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
-  const { calibrationK, current, now, plan, records, sessionWindows, shares, snapshots, weekLimitThreshold, weekStartOf } = input;
+  const { calibrationK, current, hits = [], now, plan, records, sessionWindows, shares, snapshots, weekLimitThreshold, weekStartOf } = input;
 
   const starts = new Set<number>(snapshots.map(s => Date.parse(s.weeklyResetsAt) - WEEK_MS));
   if (current)
@@ -135,13 +141,17 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       source = 'estimated';
     }
 
+    const weekHits = hits.map(hit => hit.ts).filter(ts => Date.parse(ts) >= start && Date.parse(ts) < end);
+
     return {
+      blockedSessions: windows.filter(w => w.limitHits).length,
       cappedSessions: windows.filter(w => w.capped).length,
       cost: week.cost,
       days: week.days.map((cost, i) => (start + i * DAY_MS > now ? null : cost)),
       end: new Date(end).toISOString(),
       hit: source === 'reading' && !percentEstimated && percent !== undefined && percent >= weekLimitThreshold ? true : undefined,
       inProgress: inProgress ? true : undefined,
+      limitHits: weekHits.length > 0 ? weekHits : undefined,
       messages: week.messages,
       percent,
       percentEstimated: percentEstimated ? true : undefined,
@@ -158,6 +168,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
   return {
     weeks: rows,
     stats: {
+      blocked: rows.filter(w => w.blockedSessions > 0 || w.limitHits).length,
       hit: rows.filter(w => w.hit).length,
       medianCost: median(done.filter(w => w.messages > 0).map(w => w.cost)),
       medianPercent: median(done.filter(w => w.percent !== undefined).map(w => w.percent!)),

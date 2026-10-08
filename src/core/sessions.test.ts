@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SessionsInput } from './sessions.ts';
-import type { Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
 
 import { buildSessions, fiveHourWindows, sessionPaces } from './sessions.ts';
 
@@ -149,11 +149,11 @@ describe('range and details', () => {
       ],
     );
     // Windows: 30 Sep estimated, 1 Oct reading (97%), 2 Oct reading (41%, no message), 3 Oct reading in progress (99%).
-    expect(stats).toEqual({ capped: 2, count: 4, medianCost: 40, medianPeak: 69 });
+    expect(stats).toEqual({ blocked: 0, capped: 2, count: 4, medianCost: 40, medianPeak: 69 });
   });
 
   it('has no medians without windows', () => {
-    expect(sessions([]).stats).toEqual({ capped: 0, count: 0, medianCost: undefined, medianPeak: undefined });
+    expect(sessions([]).stats).toEqual({ blocked: 0, capped: 0, count: 0, medianCost: undefined, medianPeak: undefined });
   });
 });
 
@@ -190,5 +190,28 @@ describe('shift', () => {
 
   it('is absent for a window without cost', () => {
     expect(sessions([], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 30)]).windows[0]!.shift).toBeUndefined();
+  });
+});
+
+describe('observed limit hits', () => {
+  const hit = (ts: string, extra: Partial<ApiEvent> = {}): ApiEvent => ({ key: ts, kind: 'limit', limitType: 'five_hour', ts, ...extra });
+  const readingWindow = [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', 80)];
+
+  it('puts a hit in the window its reset time ends, apart from the inferred cap', () => {
+    const { stats, windows } = sessions([rec('2026-10-02T09:00:00Z')], readingWindow, { hits: [hit('2026-10-02T12:20:00Z', { resetsAt: '2026-10-02T12:50:00.000Z' })] });
+    expect(windows[0]).toMatchObject({ limitHits: ['2026-10-02T12:20:00Z'] });
+    expect(windows[0]!.capped).toBeUndefined();
+    expect(stats.blocked).toBe(1);
+  });
+
+  it('puts a hit in the window holding its time when no window ends at its reset time', () => {
+    const { windows } = sessions([rec('2026-10-02T08:00:00Z')], [], { hits: [hit('2026-10-02T10:00:00Z', { resetsAt: '2026-10-02T13:10:00.000Z' })] });
+    expect(windows[0]).toMatchObject({ limitHits: ['2026-10-02T10:00:00Z'], source: 'estimated' });
+  });
+
+  it('ignores a hit that falls in no window, and leaves other windows unmarked', () => {
+    const { stats, windows } = sessions([rec('2026-10-02T09:00:00Z')], readingWindow, { hits: [hit('2026-09-29T10:00:00Z')] });
+    expect(windows[0]!.limitHits).toBeUndefined();
+    expect(stats.blocked).toBe(0);
   });
 });

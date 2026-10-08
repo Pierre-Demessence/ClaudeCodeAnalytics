@@ -1370,6 +1370,25 @@ details .table {
   background: var(--series-1);
 }
 
+/* One cell per bar of .cache-bars (same 4px gap), so a mark sits under its day. */
+.flush-marks {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 4px;
+  min-height: 20px;
+  margin-top: 4px;
+}
+
+.flush-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--critical-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .cache-reference {
   position: absolute;
   right: 0;
@@ -1710,6 +1729,10 @@ button.info-tip:hover {
   margin-right: 0;
 }
 
+.session-peak-blocked {
+  display: inline-flex;
+}
+
 .session-peak-text {
   width: 44px;
   text-align: right;
@@ -1996,7 +2019,7 @@ button.info-tip:hover {
 
 .wk-row {
   display: grid;
-  grid-template-columns: 8.5em minmax(0, 1fr) 15em;
+  grid-template-columns: 8.5em minmax(0, 1fr) 17.5em;
   align-items: center;
   gap: 16px;
 }
@@ -2087,7 +2110,7 @@ button.info-tip:hover {
 
 .wk-percent {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 5.5em;
+  grid-template-columns: minmax(0, 1fr) 8em;
   align-items: center;
   gap: 10px;
 }
@@ -2096,6 +2119,28 @@ button.info-tip:hover {
   height: 14px;
 }
 
+.wk-percent .week-value {
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+
+.wk-blocked-mark {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.wk-blocked-mark .icon-inline {
+  margin: 0 3px 0 0;
+}
+
+.wk-sessions-cell {
+  white-space: nowrap;
+}
+
+.wk-blocked-sessions,
 .wk-capped {
   display: inline-flex;
   align-items: center;

@@ -160,8 +160,9 @@ async function underLock(store: Store, waitMs: number, write: () => Promise<void
 }
 
 async function summary(store: Store, timeZone: string) {
-  const [records, snapshots, settings, status, titles] = await Promise.all([
+  const [records, events, snapshots, settings, status, titles] = await Promise.all([
     store.loadRecords(),
+    store.loadEvents(),
     store.loadSnapshots(),
     store.loadSettings(),
     store.loadStatus(),
@@ -170,6 +171,7 @@ async function summary(store: Store, timeZone: string) {
   return {
     ...buildSummary({
       endpointEnabled: settings.endpointEnabled,
+      events: [...events.values()],
       limitThreshold: settings.limitThreshold,
       now: Date.now(),
       planHistory: settings.planHistory,

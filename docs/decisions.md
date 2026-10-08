@@ -157,7 +157,7 @@ labels moved around it. A fixed spot collided with the range bracket.
 ## Weekly projection without a calibration: typical week, then trend
 
 Without a calibration, a week's own pace is noise for its first 12 hours, so the
-projection is the typical past week (median and quartiles of final %, on the
+projection is the typical past week (median and quartiles of peak %, on the
 current plan, never below what is used). After 12 hours the window's own trend
 takes over. Only a first week without any history has no projection.
 
@@ -272,7 +272,7 @@ touched.
 
 The Weeks tab lists the last 12 weekly windows, cut where `weekStartFor` cuts
 them (the first reset after a message), so its weeks match the Usage tab's
-weekly chart. A week's final % is its last reading, converted to the current
+weekly chart. A week's peak % is its last reading, converted to the current
 plan like the Overview did; a completed week without a reading gets `k × cost`
 (capped at 100, shown with "~"). A week "hit the limit" only from a final reading at
 the weekly threshold: a transcript estimate, or a reading extended from before the reset, never counts, as on the Sessions tab. The day cells
@@ -321,3 +321,29 @@ last about a second, writes are atomic (temp file, then rename), and a lost
 write is imported again by the next scan because offsets only advance after a
 save. A read-back of the lock file would narrow the race without closing it and
 cannot be tested. Revisit if malformed lines or missing messages ever appear.
+
+## Rate-limit hits from the structured error entries, in their own file
+
+A limit hit is a transcript entry with `isApiErrorMessage`, `error:
+'rate_limit'` and `quotaLimits.rateLimitType` / `resetsAt`; the exact window
+end comes from `resetsAt`, so a hit lands in its 5-hour window without
+guessing. The message text ("You've hit your session limit") is only a
+fallback classifier and is never stored. Hits, overloads and compactions go to
+`events.jsonl` (a few lines), not into the monthly message files: they are not
+usage records and `parseTranscriptLine` drops `<synthetic>` models on purpose.
+Rejected: matching the English text alone (the wording varies: "session",
+"plan", "usage limit reached").
+
+## A no-gap cache flush needs the lost read written back
+
+Within the cache lifetime, a turn whose cache read fell under half the previous
+turn's counts as a flush only if at least half of the lost read was written
+back. Without that, `/clear` and compactions (context shrinks, nothing is
+rebuilt) flagged 24 of 104 "flushes" on the local data, some of 473 tokens.
+Rejected: the plain read-drop rule of the AeternaLabsHQ/claude-code-stats
+reference.
+
+Flushes are detected on the main conversation only: parallel subagents of one
+session interleave their turns and records carry no agent id, so a subagent's
+first turn read as a flush (54 of the 80 flushes found on the local data were
+subagent turns, but only $3.60 of the $38.44).

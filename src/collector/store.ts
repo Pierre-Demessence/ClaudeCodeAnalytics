@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 
-import type { SessionInfo, Settings, Snapshot, Status, UsageRecord } from '../core/types.ts';
+import type { ApiEvent, SessionInfo, Settings, Snapshot, Status, UsageRecord } from '../core/types.ts';
 
 import { DEFAULT_LIMIT_THRESHOLD } from '../core/sessions.ts';
 import { DEFAULT_WEEK_LIMIT_THRESHOLD } from '../core/weekHistory.ts';
@@ -13,10 +13,11 @@ import { DEFAULT_WEEK_LIMIT_THRESHOLD } from '../core/weekHistory.ts';
 export type ScanState = Record<string, { malformed?: number; mtimeMs: number; offset: number }>;
 
 /**
- * Bumped when records gain fields that only a full re-read of the transcripts
- * can fill in for the messages already imported (see `collect`).
+ * Bumped when records gain fields, or a new kind of entry (events) is read,
+ * that only a full re-read of the transcripts can fill in for what was already
+ * imported (see `collect`).
  */
-export const SCAN_FORMAT = 2;
+export const SCAN_FORMAT = 3;
 
 /** Contents of `scan-state.json`. */
 export interface StoredScanState {
@@ -130,6 +131,17 @@ export class Store {
     for (const file of await this.messageFiles())
       await copyFile(this.path(file), join(temp, file));
     await rename(temp, target);
+  }
+
+  // Events (rate-limit hits, overloads, compactions) are few: one file.
+
+  async loadEvents(): Promise<Map<string, ApiEvent>> {
+    return new Map((await readJsonLines<ApiEvent>(this.path('events.jsonl'))).map(event => [event.key, event]));
+  }
+
+  async saveEvents(events: Map<string, ApiEvent>): Promise<void> {
+    const lines = [...events.values()].sort((a, b) => a.ts.localeCompare(b.ts)).map(event => `${JSON.stringify(event)}\n`);
+    await writeAtomic(this.path('events.jsonl'), lines.join(''));
   }
 
   async loadSessions(): Promise<Record<string, SessionInfo>> {

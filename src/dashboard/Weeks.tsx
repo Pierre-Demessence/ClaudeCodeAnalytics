@@ -4,8 +4,9 @@ import type { WeekRow } from '@/core/weekHistory';
 import type { Summary } from '@/dashboard/api';
 
 import { dayKey } from '@/core/aggregate';
+import { BlockedIcon } from '@/dashboard/BlockedIcon';
 import { formatDollars, formatInteger, formatPercent, formatUsd } from '@/dashboard/format';
-import { formatSessionDay } from '@/dashboard/sessionsData';
+import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
 import { InfoTip } from '@/dashboard/Tip';
 import { useTip } from '@/dashboard/useTip';
 import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText } from '@/dashboard/weeksData';
@@ -13,6 +14,15 @@ import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percent
 const HitIcon = ({ size = 14 }: { size?: number }) => <TriangleAlert aria-hidden="true" className="icon-inline icon-critical" size={size} />;
 
 const EMPTY = 'No weekly window yet.';
+
+/** What the rate limits seen in the transcripts did to a week: blocked 5-hour sessions, weekly-limit hits and when. */
+function blockedTip({ blockedSessions, limitHits }: WeekRow, timeZone: string): string {
+  const when = (hit: string) => `${formatSessionDay(dayKey(Date.parse(hit), timeZone))} ${formatTime(hit, timeZone)}`;
+  return [
+    blockedSessions > 0 && `${blockedSessions} ${blockedSessions === 1 ? 'session' : 'sessions'} blocked by a rate limit`,
+    limitHits && `Weekly limit hit: ${limitHits.map(when).join(', ')}`,
+  ].filter(Boolean).join('\n');
+}
 
 function weekTip(week: WeekRow, timeZone: string): string {
   return `${formatWeekRange(week, timeZone)}${week.inProgress ? ' (in progress)' : ''}\n${formatUsd(week.cost)} · ${week.messages} messages · ${week.sessions} sessions`;
@@ -35,26 +45,31 @@ function Stats({ summary }: { summary: Summary }) {
           {stats.hit}
         </strong>
         <span>
-          {`hit the weekly limit (≥ ${weekLimitThreshold}%)`}
-          <InfoTip label="About the limit">Weeks whose final reading reached that %. A percent estimated from transcripts never counts.</InfoTip>
+          {`peak ≥ ${weekLimitThreshold}%`}
+          <InfoTip label="About the limit">Weeks whose peak reached that %. A percent estimated from transcripts never counts.</InfoTip>
+        </span>
+        <span>
+          <BlockedIcon />
+          {`${stats.blocked} blocked by a rate limit`}
+          <InfoTip label="About blocked weeks">Weeks in which Claude Code printed a rate-limit message, read from the transcripts: a 5-hour or a weekly limit actually hit.</InfoTip>
         </span>
       </div>
       <div className="card">
         <strong>{stats.medianPercent === undefined ? '–' : formatPercent(stats.medianPercent)}</strong>
         <span>
-          median final %
-          <InfoTip label="About median final percent">
+          median peak
+          <InfoTip label="About median peak">
             {stats.medianPercent === undefined
               ? 'No finished week with a percent yet.'
-              : 'Median of the finished weeks\' final weekly %, estimates included, on your current plan. The tick on every bar marks it.'}
+              : 'Median of the finished weeks\' peak weekly %, estimates included, on your current plan. The tick on every bar marks it.'}
           </InfoTip>
         </span>
       </div>
       <div className="card">
         <strong>{stats.medianCost === undefined ? '–' : formatDollars(stats.medianCost)}</strong>
         <span>
-          median week cost
-          <InfoTip label="About median week cost">Median API-equivalent cost of the finished weeks with Claude Code messages.</InfoTip>
+          median cost
+          <InfoTip label="About median cost">Median API-equivalent cost of the finished weeks with Claude Code messages.</InfoTip>
         </span>
       </div>
     </section>
@@ -62,7 +77,7 @@ function Stats({ summary }: { summary: Summary }) {
 }
 
 function Timeline({ summary }: { summary: Summary }) {
-  const { timeZone, weekHistory: { stats, weeks } } = summary;
+  const { timeZone, weekHistory: { stats, weeks }, weekLimitThreshold } = summary;
   const tip = useTip();
   const bounds = heatBounds(weeks);
   const maxDay = Math.max(0, ...weeks.flatMap(w => w.days.map(cost => cost ?? 0)));
@@ -74,8 +89,8 @@ function Timeline({ summary }: { summary: Summary }) {
         <h2>Weekly usage, last 12 weeks</h2>
         <InfoTip label="About the weekly timeline">
           {weeks[0]
-            ? `Each cell is the cost of 24 h from the weekly reset (${resetText(weeks[0].start, timeZone)}). The bar is the week's final %.`
-            : 'Each cell is the cost of 24 h from the weekly reset. The bar is the week\'s final %.'}
+            ? `Each cell is the cost of 24 h from the weekly reset (${resetText(weeks[0].start, timeZone)}). The bar is the week's peak %.`
+            : 'Each cell is the cost of 24 h from the weekly reset. The bar is the week\'s peak %.'}
         </InfoTip>
       </div>
       {weeks.length === 0
@@ -88,7 +103,7 @@ function Timeline({ summary }: { summary: Summary }) {
                   <div aria-hidden="true" className="wk-days">
                     {headers.map(day => <span key={day}>{day}</span>)}
                   </div>
-                  <span className="wk-percent-head">Final weekly %</span>
+                  <span className="wk-percent-head">Peak weekly %</span>
                 </div>
                 {weeks.map(week => (
                   <div className="wk-row" key={week.start}>
@@ -119,6 +134,12 @@ function Timeline({ summary }: { summary: Summary }) {
                       <span className="week-value">
                         <strong>{percentText(week)}</strong>
                         {week.hit && <HitIcon />}
+                        {(week.blockedSessions > 0 || week.limitHits) && (
+                          <span className="wk-blocked-mark" {...tip(blockedTip(week, timeZone))}>
+                            <BlockedIcon />
+                            {week.blockedSessions + (week.limitHits?.length ?? 0)}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -138,13 +159,17 @@ function Timeline({ summary }: { summary: Summary }) {
                   </li>
                 )}
                 <li>
-                  <span className="legend-swatch over" />
-                  <HitIcon />
-                  hit the limit
+                  <span className="legend-swatch estimated" />
+                  estimated
                 </li>
                 <li>
-                  <span className="legend-swatch estimated" />
-                  ~ estimated, no final reading
+                  <span className="legend-swatch over" />
+                  <HitIcon />
+                  {`peak ≥ ${weekLimitThreshold}%`}
+                </li>
+                <li>
+                  <BlockedIcon />
+                  blocked by a rate limit
                 </li>
               </ul>
             </>
@@ -154,7 +179,7 @@ function Timeline({ summary }: { summary: Summary }) {
 }
 
 function List({ summary }: { summary: Summary }) {
-  const { timeZone, weekHistory: { weeks } } = summary;
+  const { limitThreshold, timeZone, weekHistory: { weeks } } = summary;
   const tip = useTip();
   return (
     <section className="card">
@@ -170,17 +195,23 @@ function List({ summary }: { summary: Summary }) {
                     <th scope="col">Projects</th>
                     <th scope="col">
                       Sessions
-                      <InfoTip label="About sessions">5-hour windows started in the week. The number beside the triangle reached the 5-hour limit threshold.</InfoTip>
+                      <InfoTip label="About sessions">
+                        {'5-hour windows started in the week.\n'}
+                        <HitIcon size={13} />
+                        {` peak ≥ ${limitThreshold}%\n`}
+                        <BlockedIcon size={13} />
+                        {' blocked by a rate limit'}
+                      </InfoTip>
                     </th>
                     <th scope="col">Messages</th>
                     <th scope="col">
                       Cost
                       <InfoTip label="About cost">API-equivalent cost of the week's Claude Code messages.</InfoTip>
                     </th>
-                    <th scope="col">Final %</th>
+                    <th scope="col">Peak %</th>
                     <th scope="col">
                       Source
-                      <InfoTip label="About source">Reading: the final % comes from a reading of the week. Estimated: no reading, so it comes from the transcripts and the calibration.</InfoTip>
+                      <InfoTip label="About source">{'Reading: the peak % comes from a reading of the week.\nEstimated: no reading, so it comes from the transcripts and the calibration.'}</InfoTip>
                     </th>
                   </tr>
                 </thead>
@@ -192,12 +223,18 @@ function List({ summary }: { summary: Summary }) {
                         {week.inProgress && <span className="session-now">in progress</span>}
                       </th>
                       <td {...(week.projects.length > 0 ? tip(week.projects.map(p => p.path).join('\n')) : {})}>{projectsText(week)}</td>
-                      <td>
+                      <td className="wk-sessions-cell">
                         {week.sessions}
                         {week.cappedSessions > 0 && (
                           <span className="wk-capped">
                             <HitIcon size={13} />
                             {week.cappedSessions}
+                          </span>
+                        )}
+                        {week.blockedSessions > 0 && (
+                          <span className="wk-blocked-sessions">
+                            <BlockedIcon size={13} />
+                            {week.blockedSessions}
                           </span>
                         )}
                       </td>

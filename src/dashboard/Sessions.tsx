@@ -7,8 +7,9 @@ import type { FiveHourWindow } from '@/core/sessions';
 import type { Summary } from '@/dashboard/api';
 
 import { dayKey } from '@/core/aggregate';
+import { BlockedIcon } from '@/dashboard/BlockedIcon';
 import { formatDollars, formatPercent, formatUsd } from '@/dashboard/format';
-import { formatSessionDay, formatSpan, peakText, projectsText, timelineRows } from '@/dashboard/sessionsData';
+import { formatSessionDay, formatSpan, formatTime, peakText, projectsText, timelineRows } from '@/dashboard/sessionsData';
 import { InfoTip } from '@/dashboard/Tip';
 import { useTip } from '@/dashboard/useTip';
 
@@ -25,7 +26,8 @@ function windowText(window: FiveHourWindow, timeZone: string) {
 
 /** The block already shows the peak and, by its border, the source. */
 function windowTip(window: FiveHourWindow, timeZone: string): string {
-  return `${windowText(window, timeZone)}${window.inProgress ? ' (in progress)' : ''} · ${formatUsd(window.cost)}\n${window.messages} messages`;
+  const hits = window.limitHits?.map(hit => `\nRate limit hit at ${formatTime(hit, timeZone)}`).join('') ?? '';
+  return `${windowText(window, timeZone)}${window.inProgress ? ' (in progress)' : ''} · ${formatUsd(window.cost)}\n${window.messages} messages${hits}`;
 }
 
 function Stats({ summary }: { summary: Summary }) {
@@ -45,8 +47,13 @@ function Stats({ summary }: { summary: Summary }) {
           {stats.capped}
         </strong>
         <span>
-          {`hit the 5-hour limit (≥ ${limitThreshold}%)`}
+          {`peak ≥ ${limitThreshold}%`}
           <InfoTip label="About the limit">Windows where a reading reached the threshold. Set it in the Calibration tab.</InfoTip>
+        </span>
+        <span>
+          <BlockedIcon />
+          {`${stats.blocked} blocked by a rate limit`}
+          <InfoTip label="About blocked windows">Windows in which Claude Code printed a rate-limit message, read from the transcripts. Unlike the threshold, this is a limit actually hit.</InfoTip>
         </span>
       </div>
       <div className="card">
@@ -63,8 +70,8 @@ function Stats({ summary }: { summary: Summary }) {
       <div className="card">
         <strong>{stats.medianCost === undefined ? '–' : formatDollars(stats.medianCost)}</strong>
         <span>
-          median session cost
-          <InfoTip label="About median session cost">Median API-equivalent cost of the finished windows with Claude Code messages.</InfoTip>
+          median cost
+          <InfoTip label="About median cost">Median API-equivalent cost of the finished windows with Claude Code messages.</InfoTip>
         </span>
       </div>
     </section>
@@ -72,7 +79,7 @@ function Stats({ summary }: { summary: Summary }) {
 }
 
 function Timeline({ summary }: { summary: Summary }) {
-  const { sessions: { days, windows }, timeZone } = summary;
+  const { limitThreshold, sessions: { days, windows }, timeZone } = summary;
   const tip = useTip();
   // The hovered or focused window's start; its block(s) stay lit while the rest dim.
   const [active, setActive] = useState<string>();
@@ -127,6 +134,7 @@ function Timeline({ summary }: { summary: Summary }) {
                             {isStart && (
                               <span className="session-label">
                                 {window.capped && <CappedIcon size={12} />}
+                                {window.limitHits && <BlockedIcon size={12} />}
                                 {peakText(window)}
                                 {window.inProgress && <span className="wk-now">now</span>}
                               </span>
@@ -141,16 +149,20 @@ function Timeline({ summary }: { summary: Summary }) {
               <ul className="legend session-legend">
                 <li>
                   <span className="legend-session reading" />
-                  window from a reading
+                  from a reading
                 </li>
                 <li>
                   <span className="legend-session estimated" />
-                  window estimated from transcript times (peak marked ~)
+                  estimated from transcript times
                 </li>
                 <li>
                   <span className="legend-session capped" />
                   <CappedIcon />
-                  hit the limit
+                  {`peak ≥ ${limitThreshold}%`}
+                </li>
+                <li>
+                  <BlockedIcon />
+                  blocked by a rate limit
                 </li>
               </ul>
             </>
@@ -160,7 +172,7 @@ function Timeline({ summary }: { summary: Summary }) {
 }
 
 function List({ summary }: { summary: Summary }) {
-  const { sessions: { windows }, timeZone } = summary;
+  const { limitThreshold, sessions: { windows }, timeZone } = summary;
   const tip = useTip();
   return (
     <section className="card">
@@ -181,7 +193,13 @@ function List({ summary }: { summary: Summary }) {
                     </th>
                     <th scope="col">
                       Peak
-                      <InfoTip label="About peak">Highest 5-hour % read during the window; ~ marks an estimate from the 5-hour calibration.</InfoTip>
+                      <InfoTip label="About peak">
+                        {'Highest 5-hour % read during the window.\n~ marks an estimate from the 5-hour calibration.\n'}
+                        <CappedIcon size={13} />
+                        {` peak ≥ ${limitThreshold}%\n`}
+                        <BlockedIcon size={13} />
+                        {' blocked by a rate limit: hover the icon for the time'}
+                      </InfoTip>
                     </th>
                     <th scope="col">
                       Source
@@ -206,6 +224,13 @@ function List({ summary }: { summary: Summary }) {
                           </span>
                           {/* A fixed slot right of the bar, so the icon lines up whatever the % width. */}
                           <span className="session-peak-icon">{window.capped && <CappedIcon />}</span>
+                          <span className="session-peak-icon">
+                            {window.limitHits && (
+                              <span className="session-peak-blocked" {...tip(window.limitHits.map(hit => `Rate limit hit at ${formatTime(hit, timeZone)}`).join('\n'))}>
+                                <BlockedIcon />
+                              </span>
+                            )}
+                          </span>
                           <span className="session-peak-text">{peakText(window)}</span>
                         </div>
                       </td>

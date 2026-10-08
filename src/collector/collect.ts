@@ -36,8 +36,9 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
   let status: Status = {};
   try {
     status = await store.loadStatus();
-    const [records, scanState, sessions, settings] = await Promise.all([
+    const [records, events, scanState, sessions, settings] = await Promise.all([
       store.loadRecords(),
+      store.loadEvents(),
       store.loadScanState(),
       store.loadSessions(),
       store.loadSettings(),
@@ -51,11 +52,13 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
       await store.backupRecords(`backup-format-${scanState.format}`);
       scanState.files = {};
     }
-    const scan = await scanTranscripts(options.claudeDir, records, scanState.files, sessions);
+    const scan = await scanTranscripts(options.claudeDir, records, scanState.files, sessions, events);
     if (scan.filesRead > 0 || reread) {
       await store.saveRecords(records, scan.changedMonths);
       if (scan.sessionsChanged)
         await store.saveSessions(sessions);
+      if (scan.eventsChanged)
+        await store.saveEvents(events);
       // Written last: a crash before it only repeats the re-read.
       scanState.format = SCAN_FORMAT;
       await store.saveScanState(scanState);

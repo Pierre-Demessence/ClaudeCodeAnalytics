@@ -21,6 +21,17 @@ function assistantLine(id: string, output: number, version = '2.1.287') {
   });
 }
 
+const HIT_LINE = JSON.stringify({
+  error: 'rate_limit',
+  isApiErrorMessage: true,
+  message: { content: [{ text: 'You have hit your session limit', type: 'text' }], model: '<synthetic>' },
+  quotaLimits: { rateLimitType: 'five_hour', resetsAt: 1790999400 },
+  sessionId: 's2',
+  timestamp: '2026-10-02T08:30:00Z',
+  type: 'assistant',
+  uuid: 'hit-1',
+});
+
 const USAGE = {
   five_hour: { resets_at: '2026-10-02T12:50:00Z', utilization: 35 },
   seven_day: { resets_at: '2026-10-07T20:00:00Z', utilization: 44 },
@@ -69,6 +80,18 @@ describe('collect', () => {
     expect((await store.loadSettings()).planHistory).toEqual([{ from: '2026-10-02T09:00:00.000Z', plan: 'pro', source: 'detected' }]);
     const status = await store.loadStatus();
     expect(status).toMatchObject({ claudeCodeVersion: '2.1.300', endpointResult: 'ok', malformedLines: 1, messages: 2 });
+  });
+
+  it('stores rate-limit hits as events, once, without their text', async () => {
+    await writeFile(join(claudeDir, 'projects', 'proj-a', 's2.jsonl'), `${HIT_LINE}\n`);
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW + 60_000 });
+
+    const store = new Store(dataDir);
+    expect([...(await store.loadEvents()).values()]).toEqual([
+      { key: 'hit-1', kind: 'limit', limitType: 'five_hour', resetsAt: '2026-10-03T03:50:00.000Z', sessionId: 's2', ts: '2026-10-02T08:30:00Z' },
+    ]);
+    expect(await readFile(join(dataDir, 'events.jsonl'), 'utf8')).not.toContain('hit your');
   });
 
   it('never writes the token to the data dir', async () => {
@@ -182,6 +205,19 @@ describe('collect', () => {
       expect(records.get('gone|req_gone')).toEqual(oldRecord('gone|req_gone', 50));
       expect(records.has('m2|req_m2')).toBe(true);
       expect((await store.loadScanState()).format).toBe(SCAN_FORMAT);
+    });
+
+    it('finds the events of transcripts imported before the bump', async () => {
+      const hitFile = join(claudeDir, 'projects', 'proj-a', 's2.jsonl');
+      await writeFile(hitFile, `${HIT_LINE}\n`);
+      const store = await seedOldDataDir();
+      // Marked fully imported, as before the bump: only the re-read can find the hit.
+      const { files } = await store.loadScanState();
+      const info = await stat(hitFile);
+      files[join('proj-a', 's2.jsonl')] = { mtimeMs: info.mtimeMs, offset: info.size };
+      await store.saveScanState({ files, format: OLD_FORMAT });
+      await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+      expect([...(await store.loadEvents()).keys()]).toEqual(['hit-1']);
     });
 
     it('backs up the message files once, before changing them', async () => {

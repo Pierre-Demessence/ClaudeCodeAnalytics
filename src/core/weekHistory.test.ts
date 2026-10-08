@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { FiveHourWindow } from './sessions.ts';
-import type { Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
 import type { WeekHistoryInput } from './weekHistory.ts';
 
 import { DAY_MS, WEEK_MS } from './calibration.ts';
@@ -63,7 +63,7 @@ describe('windows', () => {
   });
 
   it('is empty without data', () => {
-    expect(weeks()).toEqual({ stats: { hit: 0 }, weeks: [] });
+    expect(weeks()).toEqual({ stats: { blocked: 0, hit: 0 }, weeks: [] });
   });
 });
 
@@ -171,6 +171,43 @@ describe('sessions', () => {
       ],
     });
     expect(rows.map(w => [w.sessions, w.cappedSessions])).toEqual([[2, 1], [2, 1]]);
+  });
+
+  it('counts the 5-hour windows that were blocked by a rate limit seen in the transcripts', () => {
+    const { weeks: rows } = weeks({
+      records: [rec(START + DAY_MS)],
+      sessionWindows: [
+        session(START + DAY_MS, { limitHits: [iso(START + DAY_MS + 3_600_000)] }),
+        session(START + 2 * DAY_MS),
+        session(START + 3 * DAY_MS, { capped: true }),
+      ],
+    });
+    expect(rows[0]).toMatchObject({ blockedSessions: 1, cappedSessions: 1, sessions: 3 });
+  });
+});
+
+describe('weekly limit hits', () => {
+  const hit = (ms: number): ApiEvent => ({ key: String(ms), kind: 'limit', limitType: 'seven_day', ts: iso(ms) });
+
+  it('lists the weekly-limit hits that fall in each window', () => {
+    const { weeks: rows } = weeks({
+      hits: [hit(START + DAY_MS), hit(START + 2 * DAY_MS), hit(weekStart(1) + DAY_MS), hit(weekStart(5))],
+      records: [rec(weekStart(1) + DAY_MS), rec(START + DAY_MS)],
+    });
+    expect(rows.map(w => w.limitHits)).toEqual([[iso(START + DAY_MS), iso(START + 2 * DAY_MS)], [iso(weekStart(1) + DAY_MS)]]);
+  });
+
+  it('has none without hits', () => {
+    expect(weeks({ records: [rec(START + DAY_MS)] }).weeks[0]!.limitHits).toBeUndefined();
+  });
+
+  it('counts the weeks that a rate limit blocked, by a weekly hit or a blocked session', () => {
+    const { stats } = weeks({
+      hits: [hit(weekStart(1) + DAY_MS)],
+      records: [rec(START + DAY_MS), rec(weekStart(1) + DAY_MS), rec(weekStart(2) + DAY_MS), rec(weekStart(3) + DAY_MS)],
+      sessionWindows: [session(weekStart(2) + DAY_MS, { limitHits: [iso(weekStart(2) + DAY_MS)] })],
+    });
+    expect(stats.blocked).toBe(2);
   });
 });
 

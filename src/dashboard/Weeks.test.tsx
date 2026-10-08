@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { Snapshot, UsageRecord } from '@/core/types';
+import type { ApiEvent, Snapshot, UsageRecord } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
 
 import { buildSummary } from '@/core/summary';
@@ -27,8 +27,8 @@ function reading(ts: string, weekly: number, weeklyResetsAt: string): Snapshot {
   return { source: 'endpoint', ts, weekly, weeklyResetsAt };
 }
 
-function summary(records: UsageRecord[], snapshots: Snapshot[] = []): Summary {
-  return { ...buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' }), status: {} };
+function summary(records: UsageRecord[], snapshots: Snapshot[] = [], events: ApiEvent[] = []): Summary {
+  return { ...buildSummary({ endpointEnabled: true, events, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' }), status: {} };
 }
 
 /** Thu 1 Oct 07:00 starts the running window; the week before ended at a 100% reading; the one before has none. */
@@ -62,10 +62,10 @@ describe('weeks tab', () => {
     const stats = screen.getByRole('region', { name: 'Weeks summary' });
     const value = (label: string) => within(stats).getByText(label).closest('.card')!.querySelector('strong')!.textContent;
     expect(value('weeks shown')).toBe('3');
-    expect(value('hit the weekly limit (≥ 98%)')).toBe('1');
+    expect(value('peak ≥ 98%')).toBe('1');
     // Finished weeks: 100% ($40) and one without a percent ($20).
-    expect(value('median final %')).toBe('100%');
-    expect(value('median week cost')).toBe('$30');
+    expect(value('median peak')).toBe('100%');
+    expect(value('median cost')).toBe('$30');
   });
 
   it('lists the weeks newest first, flagging the one in progress, the hit and the missing percent', () => {
@@ -99,7 +99,7 @@ describe('weeks tab', () => {
     expect(line!.querySelector('.week-bar.estimated')).toBeTruthy();
     expect(line!.querySelector('.week-bar.hit')).toBeNull();
     expect(line!.textContent).toContain('~100%');
-    expect(screen.getByRole('region', { name: 'Weeks summary' }).textContent).toContain('0hit the weekly limit');
+    expect(screen.getByRole('region', { name: 'Weeks summary' }).textContent).toContain('0peak ≥ 98%');
   });
 
   it('repeats cost, counts and projects under each week for the phone layout', () => {
@@ -131,5 +131,40 @@ describe('weeks tab', () => {
     renderTab(summary(records, snapshots));
     expect(tipOf(screen.getByRole('button', { name: 'About the weekly timeline' }))).toContain('Thu 07:00');
     expect(tipOf(screen.getByRole('button', { name: 'About sessions' }))).toContain('5-hour windows started in the week');
+  });
+
+  describe('rate-limit hits seen in the transcripts', () => {
+    const events: ApiEvent[] = [
+      // Inside the 5-hour window opened by the 09:00 message of the running week.
+      { key: 'session-hit', kind: 'limit', limitType: 'five_hour', ts: '2026-10-02T09:30:00.000Z' },
+      // The weekly limit, in the week before.
+      { key: 'week-hit', kind: 'limit', limitType: 'seven_day', ts: '2026-09-27T12:00:00.000Z' },
+    ];
+
+    it('counts the weeks apart from the ones that reached the threshold', () => {
+      renderTab(summary(records, snapshots, events));
+      expect(screen.getByText('2 blocked by a rate limit')).toBeTruthy();
+      expect(within(screen.getByRole('region', { name: 'Weeks summary' })).getByText('peak ≥ 98%').previousElementSibling!.textContent).toBe('1');
+    });
+
+    it('marks each week row with an icon and a count, and says what blocked it in the tooltip', () => {
+      renderTab(summary(records, snapshots, events));
+      const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
+      const mark = (i: number) => lines[i]!.querySelector('.wk-percent .wk-blocked-mark');
+      expect(mark(0)!.textContent).toBe('1');
+      expect(mark(0)!.querySelector('.icon-blocked')).toBeTruthy();
+      expect(tipOf(mark(0)!)).toBe('1 session blocked by a rate limit');
+      expect(mark(1)!.textContent).toBe('1');
+      expect(tipOf(mark(1)!)).toBe('Weekly limit hit: Sun 27 Sept 12:00');
+      expect(mark(2)).toBeNull();
+    });
+
+    it('counts the blocked sessions beside the sessions in the list', () => {
+      renderTab(summary(records, snapshots, events));
+      const rows = within(card('Week list')).getAllByRole('row').slice(1);
+      expect(rows[0]!.querySelector('.wk-blocked-sessions')!.textContent).toBe('1');
+      expect(rows[0]!.querySelector('.wk-blocked-sessions .icon-blocked')).toBeTruthy();
+      expect(rows[2]!.querySelector('.wk-blocked-sessions')).toBeNull();
+    });
   });
 });
