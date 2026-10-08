@@ -84,9 +84,9 @@ Run lint, test and build before considering work done.
 - The data dir (`~/.claude-code-analytics/`, or `CCA_DATA_DIR`) holds the
   user's history: never wipe it. Tests and manual runs use a temp
   `CCA_DATA_DIR`. Stored messages hold token counts and session metadata
-  (`sessionId`, `cwd`, `gitBranch`, …), tool names with call counts and the
+  (`sessionId`, `cwd`, `gitBranch`, …), tool names with call counts and the character count of their inputs, the
   skill or slash command name and the subagent type (from its `.meta.json`,
-  never its description), never content or tool inputs; conversation titles are
+  never its description), never content or tool inputs themselves; conversation titles are
   kept per session in `sessions.json`; `events.jsonl` keeps rate-limit hits,
   overloads and compactions (times and limit types, never their text). `deleted-readings.jsonl` keeps the manual readings deleted from the
   dashboard: keep it. `backup-format-<n>/` holds the message

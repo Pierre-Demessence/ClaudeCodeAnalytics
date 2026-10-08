@@ -22,6 +22,12 @@ export function toolLabel(name: string): string {
 }
 
 /**
+ * Characters a tool call costs beyond its input: the call wrapper and the tool
+ * name (about 15 tokens). It keeps a call with an empty input from weighing nothing.
+ */
+const CALL_OVERHEAD_CHARS = 50;
+
+/**
  * Splits `total` over `weights` in proportion, in whole tokens: each gets its
  * rounded-down share, and the tokens left go to the largest fractions (ties
  * to the first name) so the parts always sum to `total`.
@@ -46,15 +52,18 @@ function allocate(total: number, weights: [string, number][]): [string, number][
 /**
  * Where one message's output tokens went. Thinking is recorded exactly; the
  * rest is the text and the tool calls, which the transcript does not size
- * separately, so it is spread evenly over the tool calls (one share per
- * call), or counted as reply text when there are none. A message imported
- * before tool calls were kept is `untracked`. The parts sum to `output`.
+ * separately, so it is spread over the tool calls in proportion to the size of
+ * their input (plus a fixed overhead per call; evenly per call when the sizes
+ * were not kept), or counted as reply text when there are none. A message
+ * imported before tool calls were kept is `untracked`. The parts sum to `output`.
  */
-export function splitOutput(record: Pick<UsageRecord, 'output' | 'thinking' | 'tools'>): OutputPart[] {
+export function splitOutput(record: Pick<UsageRecord, 'output' | 'thinking' | 'toolInput' | 'tools'>): OutputPart[] {
   const thinking = Math.min(Math.max(record.thinking ?? 0, 0), record.output);
   const rest = record.output - thinking;
   const parts: OutputPart[] = [{ kind: 'thinking', tokens: thinking }];
-  const calls = Object.entries(record.tools ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  const calls = Object.entries(record.tools ?? {})
+    .map(([name, count]): [string, number] => [name, (record.toolInput?.[name] ?? 0) + count * CALL_OVERHEAD_CHARS])
+    .sort(([a], [b]) => a.localeCompare(b));
   if (!record.tools)
     parts.push({ kind: 'untracked', tokens: rest });
   else if (calls.length === 0)

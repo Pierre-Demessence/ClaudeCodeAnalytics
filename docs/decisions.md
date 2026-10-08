@@ -348,14 +348,16 @@ session interleave their turns and records carry no agent id, so a subagent's
 first turn read as a flush (54 of the 80 flushes found on the local data were
 subagent turns, but only $3.60 of the $38.44).
 
-## Output split by tool: an even split per call, per scan
+## Output split by tool: weighted by input size, per scan
 
 Claude Code writes one transcript line per content block, each with the whole
 message's `output_tokens`, so no tool call has a size of its own. A message's
-non-thinking output is split evenly across its tool calls (largest remainder, so
-parts sum exactly) and shown as an estimate: `Write` and `Bash` carry more than
-`Read`, which the split ignores. Weighting by tool input size was rejected: it
-means storing inputs, and the transcripts' content stays out of the data dir.
+non-thinking output is split across its tool calls in proportion to the
+characters of their input plus a fixed overhead per call (largest remainder, so
+parts sum exactly) and shown as an estimate. Only the character count of each
+call's input is stored (`toolInput`), never the input, so the content stays out
+of the data dir. A record without sizes splits evenly per call. Text written
+beside the calls is not sized and goes to the tools too.
 
 A skill owns the messages from the line that starts it (a slash command, or a
 `Skill` tool call) to the user's next real prompt. The active skill is kept per

@@ -56,6 +56,7 @@ describe('parseTranscriptLine', () => {
       model: 'claude-opus-5-5',
       output: 843,
       project: 'proj',
+      toolInput: {},
       tools: {},
       ts: '2026-10-02T08:45:17.630Z',
     });
@@ -96,6 +97,22 @@ describe('parseTranscriptLine', () => {
     ];
     const record = parseTranscriptLine(entry({ blocks }), 'proj');
     expect(record?.tools).toEqual({ Bash: 1, Read: 2 });
+    expect(JSON.stringify(record)).not.toContain('secret');
+  });
+
+  it('sizes the input of each tool call in characters, never keeping it', () => {
+    const blocks = [
+      { id: 't1', name: 'Bash', input: { command: 'secret' }, type: 'tool_use' },
+      { id: 't2', name: 'Read', input: { file_path: 'a.ts' }, type: 'tool_use' },
+      { id: 't3', name: 'Read', input: { file_path: 'bb.ts' }, type: 'tool_use' },
+      { id: 't4', name: 'Snapshot', type: 'tool_use' },
+    ];
+    const record = parseTranscriptLine(entry({ blocks }), 'proj');
+    expect(record?.toolInput).toEqual({
+      Bash: JSON.stringify({ command: 'secret' }).length,
+      Read: JSON.stringify({ file_path: 'a.ts' }).length + JSON.stringify({ file_path: 'bb.ts' }).length,
+      Snapshot: 0,
+    });
     expect(JSON.stringify(record)).not.toContain('secret');
   });
 
@@ -220,6 +237,27 @@ describe('mergeRecord tools and skill', () => {
     records.set(old.key, old);
     expect(mergeRecord(records, parseTranscriptLine(toolLine('Read'), 'p')!, new Set())).toBe(true);
     expect(toolsOf(records)).toEqual({ Read: 1 });
+  });
+
+  it('adds up the input sizes like the tool counts, and replaces them on a re-read', () => {
+    const line = (name: string, input: unknown) => entry({ blocks: [{ id: `id_${name}`, name, input, type: 'tool_use' }], output: 500 });
+    const sizeOf = (records: Map<string, UsageRecord>) => records.get('msg_1|req_1')?.toolInput;
+    const records = new Map<string, UsageRecord>();
+    const seen = new Set<string>();
+    mergeRecord(records, parseTranscriptLine(line('Read', { a: 1 }), 'p')!, seen);
+    mergeRecord(records, parseTranscriptLine(line('Read', { a: 22 }), 'p')!, seen);
+    expect(sizeOf(records)).toEqual({ Read: JSON.stringify({ a: 1 }).length + JSON.stringify({ a: 22 }).length });
+    expect(mergeRecord(records, parseTranscriptLine(line('Read', { a: 1 }), 'p')!, new Set())).toBe(true);
+    expect(sizeOf(records)).toEqual({ Read: JSON.stringify({ a: 1 }).length });
+  });
+
+  it('gives a record imported without input sizes its sizes', () => {
+    const records = new Map<string, UsageRecord>();
+    const old = parseTranscriptLine(toolLine('Read'), 'p')!;
+    delete old.toolInput;
+    records.set(old.key, old);
+    expect(mergeRecord(records, parseTranscriptLine(toolLine('Read'), 'p')!, new Set())).toBe(true);
+    expect(records.get(old.key)?.toolInput).toEqual({ Read: 0 });
   });
 
   it('keeps the skill a message was first stamped with', () => {

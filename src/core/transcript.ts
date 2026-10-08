@@ -12,7 +12,7 @@ interface RawUsage {
 
 interface RawBlock {
   name?: string;
-  input?: { skill?: unknown };
+  input?: { skill?: unknown } | null;
   text?: string;
   type?: string;
 }
@@ -42,13 +42,17 @@ function blocksOf(entry: RawEntry): RawBlock[] {
   return Array.isArray(content) ? content : [];
 }
 
-function countTools(entry: RawEntry): Record<string, number> {
+/** Tool calls of a message by tool name, and the characters of their input (the content itself is dropped). */
+function measureTools(entry: RawEntry): { toolInput: Record<string, number>; tools: Record<string, number> } {
   const tools: Record<string, number> = {};
+  const toolInput: Record<string, number> = {};
   for (const block of blocksOf(entry)) {
-    if (block.type === 'tool_use' && typeof block.name === 'string' && block.name)
+    if (block.type === 'tool_use' && typeof block.name === 'string' && block.name) {
       tools[block.name] = (tools[block.name] ?? 0) + 1;
+      toolInput[block.name] = (toolInput[block.name] ?? 0) + (JSON.stringify(block.input)?.length ?? 0);
+    }
   }
-  return tools;
+  return { toolInput, tools };
 }
 
 /**
@@ -80,7 +84,7 @@ export function parseTranscriptLine(line: string, project: string, skill?: strin
     model: message.model,
     output: usage.output_tokens ?? 0,
     project,
-    tools: countTools(entry),
+    ...measureTools(entry),
     ts: entry.timestamp,
     // Without the split, the API default (5-minute TTL) applies.
     cacheRead: usage.cache_read_input_tokens ?? 0,
@@ -196,7 +200,8 @@ function addTools(a: Record<string, number> | undefined, b: Record<string, numbe
  * the copies already met (`seen` holds their keys): the first copy of a
  * message not met yet replaces the stored tools instead, so re-reading a
  * transcript does not count them twice. A skill or agent type, once set, is
- * kept, and a stored record without an agent type gets the one given.
+ * kept, and a stored record without an agent type gets the one given. The
+ * input sizes follow the same rules as the tool calls.
  * Returns whether the map changed.
  */
 export function mergeRecord(records: Map<string, UsageRecord>, record: UsageRecord, seen = new Set<string>()): boolean {
@@ -208,11 +213,12 @@ export function mergeRecord(records: Map<string, UsageRecord>, record: UsageReco
     return true;
   }
   const tools = again ? addTools(existing.tools, record.tools) : record.tools;
+  const toolInput = again ? addTools(existing.toolInput, record.toolInput) : record.toolInput;
   const skill = existing.skill ?? record.skill;
   const fills = !existing.sessionId && record.sessionId && record.output === existing.output;
   const base = record.output > existing.output || fills ? record : existing;
   const agentType = existing.agentType ?? record.agentType;
-  if (base === existing && sameTools(tools, existing.tools) && skill === existing.skill && agentType === existing.agentType)
+  if (base === existing && sameTools(tools, existing.tools) && sameTools(toolInput, existing.toolInput) && skill === existing.skill && agentType === existing.agentType)
     return false;
   const merged = { ...base };
   if (agentType)
@@ -221,6 +227,10 @@ export function mergeRecord(records: Map<string, UsageRecord>, record: UsageReco
     merged.tools = tools;
   else
     delete merged.tools;
+  if (toolInput)
+    merged.toolInput = toolInput;
+  else
+    delete merged.toolInput;
   if (skill)
     merged.skill = skill;
   else

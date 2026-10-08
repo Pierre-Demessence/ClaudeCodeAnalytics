@@ -48,6 +48,8 @@ export interface UsageRecord {
   speed?: 'fast';
   /** Output tokens spent thinking, part of `output`. */
   thinking?: number;
+  /** Characters of the tool-call input by tool name (the input itself is never kept). Absent on a message imported before they were sized. */
+  toolInput?: Record<string, number>;
   /** Tool calls by tool name; `{}` for a reply without any. Absent on a message imported before they were kept. */
   tools?: Record<string, number>;
   /** ISO timestamp. */
