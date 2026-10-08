@@ -241,6 +241,18 @@ describe('buildSummary', () => {
     expect(summary.fiveHourSession!.activeLeftByFamily!.map(f => f.family)).toEqual(['opus', 'sonnet']);
   });
 
+  it('gives the hours of one model that equal an hour of another, from the last 4 weeks', () => {
+    // Four days with an hour of Sonnet ($105/h) and an hour of Opus ($140/h).
+    const day = (ago: number) => [0, 10, 20, 30, 40, 50, 60].flatMap(m => [
+      rec(NOW - ago * DAY_MS - 5 * HOUR_MS + m * 60_000, 'claude-sonnet-4-6'),
+      rec(NOW - ago * DAY_MS - 2 * HOUR_MS + m * 60_000),
+    ]);
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [1, 2, 3, 4].flatMap(day), snapshots: [], timeZone: 'UTC' });
+    expect(summary.modelRatios).toHaveLength(1);
+    expect(summary.modelRatios[0]).toMatchObject({ from: 'opus', to: 'sonnet' });
+    expect(summary.modelRatios[0]!.hours).toBeCloseTo(140 / 105);
+  });
+
   it('lists the 5-hour windows, estimated peaks from the 5-hour calibration', () => {
     const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
     const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';

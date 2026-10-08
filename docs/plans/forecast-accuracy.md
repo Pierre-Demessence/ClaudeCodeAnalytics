@@ -104,10 +104,11 @@ equals Σ share_f × pace_f with each family's share of active time over those
 days. Per-family figures answer "if I only use X".
 
 **Model ratios (2b).** The ratio of two families' paces from stage 2. Its
-price-per-token part comes from the price table (input/output blend at the
-family's observed token mix); the rest is the ratio of tokens per active hour.
+price-per-token part is dollars per token of every kind at the mix each
+family was used with, so that price × tokens per active hour equals the hours
+ratio exactly; the rest is the ratio of tokens per active hour.
 The range is a bootstrap over active days with a small seeded PRNG
-(deterministic). Shown as one line on the limit cards and as a table (price,
+(deterministic). Shown as one line under the two limit cards (it does not depend on the window) and as a table (price,
 tokens per hour, hours per hour) on the Breakdown tab, next to the existing
 Opus-to-Sonnet what-if, which re-prices the same tokens and so measures a
 different thing. Selection bias (harder work goes to Opus) is stated in the UI.
@@ -163,8 +164,8 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 
 ### Stage 2b: model ratios
 
-- [ ] `core/modelRatio.ts`: pairwise ratio, same-day pairing, seeded bootstrap range, price × volume split, with tests (known ratios, thin data, no overlap days)
-- [ ] `summary.ts` exposes the ratios; Overview line and Breakdown table, with `InfoTip` on the bias and the split; tests
+- [x] `core/modelRatio.ts`: pairwise ratio, same-day pairing, seeded bootstrap range, price × volume split, with tests (known ratios, thin data, no overlap days)
+- [x] `summary.ts` exposes the ratios; Overview line and Breakdown table, with `InfoTip` on the bias and the split; tests
 - [ ] Check in the browser
 
 ### Stage 3: expected active hours (gated on the backtest)
@@ -181,7 +182,7 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 - [ ] `docs/backlog.md`: delete "Weekday-aware daily usage" and the bootstrap item if stage 3 ships
 - [ ] Delete this plan in the final commit, naming its path in the message
 
-Status: stage 1 committed, stage 2 done, both in the `forecast-backtest` worktree (stage 2 uncommitted). The data
+Status: stages 1 and 2 committed, stage 2b done (uncommitted), all in the `forecast-backtest` worktree. The data
 dir holds about a week of readings, so the backtest has one completed weekly
 window and a dozen 5-hour windows: stage 3 cannot be judged yet (see its gate).
-Next: stage 2b.
+Next: stage 3, once enough completed weeks exist.

@@ -18,6 +18,8 @@ export interface FamilyActivity {
   cost: number;
   /** The family's most recent priced model in the range (or its latest, when none is priced): its price stands for the family. */
   model: string;
+  /** Tokens of every kind. */
+  tokens: number;
 }
 
 export interface FamilyPace {
@@ -45,11 +47,12 @@ export function activeByFamily(records: readonly UsageRecord[], from: number, to
   const byFamily = new Map<Family, FamilyActivity>();
   for (const [i, { ms, record }] of points.entries()) {
     const family = familyOf(record.model);
-    const activity = byFamily.get(family) ?? { activeMs: 0, cost: 0, model: record.model };
+    const activity = byFamily.get(family) ?? { activeMs: 0, cost: 0, model: record.model, tokens: 0 };
     const gap = i > 0 ? ms - points[i - 1]!.ms : Infinity;
     if (gap <= IDLE_GAP_MS)
       activity.activeMs += gap;
     activity.cost += messageCost(record).cost;
+    activity.tokens += record.input + record.output + record.cacheRead + record.cacheWrite1h + record.cacheWrite5m;
     // An unpriced id (a model newer than the price table) must not replace a priced one: the price stands for the family.
     if (priceFor(record.model) || !priceFor(activity.model))
       activity.model = record.model;

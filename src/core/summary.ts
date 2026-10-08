@@ -6,6 +6,7 @@ import type { Calibration } from './calibration.ts';
 import type { Family } from './family.ts';
 import type { WindowForecast } from './forecast.ts';
 import type { Limits } from './limits.ts';
+import type { ModelRatio } from './modelRatio.ts';
 import type { MultiplierCheck } from './multipliers.ts';
 import type { WeekPacing } from './pacing.ts';
 import type { PlanFitInput } from './planFit.ts';
@@ -23,6 +24,7 @@ import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibration
 import { familyOf } from './family.ts';
 import { forecastWindow } from './forecast.ts';
 import { buildLimits } from './limits.ts';
+import { modelRatios } from './modelRatio.ts';
 import { buildMultipliers } from './multipliers.ts';
 import { weekPacing } from './pacing.ts';
 import { buildPlanFitInput } from './planFit.ts';
@@ -121,6 +123,8 @@ export interface DashboardSummary {
   limitThreshold: number;
   /** Limit drift and the readings table. */
   limits: Limits;
+  /** How many hours of a lighter model equal an hour of a heavier one, in the user's usage of the last 4 weeks. */
+  modelRatios: ModelRatio[];
   /** Measured against advertised multipliers between neighbouring plans. */
   multipliers: MultiplierCheck[];
   plan: Plan;
@@ -357,6 +361,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     generatedAt: nowIso,
     limits: buildLimits(limitsInput),
     limitThreshold,
+    modelRatios: modelRatios(records, now - TYPICAL_DAYS * DAY_MS, now, timeZone),
     multipliers: buildMultipliers(limitsInput),
     plan,
     planFit: buildPlanFitInput({ calibrationK: calibration?.k, fiveHourK: fiveHourCalibration?.k, plan, planHistory, sessionWindows, weekHistory, weekLimitThreshold }),

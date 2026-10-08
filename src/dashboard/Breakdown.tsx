@@ -6,6 +6,7 @@ import type { Series } from '@/dashboard/models';
 
 import { familyOf } from '@/core/family';
 import { formatDateTime, formatDollars, formatDuration, formatPercent } from '@/dashboard/format';
+import { ModelRatiosCard } from '@/dashboard/ModelRatios';
 import { SERIES } from '@/dashboard/models';
 import { Legend, Swatch } from '@/dashboard/Patterns';
 import { InfoTip } from '@/dashboard/Tip';
@@ -176,6 +177,8 @@ export function Breakdown({ summary }: { summary: Summary }) {
                   </section>
                 </div>
               </div>
+
+              <ModelRatiosCard ratios={summary.modelRatios} />
 
               <section className="card">
                 <div className="card-head">

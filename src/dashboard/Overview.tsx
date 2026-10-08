@@ -13,6 +13,7 @@ import { endpointResultText } from '@/dashboard/endpoint';
 import { FamilyHours } from '@/dashboard/FamilyHours';
 import { formatCountdown, formatDateTime, formatDuration, formatPercent, formatRelative } from '@/dashboard/format';
 import { Meter } from '@/dashboard/Meter';
+import { ModelRatioLine } from '@/dashboard/ModelRatios';
 import { PacingChart } from '@/dashboard/PacingChart';
 import { InfoTip } from '@/dashboard/Tip';
 import { useNow } from '@/dashboard/useNow';
@@ -200,6 +201,7 @@ export function Overview({ summary }: { summary: Summary }) {
               </EmptyCard>
             )}
       </div>
+      <ModelRatioLine ratios={summary.modelRatios} />
       {current && <PacingChart forecast={current.forecast} now={now} pacing={current.pacing} usedNow={current.estimatedNow ?? current.weekly} />}
     </>
   );
