@@ -23,10 +23,14 @@ export interface UsageRecord {
   sessionId?: string;
   /** Present only on a subagent's message. */
   sidechain?: true;
+  /** The skill or slash command (`/commit`) this main-conversation message ran under. */
+  skill?: string;
   /** Present only when the request ran in fast mode. */
   speed?: 'fast';
   /** Output tokens spent thinking, part of `output`. */
   thinking?: number;
+  /** Tool calls by tool name; `{}` for a reply without any. Absent on a message imported before they were kept. */
+  tools?: Record<string, number>;
   /** ISO timestamp. */
   ts: string;
   /** Claude Code version that wrote the message. */

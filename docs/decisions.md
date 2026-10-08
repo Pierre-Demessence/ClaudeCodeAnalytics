@@ -321,3 +321,21 @@ last about a second, writes are atomic (temp file, then rename), and a lost
 write is imported again by the next scan because offsets only advance after a
 save. A read-back of the lock file would narrow the race without closing it and
 cannot be tested. Revisit if malformed lines or missing messages ever appear.
+
+## Output split by tool: an even split per call, per scan
+
+Claude Code writes one transcript line per content block, each with the whole
+message's `output_tokens`, so no tool call has a size of its own. A message's
+non-thinking output is split evenly across its tool calls (largest remainder, so
+parts sum exactly) and shown as an estimate: `Write` and `Bash` carry more than
+`Read`, which the split ignores. Weighting by tool input size was rejected: it
+means storing inputs, and the transcripts' content stays out of the data dir.
+
+A skill owns the messages from the line that starts it (a slash command, or a
+`Skill` tool call) to the user's next real prompt. The active skill is kept per
+transcript in the scan state so an incremental scan resumes inside a turn.
+
+Tool counts from the copies of one message are added when the line continues
+a message already met in the scan or lies after the stored offset; the first
+copy met when a transcript is read from its start replaces the stored count, so
+the re-read after a `SCAN_FORMAT` bump does not double them.
