@@ -25,6 +25,7 @@ Everything stays on your machine. Data comes from two places:
   to reach 100% at reset.
 - The typical week, and its equivalent on Pro, Max 5× and Max 20×
   (approximate, from the advertised multipliers).
+- What the subscription bought: what you were charged (from the billing date Claude Code caches; list price, before VAT) against the same usage at API prices, this billing cycle or all time.
 - Daily and weekly usage by model family, in API-equivalent dollars or tokens,
   with Claude Code upgrades marked on the daily chart.
 - When you work (average cost per weekday and hour), cache efficiency (share
@@ -44,7 +45,7 @@ Everything stays on your machine. Data comes from two places:
   block, sessions, messages, projects, the weeks that hit the limit (from a
   configurable threshold, 98% by default) and the weeks a rate limit blocked.
 - Plan setting with history; the plan is also detected from Claude Code's login.
-- Tabs: Overview (limits and pacing), Usage (charts by model, heatmap, cache, message costs),
+- Tabs: Overview (limits and pacing), Usage (subscription vs API prices, charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents), Sessions (past 5-hour windows),
   Weeks (past weekly windows), Plans (which plan would have fit the last 12 weeks, an Opus-to-Sonnet what-if, and how far the advertised plan multipliers match your own weeks) and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
 - Light and dark themes: follows the OS until you pick one in the header.

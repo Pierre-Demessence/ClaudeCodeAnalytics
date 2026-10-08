@@ -13,6 +13,7 @@ import type { PlanFitInput } from './planFit.ts';
 import type { Sessions } from './sessions.ts';
 import type { WeekShare } from './share.ts';
 import type { ApiEvent, Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
+import type { ValueForMoney } from './valueForMoney.ts';
 import type { WeekHistory } from './weekHistory.ts';
 
 import { activeHourlyPace, activeLeftByFamily, activeTimeLeft } from './activePace.ts';
@@ -33,6 +34,7 @@ import { planAt, planFromSubscription } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
+import { valueForMoney } from './valueForMoney.ts';
 import { buildWeekHistory, DEFAULT_WEEK_LIMIT_THRESHOLD } from './weekHistory.ts';
 
 /** Days of daily cost and 5-hour sessions used as "typical" for forecasts. */
@@ -52,6 +54,8 @@ export interface SummaryInput {
   planHistory: readonly PlanPeriod[];
   records: readonly UsageRecord[];
   snapshots: readonly Snapshot[];
+  /** When the paid subscription started (ms); it is billed on the same day each month. */
+  subscriptionStart?: number;
   /** Minutes between endpoint calls; 15 by default. */
   throttleMinutes?: number;
   timeZone: string;
@@ -143,6 +147,8 @@ export interface DashboardSummary {
   timeZone: string;
   /** Models without a known price; their cost counts as zero. */
   unknownModels: string[];
+  /** The usage at API prices against the plan's price; absent without cost. */
+  value?: ValueForMoney;
   /** Usage per weekly window (bucket = window start, ISO) and model. */
   weekly: UsageRow[];
   /** The last 12 weekly windows: final %, cost per day, sessions and projects. */
@@ -378,6 +384,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     throttleMinutes: input.throttleMinutes ?? 15,
     timeZone,
     unknownModels,
+    value: valueForMoney({ costBetween, dataStart: first, now, planHistory, subscriptionStart: input.subscriptionStart }),
     weekHistory,
     weekLimitThreshold,
     weekly,

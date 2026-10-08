@@ -28,7 +28,7 @@ function rec(ago: number, extra: Partial<UsageRecord> = {}): UsageRecord {
   return { cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, cwd: 'S:\\Dev\\app', input: 0, key: ts + JSON.stringify(extra), model: 'claude-opus-5-5', output: 1_000_000, project: 'p', sessionId: 's1', ts, ...extra };
 }
 
-function summary(records: UsageRecord[]): Summary {
+function summary(records: UsageRecord[], subscriptionStart?: number): Summary {
   const resetsAt = new Date(NOW + 3 * DAY_MS).toISOString();
   return {
     ...buildSummary({
@@ -37,6 +37,7 @@ function summary(records: UsageRecord[]): Summary {
       planHistory: [],
       records,
       snapshots: [{ source: 'endpoint', ts: new Date(NOW - 10 * 60_000).toISOString(), weekly: 42, weeklyResetsAt: resetsAt }],
+      subscriptionStart,
       timeZone: 'UTC',
     }),
     status: {},
@@ -113,6 +114,37 @@ describe('usage tab', () => {
     expect(within(card('Cache efficiency')).getByText('No usage this week yet.')).toBeTruthy();
     expect(within(card('Cost per message')).getByText('No usage this week yet.')).toBeTruthy();
     expect(within(card('When you work')).getByText('No usage in the last 4 weeks.')).toBeTruthy();
+  });
+
+  it('sets the subscription against the API value, over 4 weeks or all time', () => {
+    render(<Usage summary={summary([rec(60 * DAY_MS), rec(10 * DAY_MS)])} />);
+    const value = card('Subscription vs API prices');
+    const figures = () => [...value.querySelectorAll('.stats div')].map(div => div.textContent);
+    expect(figures()).toEqual(['Subscription$18', 'API value$20', 'Saved$28% below API']);
+    fireEvent.click(within(value).getByRole('button', { name: 'All time' }));
+    expect(figures()).toEqual(['Subscription$39', 'API value$40', 'Saved$11% below API']);
+  });
+
+  it('charges the whole billing cycle when the subscription start is known', () => {
+    render(<Usage summary={summary([rec(9 * DAY_MS), rec(8 * DAY_MS)], NOW - 10 * DAY_MS)} />);
+    const value = card('Subscription vs API prices');
+    expect(within(value).getByRole('button', { name: 'This billing cycle' }).getAttribute('aria-pressed')).toBe('true');
+    expect([...value.querySelectorAll('.stats div')].map(div => div.textContent)).toEqual(['Subscription$20', 'API value$40', 'Saved$2050% below API']);
+  });
+
+  it('opens on all time when the last 4 weeks had no usage', () => {
+    render(<Usage summary={summary([rec(60 * DAY_MS)])} />);
+    expect(within(card('Subscription vs API prices')).getByRole('button', { name: 'All time' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('says so when the plan cost more than the usage', () => {
+    render(<Usage summary={summary([rec(10 * DAY_MS, { output: 10_000 })])} />);
+    expect(within(card('Subscription vs API prices')).getByText(/% above API$/)).toBeTruthy();
+  });
+
+  it('has no value card without usage', () => {
+    render(<Usage summary={summary([])} />);
+    expect(screen.queryByRole('heading', { name: 'Subscription vs API prices' })).toBeNull();
   });
 });
 
