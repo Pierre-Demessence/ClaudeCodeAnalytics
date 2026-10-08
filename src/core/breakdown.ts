@@ -61,6 +61,13 @@ export interface SkillUsage {
   output: number;
 }
 
+/** What one subagent type's messages cost; `type` is absent when it was not recorded. */
+export interface SubagentTypeCost {
+  cost: number;
+  messages: number;
+  type?: string;
+}
+
 /** Where one period's usage went. Costs are API-equivalent USD. */
 export interface Breakdown {
   agents: { main: number; subagents: number };
@@ -76,6 +83,8 @@ export interface Breakdown {
   projects: ProjectCost[];
   /** The costliest skills and commands. */
   skills: SkillUsage[];
+  /** Subagent cost by type, costliest first. */
+  subagentTypes: SubagentTypeCost[];
   surfaces: { cost: number; entrypoint?: string }[];
   /** Thinking share of output tokens, 0–1. */
   thinkingShare: number;
@@ -167,6 +176,7 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
   const projects = new Map<string, ProjectCost & { cacheRead: number; inputAll: number }>();
   const effort = new Map<string, number>();
   const surfaces = new Map<string | undefined, number>();
+  const subagentTypes = new Map<string | undefined, SubagentTypeCost>();
   const conversations = new Map<string, ConversationCost & { branches: Map<string, number> }>();
   let output = 0;
   let thinking = 0;
@@ -203,10 +213,16 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
       noSkill.cost += cost;
       noSkill.output += record.output;
     }
-    if (record.sidechain)
+    if (record.sidechain) {
       agents.subagents += cost;
-    else
+      const subagentType = subagentTypes.get(record.agentType) ?? { cost: 0, messages: 0, type: record.agentType };
+      subagentType.cost += cost;
+      subagentType.messages++;
+      subagentTypes.set(record.agentType, subagentType);
+    }
+    else {
       agents.main += cost;
+    }
     if (record.effort && !record.sidechain)
       effort.set(record.effort, (effort.get(record.effort) ?? 0) + cost);
     surfaces.set(record.entrypoint, (surfaces.get(record.entrypoint) ?? 0) + cost);
@@ -254,6 +270,7 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
     effort: [...effort].map(([level, cost]) => ({ cost, level })).sort((a, b) => rank(a.level) - rank(b.level) || a.level.localeCompare(b.level)),
     noSkill,
     skills: rankedSkills.slice(0, TOP_SKILLS),
+    subagentTypes: [...subagentTypes.values()].sort((a, b) => byCost(a, b) || (a.type ?? '').localeCompare(b.type ?? '')),
     surfaces: [...surfaces].map(([entrypoint, cost]) => ({ cost, entrypoint })).sort(byCost),
     thinkingShare: output > 0 ? thinking / output : 0,
     total,

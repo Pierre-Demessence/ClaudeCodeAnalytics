@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
-import { open, readdir, stat } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { open, readdir, readFile, stat } from 'node:fs/promises';
+import { basename, dirname, join, relative, sep } from 'node:path';
 
 import type { ApiEvent, SessionInfo, UsageRecord } from '../core/types.ts';
 import type { ScanState } from './store.ts';
@@ -60,6 +60,23 @@ export function malformedLineCount(state: ScanState): number {
   return Object.values(state).reduce((sum, entry) => sum + (entry.malformed ?? 0), 0);
 }
 
+/**
+ * The type of the subagent a transcript belongs to, from the `<name>.meta.json`
+ * Claude Code writes beside it. Undefined for a main transcript or a missing
+ * or unreadable file.
+ */
+async function subagentType(file: string): Promise<string | undefined> {
+  if (basename(dirname(file)) !== 'subagents')
+    return undefined;
+  try {
+    const meta = JSON.parse(await readFile(file.replace(/\.jsonl$/, '.meta.json'), 'utf8')) as { agentType?: unknown };
+    return typeof meta.agentType === 'string' && meta.agentType ? meta.agentType : undefined;
+  }
+  catch {
+    return undefined;
+  }
+}
+
 const VERSION_PATTERN = /"version":"(\d+(?:\.\d+)*)"/;
 const NEWLINE = 0x0A;
 
@@ -103,10 +120,11 @@ export async function scanTranscripts(claudeDir: string, records: Map<string, Us
 
     const project = id.split(sep)[0]!;
     let skill = resume?.skill;
+    const agentType = await subagentType(file);
     for (const line of lines) {
       if (!line)
         continue;
-      const record = parseTranscriptLine(line, project, skill);
+      const record = parseTranscriptLine(line, project, skill, agentType);
       // A skill applies to the messages after the line that starts it.
       const signal = parseSkillSignal(line);
       if (signal)

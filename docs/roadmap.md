@@ -8,11 +8,10 @@ Order of the milestones. A milestone that needs design gets its own plan in
 
 Independent of each other; ordered by value for effort.
 
-1. **Subagent types**: break "subagents" in Breakdown down by type.
-2. **Skill per conversation**: the skill or command a conversation ran.
-3. **API-equivalent value vs plan price**.
-4. **Project drill-down**: a project's sessions, weekly cost and cache health.
-5. **Anonymize toggle**: last, so it also masks the views above.
+1. **Skill per conversation**: the skill or command a conversation ran.
+2. **API-equivalent value vs plan price**.
+3. **Project drill-down**: a project's sessions, weekly cost and cache health.
+4. **Anonymize toggle**: last, so it also masks the views above.
 
 ## Waiting for data
 

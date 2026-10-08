@@ -82,7 +82,7 @@ function ShareBars({ rows, total }: { rows: { cost: number; label: string; title
 export function Breakdown({ summary }: { summary: Summary }) {
   const [period, setPeriod] = useState<BreakdownPeriod>('week');
   const breakdown = summary.breakdown[period];
-  const { agents, conversations, effort, projects, surfaces, total } = breakdown;
+  const { agents, conversations, effort, projects, subagentTypes, surfaces, total } = breakdown;
   const current = summary.current;
   const weeklyPercent = period === 'week' && current ? current.estimatedNow ?? current.weekly : undefined;
   const effortTotal = effort.reduce((sum, e) => sum + e.cost, 0);
@@ -154,6 +154,12 @@ export function Breakdown({ summary }: { summary: Summary }) {
                         {` · ${formatDollars(agents.subagents)}`}
                       </span>
                     </p>
+                    {subagentTypes.length > 0 && (
+                      <>
+                        <p className="note">Share of the subagents' cost, by type.</p>
+                        <ShareBars rows={subagentTypes.map(s => ({ cost: s.cost, label: s.type ?? 'Unknown' }))} total={agents.subagents} />
+                      </>
+                    )}
                   </section>
 
                   <section className="card">

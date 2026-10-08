@@ -82,6 +82,17 @@ describe('collect', () => {
     expect(status).toMatchObject({ claudeCodeVersion: '2.1.300', endpointResult: 'ok', malformedLines: 1, messages: 2 });
   });
 
+  it('takes a subagent\'s type from the metadata file beside its transcript, never its description', async () => {
+    const dir = join(claudeDir, 'projects', 'proj-a', 'session', 'subagents');
+    await writeFile(join(dir, 'agent.jsonl'), JSON.stringify({ ...JSON.parse(assistantLine('m2', 10)), isSidechain: true }));
+    await writeFile(join(dir, 'agent.meta.json'), JSON.stringify({ agentType: 'Explore', description: 'secret task' }));
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+
+    const store = new Store(dataDir);
+    expect((await store.loadRecords()).get('m2|req_m2')?.agentType).toBe('Explore');
+    expect(await readFile(join(dataDir, 'messages-2026-10.jsonl'), 'utf8')).not.toContain('secret task');
+  });
+
   it('stores rate-limit hits as events, once, without their text', async () => {
     await writeFile(join(claudeDir, 'projects', 'proj-a', 's2.jsonl'), `${HIT_LINE}\n`);
     await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
@@ -205,6 +216,18 @@ describe('collect', () => {
       expect(records.get('gone|req_gone')).toEqual(oldRecord('gone|req_gone', 50));
       expect(records.has('m2|req_m2')).toBe(true);
       expect((await store.loadScanState()).format).toBe(SCAN_FORMAT);
+    });
+
+    it('fills the agent type of subagent records that already have their metadata', async () => {
+      const dir = join(claudeDir, 'projects', 'proj-a', 'session', 'subagents');
+      await writeFile(join(dir, 'agent.jsonl'), JSON.stringify({ ...JSON.parse(assistantLine('m2', 10)), isSidechain: true }));
+      await writeFile(join(dir, 'agent.meta.json'), JSON.stringify({ agentType: 'Explore' }));
+      const store = await seedOldDataDir();
+      const stored = new Map([['m2|req_m2', { ...oldRecord('m2|req_m2', 10), sessionId: 's1', sidechain: true as const }]]);
+      await store.saveRecords(stored, ['2026-10']);
+      await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+
+      expect((await store.loadRecords()).get('m2|req_m2')?.agentType).toBe('Explore');
     });
 
     it('finds the events of transcripts imported before the bump', async () => {

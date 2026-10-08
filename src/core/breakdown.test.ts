@@ -213,6 +213,21 @@ describe('buildBreakdown', () => {
     expect(otherSkills).toEqual({ cost: 12, count: 3, output: 600_000 });
   });
 
+  it('splits subagent cost by type, costliest first, with unrecorded types apart', () => {
+    const { subagentTypes } = buildBreakdown([
+      rec('2026-10-01T10:00:00Z'),
+      rec('2026-10-01T10:01:00Z', { agentType: 'Explore', sidechain: true }),
+      rec('2026-10-01T10:02:00Z', { agentType: 'general-purpose', output: 3_000_000, sidechain: true }),
+      rec('2026-10-01T10:03:00Z', { agentType: 'Explore', sidechain: true }),
+      rec('2026-10-01T10:04:00Z', { sidechain: true }),
+    ], {});
+    expect(subagentTypes).toEqual([
+      { cost: 60, messages: 1, type: 'general-purpose' },
+      { cost: 40, messages: 2, type: 'Explore' },
+      { cost: 20, messages: 1, type: undefined },
+    ]);
+  });
+
   it('is empty without usage in the period', () => {
     const breakdown = buildBreakdown([rec('2026-09-01T10:00:00Z')], {}, Date.parse('2026-10-01T00:00:00Z'));
     expect(breakdown).toEqual({
@@ -224,6 +239,7 @@ describe('buildBreakdown', () => {
       output: { otherTools: { count: 0, tokens: 0 }, reply: 0, thinking: 0, tools: [], total: 0, untracked: 0 },
       projects: [],
       skills: [],
+      subagentTypes: [],
       surfaces: [],
       thinkingShare: 0,
       total: { cost: 0, messages: 0 },
