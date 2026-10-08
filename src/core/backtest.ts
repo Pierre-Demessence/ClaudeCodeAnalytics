@@ -241,7 +241,8 @@ export function runBacktest(input: BacktestInput): BacktestReport {
   };
 
   const weeks = input.weeks ?? DEFAULT_WEEKS;
-  for (let at = now - weeks * WEEK_MS; at < now; at += step) {
+  // Multiples of the step, not offsets from `now`: runs minutes apart then replay the same instants and stay comparable.
+  for (let at = Math.ceil((now - weeks * WEEK_MS) / step) * step; at < now; at += step) {
     const summary = summarize({
       endpointEnabled: true,
       limitThreshold: input.limitThreshold,

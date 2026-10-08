@@ -171,6 +171,13 @@ describe('runBacktest', () => {
     expect(seen[1]!.at - seen[0]!.at).toBe(12 * HOUR_MS);
   });
 
+  it('aligns the instants to the step, so two runs a few minutes apart replay the same ones', () => {
+    const first = run({ now: NOW + 7 * 60_000 }).seen.map(call => call.at);
+    const second = run({ now: NOW + 41 * 60_000 }).seen.map(call => call.at);
+    expect(first).toEqual(second);
+    expect(first.every(at => at % (12 * HOUR_MS) === 0)).toBe(true);
+  });
+
   it('scores forecasts against the final of their window', () => {
     const { report } = run();
     const weekly = report.scores.find(s => s.kind === 'weekly' && s.lead === 'all')!;
