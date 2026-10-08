@@ -108,6 +108,44 @@ export function sessionProjects(records: readonly UsageRecord[]): (record: Usage
   return record => projectOf((record.sessionId && startCwd.get(record.sessionId)?.cwd) || record.cwd, record.project);
 }
 
+/**
+ * Returns each record's skill or slash command. A subagent's own transcript
+ * knows none, so its messages take the one its conversation was under at the
+ * time: that of the latest main-agent message before it.
+ */
+export function sessionSkills(records: readonly UsageRecord[]): (record: UsageRecord) => string | undefined {
+  const mainBySession = new Map<string, { ms: number; skill?: string }[]>();
+  for (const record of records) {
+    if (record.sidechain || !record.sessionId)
+      continue;
+    const messages = mainBySession.get(record.sessionId) ?? [];
+    messages.push({ ms: Date.parse(record.ts), skill: record.skill });
+    mainBySession.set(record.sessionId, messages);
+  }
+  for (const messages of mainBySession.values())
+    messages.sort((a, b) => a.ms - b.ms);
+
+  return (record) => {
+    if (!record.sidechain)
+      return record.skill;
+    const messages = record.sessionId && mainBySession.get(record.sessionId);
+    if (!messages)
+      return undefined;
+    const ms = Date.parse(record.ts);
+    // Binary search for the last main-agent message at or before `ms`.
+    let low = 0;
+    let high = messages.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (messages[middle]!.ms <= ms)
+        low = middle + 1;
+      else
+        high = middle;
+    }
+    return low > 0 ? messages[low - 1]!.skill : undefined;
+  };
+}
+
 function addTo(split: CostSplit, model: string, cost: number): void {
   split.cost += cost;
   split.byModel[model] = (split.byModel[model] ?? 0) + cost;
@@ -122,6 +160,7 @@ const byCost = <T extends { cost: number }>(a: T, b: T) => b.cost - a.cost;
  */
 export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly<Record<string, SessionInfo>>, from = -Infinity): Breakdown {
   const projectFor = sessionProjects(records);
+  const skillFor = sessionSkills(records);
 
   const total = { cost: 0, messages: 0 };
   const agents = { main: 0, subagents: 0 };
@@ -153,11 +192,12 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
       else
         split[part.kind] += part.tokens;
     }
-    if (record.skill) {
-      const skill = skills.get(record.skill) ?? { name: record.skill, cost: 0, output: 0 };
+    const skillName = skillFor(record);
+    if (skillName) {
+      const skill = skills.get(skillName) ?? { name: skillName, cost: 0, output: 0 };
       skill.cost += cost;
       skill.output += record.output;
-      skills.set(record.skill, skill);
+      skills.set(skillName, skill);
     }
     else {
       noSkill.cost += cost;

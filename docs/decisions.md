@@ -335,6 +335,13 @@ A skill owns the messages from the line that starts it (a slash command, or a
 `Skill` tool call) to the user's next real prompt. The active skill is kept per
 transcript in the scan state so an incremental scan resumes inside a turn.
 
+A subagent's transcript starts no skill of its own, so its messages take, at
+aggregation time, the skill of the conversation's latest main-agent message
+at or before them. Rejected: linking each `Agent` call to its subagent file (needs
+the call and result ids stored, and a scan order between files). The cost is
+that a background subagent still running after the user's next prompt joins
+that prompt's skill.
+
 Tool counts from the copies of one message are added when the line continues
 a message already met in the scan or lies after the stored offset; the first
 copy met when a transcript is read from its start replaces the stored count, so

@@ -108,7 +108,7 @@ export function SkillCard({ breakdown }: { breakdown: Breakdown }) {
         <span className="card-head-spacer" />
         <span className="card-subtitle">{`${formatDollars(total.cost)} · ${formatTokens(breakdown.output.total)} output tokens`}</span>
       </div>
-      <p className="note">A skill or slash command owns the messages after it until your next prompt. Subagent work is counted under No skill.</p>
+      <p className="note">A skill or slash command owns the messages after it until your next prompt. Subagents count under the skill their conversation was under when they ran.</p>
       {!hasSkills
         ? <p className="note">No skill or slash command in this period.</p>
         : (

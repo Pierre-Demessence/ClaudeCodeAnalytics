@@ -178,6 +178,34 @@ describe('buildBreakdown', () => {
     expect(breakdown.total.cost).toBe(42);
   });
 
+  it('gives a subagent the skill its conversation was under when it ran', () => {
+    const breakdown = buildBreakdown([
+      rec('2026-10-01T10:00:00Z', { skill: '/commit' }),
+      rec('2026-10-01T10:01:00Z', { sidechain: true }),
+      rec('2026-10-01T10:01:30Z', { sidechain: true }),
+      // The next prompt ran without a skill: its subagents are not the skill's.
+      rec('2026-10-01T10:05:00Z'),
+      rec('2026-10-01T10:06:00Z', { sidechain: true }),
+      // Another conversation's skill does not leak, and neither does a subagent before any main message.
+      rec('2026-10-01T10:02:00Z', { sessionId: 's2', skill: 'other' }),
+      rec('2026-10-01T09:00:00Z', { sidechain: true }),
+      rec('2026-10-01T10:03:00Z', { sessionId: undefined, sidechain: true }),
+    ], {});
+    expect(breakdown.skills).toEqual([
+      { name: '/commit', cost: 60, output: 3_000_000 },
+      { name: 'other', cost: 20, output: 1_000_000 },
+    ]);
+    expect(breakdown.noSkill).toEqual({ cost: 80, output: 4_000_000 });
+  });
+
+  it('uses a main-agent message from before the period as the context of a subagent inside it', () => {
+    const breakdown = buildBreakdown([
+      rec('2026-09-20T10:00:00Z', { skill: '/commit' }),
+      rec('2026-10-01T10:00:00Z', { sidechain: true }),
+    ], {}, Date.parse('2026-09-28T00:00:00Z'));
+    expect(breakdown.skills).toEqual([{ name: '/commit', cost: 20, output: 1_000_000 }]);
+  });
+
   it('keeps the costliest skills and groups the rest', () => {
     const records = Array.from({ length: 11 }, (_, i) => rec(`2026-10-01T10:${String(i).padStart(2, '0')}:00Z`, { output: (i + 1) * 100_000, skill: `skill-${i}` }));
     const { otherSkills, skills } = buildBreakdown(records, {});
