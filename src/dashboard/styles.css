@@ -1782,6 +1782,13 @@ button.info-tip:hover {
   transition: opacity 0.12s ease;
 }
 
+/* A block too narrow for its label (a window cut by the first day) lets it spill over the neighbour while lit. */
+.session-block:hover,
+.session-block:focus {
+  z-index: 1;
+  overflow: visible;
+}
+
 .session-block.dimmed {
   opacity: 0.3;
 }
