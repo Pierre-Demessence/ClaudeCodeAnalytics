@@ -81,6 +81,48 @@ describe('breakdown', () => {
     expect(surface.textContent).toContain('Terminal');
   });
 
+  describe('output cards', () => {
+    const outputRecords = [
+      rec(HOUR_MS, { skill: '/commit', thinking: 400_000, tools: { Bash: 1, Read: 1 } }),
+      rec(2 * HOUR_MS, { tools: {} }),
+      rec(3 * HOUR_MS, { skill: 'superpowers:brainstorming', thinking: 100_000 }),
+    ];
+    const rowsOf = (name: string) => within(card(name)).getAllByRole('row').slice(1).map(row => row.textContent);
+
+    it('splits the output by thinking, reply text and tool, whose rows sum to the total', () => {
+      render(<Breakdown summary={summary(outputRecords)} />, { wrapper: TipProvider });
+      const output = card('Where output goes');
+      expect(output.textContent).toContain('3m output tokens');
+      expect(output.querySelector('[role="img"]')!.getAttribute('aria-label')).toBe('Thinking 17%, Reply text 33%, Untracked 30%, Tool calls 20%');
+      expect(rowsOf('Where output goes')).toEqual([
+        'Thinking500k17%',
+        'Reply text1m33%',
+        'Untracked900k30%',
+        'Bash300k10%',
+        'Read300k10%',
+        'Output total3m100%',
+      ]);
+      expect(output.textContent).toContain('Untracked: messages recorded before tool calls were kept.');
+    });
+
+    it('splits cost and output tokens by skill, with the rest under No skill', () => {
+      render(<Breakdown summary={summary(outputRecords)} />, { wrapper: TipProvider });
+      expect(rowsOf('By skill or command')).toEqual([
+        'No skill' + 'no skill active' + '1m$2033%',
+        '/commit' + 'slash command' + '1m$2033%',
+        'superpowers:brainstorming' + 'skill' + '1m$2033%',
+        'All messages3m$60100%',
+      ]);
+      expect(tipOf(screen.getByRole('button', { name: 'About tokens and cost' }))).toBe('Cost includes input and cache; tokens are output only.');
+    });
+
+    it('says so when no skill or command ran in the period', () => {
+      render(<Breakdown summary={summary([rec(HOUR_MS, { tools: {} })])} />, { wrapper: TipProvider });
+      expect(card('By skill or command').textContent).toContain('No skill or slash command in this period.');
+      expect(card('Where output goes').textContent).not.toContain('Untracked');
+    });
+  });
+
   it('lists conversations by title, falling back to project and branch', () => {
     render(<Breakdown summary={summary(records)} />);
     const rows = within(card('Most expensive conversations')).getAllByRole('row').slice(1);

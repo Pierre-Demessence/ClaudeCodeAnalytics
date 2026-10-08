@@ -6,7 +6,7 @@ import type { ApiEvent, SessionInfo, UsageRecord } from '../core/types.ts';
 import type { ScanState } from './store.ts';
 
 import { parseEventLine } from '../core/events.ts';
-import { mergeRecord, parseTitleLine, parseTranscriptLine } from '../core/transcript.ts';
+import { mergeRecord, parseSkillSignal, parseTitleLine, parseTranscriptLine } from '../core/transcript.ts';
 import { compareVersions } from '../core/versions.ts';
 
 export interface ScanResult {
@@ -76,6 +76,8 @@ const NEWLINE = 0x0A;
 export async function scanTranscripts(claudeDir: string, records: Map<string, UsageRecord>, state: ScanState, sessions: Record<string, SessionInfo> = {}, events: Map<string, ApiEvent> = new Map()): Promise<ScanResult> {
   const projectsDir = join(claudeDir, 'projects');
   const result: ScanResult = { changedMonths: new Set(), eventsChanged: false, filesRead: 0, sessionsChanged: false };
+  // Messages met in this scan: `mergeRecord` adds up their tool calls only among these.
+  const seen = new Set<string>();
 
   for (const file of await listTranscripts(projectsDir)) {
     const info = await stat(file);
@@ -100,12 +102,20 @@ export async function scanTranscripts(claudeDir: string, records: Map<string, Us
     offset += tailComplete ? buffer.length : lastNewline + 1;
 
     const project = id.split(sep)[0]!;
+    let skill = resume?.skill;
     for (const line of lines) {
       if (!line)
         continue;
-      const record = parseTranscriptLine(line, project);
+      const record = parseTranscriptLine(line, project, skill);
+      // A skill applies to the messages after the line that starts it.
+      const signal = parseSkillSignal(line);
+      if (signal)
+        skill = signal.kind === 'start' ? signal.name : undefined;
       if (record) {
-        if (mergeRecord(records, record))
+        // Lines after the stored offset continue messages already stored: add their tools.
+        if (resume)
+          seen.add(record.key);
+        if (mergeRecord(records, record, seen))
           result.changedMonths.add(record.ts.slice(0, 7));
         const version = VERSION_PATTERN.exec(line)?.[1];
         if (version && (!result.claudeCodeVersion || compareVersions(version, result.claudeCodeVersion) > 0))
@@ -131,7 +141,7 @@ export async function scanTranscripts(claudeDir: string, records: Map<string, Us
         }
       }
     }
-    state[id] = { malformed, mtimeMs: info.mtimeMs, offset };
+    state[id] = { malformed, mtimeMs: info.mtimeMs, offset, ...(skill && { skill }) };
     result.filesRead++;
   }
   return result;

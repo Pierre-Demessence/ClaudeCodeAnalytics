@@ -347,3 +347,28 @@ Flushes are detected on the main conversation only: parallel subagents of one
 session interleave their turns and records carry no agent id, so a subagent's
 first turn read as a flush (54 of the 80 flushes found on the local data were
 subagent turns, but only $3.60 of the $38.44).
+
+## Output split by tool: an even split per call, per scan
+
+Claude Code writes one transcript line per content block, each with the whole
+message's `output_tokens`, so no tool call has a size of its own. A message's
+non-thinking output is split evenly across its tool calls (largest remainder, so
+parts sum exactly) and shown as an estimate: `Write` and `Bash` carry more than
+`Read`, which the split ignores. Weighting by tool input size was rejected: it
+means storing inputs, and the transcripts' content stays out of the data dir.
+
+A skill owns the messages from the line that starts it (a slash command, or a
+`Skill` tool call) to the user's next real prompt. The active skill is kept per
+transcript in the scan state so an incremental scan resumes inside a turn.
+
+A subagent's transcript starts no skill of its own, so its messages take, at
+aggregation time, the skill of the conversation's latest main-agent message
+at or before them. Rejected: linking each `Agent` call to its subagent file (needs
+the call and result ids stored, and a scan order between files). The cost is
+that a background subagent still running after the user's next prompt joins
+that prompt's skill.
+
+Tool counts from the copies of one message are added when the line continues
+a message already met in the scan or lies after the stored offset; the first
+copy met when a transcript is read from its start replaces the stored count, so
+the re-read after a `SCAN_FORMAT` bump does not double them.

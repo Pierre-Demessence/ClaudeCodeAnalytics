@@ -10,14 +10,15 @@ import { DEFAULT_LIMIT_THRESHOLD } from '../core/sessions.ts';
 import { DEFAULT_WEEK_LIMIT_THRESHOLD } from '../core/weekHistory.ts';
 
 /** Per transcript file: bytes already imported, mtime, and malformed lines seen. */
-export type ScanState = Record<string, { malformed?: number; mtimeMs: number; offset: number }>;
+/** Per transcript: how far it was read, and the skill or command active at that point. */
+export type ScanState = Record<string, { malformed?: number; mtimeMs: number; offset: number; skill?: string }>;
 
 /**
  * Bumped when records gain fields, or a new kind of entry (events) is read,
  * that only a full re-read of the transcripts can fill in for what was already
  * imported (see `collect`).
  */
-export const SCAN_FORMAT = 3;
+export const SCAN_FORMAT = 4;
 
 /** Contents of `scan-state.json`. */
 export interface StoredScanState {

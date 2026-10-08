@@ -102,6 +102,98 @@ describe('scanTranscripts', () => {
   });
 });
 
+describe('scanTranscripts tools and skills', () => {
+  let claudeDir: string;
+  let file: string;
+
+  const assistant = (id: string, blocks: unknown[]) => `${JSON.stringify({
+    message: { id, content: blocks, model: 'claude-opus-5-5', usage: { input_tokens: 1, output_tokens: 10 } },
+    requestId: `req_${id}`,
+    timestamp: '2026-10-02T08:00:00Z',
+    type: 'assistant',
+  })}\n`;
+  const tool = (name: string, input: unknown = {}) => ({ id: `tool_${name}`, name, input, type: 'tool_use' });
+  const user = (content: unknown) => `${JSON.stringify({ message: { content, role: 'user' }, type: 'user' })}\n`;
+  const command = (name: string) => user(`<command-name>${name}</command-name>\n<command-args></command-args>`);
+  const result = user([{ content: 'ok', tool_use_id: 'tool_Skill', type: 'tool_result' }]);
+
+  beforeEach(async () => {
+    claudeDir = await mkdtemp(join(tmpdir(), 'cca-skills-'));
+    await mkdir(join(claudeDir, 'projects', 'proj'), { recursive: true });
+    file = join(claudeDir, 'projects', 'proj', 'session.jsonl');
+  });
+  afterEach(async () => {
+    await rm(claudeDir, { force: true, recursive: true });
+  });
+
+  it('adds up the tool calls of a message streamed as one line per block', async () => {
+    await writeFile(file, assistant('a', [{ type: 'thinking' }]) + assistant('a', [tool('Read')]) + assistant('a', [tool('Read')]) + assistant('b', [{ text: 'hi', type: 'text' }]));
+    const records = new Map<string, UsageRecord>();
+    await scanTranscripts(claudeDir, records, {});
+    expect(records.get('a|req_a')?.tools).toEqual({ Read: 2 });
+    expect(records.get('b|req_b')?.tools).toEqual({});
+  });
+
+  it('does not count tools twice when a transcript is read again', async () => {
+    await writeFile(file, assistant('a', [tool('Read')]) + assistant('a', [tool('Bash')]));
+    const records = new Map<string, UsageRecord>();
+    // An empty scan state makes each scan read the file from the start, as a format bump does.
+    await scanTranscripts(claudeDir, records, {});
+    await scanTranscripts(claudeDir, records, {});
+    await scanTranscripts(claudeDir, records, {});
+    expect(records.get('a|req_a')?.tools).toEqual({ Bash: 1, Read: 1 });
+  });
+
+  it('keeps the tools of a message whose lines fall in two scans', async () => {
+    await writeFile(file, assistant('a', [{ type: 'thinking' }]) + assistant('a', [tool('Read')]));
+    const records = new Map<string, UsageRecord>();
+    const state: ScanState = {};
+    await scanTranscripts(claudeDir, records, state);
+
+    await appendFile(file, assistant('a', [tool('Bash')]));
+    await scanTranscripts(claudeDir, records, state);
+    expect(records.get('a|req_a')?.tools).toEqual({ Bash: 1, Read: 1 });
+  });
+
+  it('attributes the messages after a slash command or a Skill call to it, until the next prompt', async () => {
+    await writeFile(file, [
+      assistant('before', []),
+      command('/commit'),
+      assistant('commit1', [tool('Bash')]),
+      result,
+      assistant('commit2', []),
+      user('Now something else'),
+      assistant('plain', [tool('Skill', { skill: 'superpowers:brainstorming' })]),
+      result,
+      assistant('brain', []),
+    ].join(''));
+    const records = new Map<string, UsageRecord>();
+    await scanTranscripts(claudeDir, records, {});
+    const skillOf = (id: string) => records.get(`${id}|req_${id}`)?.skill;
+    expect(skillOf('before')).toBeUndefined();
+    expect(skillOf('commit1')).toBe('/commit');
+    expect(skillOf('commit2')).toBe('/commit');
+    expect(skillOf('plain')).toBeUndefined();
+    expect(skillOf('brain')).toBe('superpowers:brainstorming');
+  });
+
+  it('carries the active skill over to the next scan of the same transcript', async () => {
+    await writeFile(file, command('/commit') + assistant('a', []));
+    const records = new Map<string, UsageRecord>();
+    const state: ScanState = {};
+    await scanTranscripts(claudeDir, records, state);
+
+    await appendFile(file, assistant('b', []));
+    await scanTranscripts(claudeDir, records, state);
+    expect(records.get('b|req_b')?.skill).toBe('/commit');
+
+    await appendFile(file, user('A new prompt') + assistant('c', []));
+    await scanTranscripts(claudeDir, records, state);
+    expect(records.get('c|req_c')?.skill).toBeUndefined();
+    expect(Object.values(state)[0]!.skill).toBeUndefined();
+  });
+});
+
 describe('scanTranscripts session titles', () => {
   let claudeDir: string;
   let file: string;
