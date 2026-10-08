@@ -155,6 +155,52 @@ describe('scanTranscripts tools and skills', () => {
     expect(records.get('a|req_a')?.tools).toEqual({ Bash: 1, Read: 1 });
   });
 
+  const called = (id: string, name: string) => assistant(id, [{ id: `toolu_${id}`, name, input: {}, type: 'tool_use' }]);
+  const answered = (id: string, content: unknown) => user([{ content, tool_use_id: `toolu_${id}`, type: 'tool_result' }]);
+
+  it('sizes each result under the tool of the call it answers', async () => {
+    await writeFile(file, called('a', 'Read') + called('b', 'mcp__plugin_playwright_playwright__browser_snapshot') + answered('a', 'x'.repeat(40)) + answered('b', [{ text: 'abcd', type: 'text' }, { source: { data: 'secret', type: 'base64' }, type: 'image' }]));
+    const records = new Map<string, UsageRecord>();
+    const state: ScanState = {};
+    const scanned = await scanTranscripts(claudeDir, records, state);
+    expect(records.get('a|req_a')?.context).toEqual({ Read: { chars: 40, images: 0, results: 1 } });
+    expect(records.get('b|req_b')?.context).toEqual({ mcp__plugin_playwright_playwright__browser_snapshot: { chars: 4, images: 1, results: 1 } });
+    expect([...scanned.changedMonths]).toEqual(['2026-10']);
+    expect(Object.values(state)[0]!.calls).toBeUndefined();
+    expect(malformedLineCount(state)).toBe(0);
+  });
+
+  it('attributes a result read in a later scan than its call', async () => {
+    await writeFile(file, called('a', 'Bash'));
+    const records = new Map<string, UsageRecord>();
+    const state: ScanState = {};
+    await scanTranscripts(claudeDir, records, state);
+    expect(records.get('a|req_a')?.context).toBeUndefined();
+    expect(Object.values(state)[0]!.calls).toEqual({ toolu_a: { name: 'Bash', key: 'a|req_a' } });
+
+    await appendFile(file, answered('a', 'x'.repeat(8)));
+    const scanned = await scanTranscripts(claudeDir, records, state);
+    expect(records.get('a|req_a')?.context).toEqual({ Bash: { chars: 8, images: 0, results: 1 } });
+    expect([...scanned.changedMonths]).toEqual(['2026-10']);
+    expect(Object.values(state)[0]!.calls).toBeUndefined();
+  });
+
+  it('does not count results twice when a transcript is read again', async () => {
+    await writeFile(file, called('a', 'Read') + answered('a', 'x'.repeat(40)));
+    const records = new Map<string, UsageRecord>();
+    // An empty scan state makes each scan read the file from the start, as a format bump does.
+    await scanTranscripts(claudeDir, records, {});
+    await scanTranscripts(claudeDir, records, {});
+    expect(records.get('a|req_a')?.context).toEqual({ Read: { chars: 40, images: 0, results: 1 } });
+  });
+
+  it('ignores a result whose call is unknown', async () => {
+    await writeFile(file, called('a', 'Read') + answered('zzz', 'x'.repeat(40)));
+    const records = new Map<string, UsageRecord>();
+    await scanTranscripts(claudeDir, records, {});
+    expect(records.get('a|req_a')?.context).toBeUndefined();
+  });
+
   it('attributes the messages after a slash command or a Skill call to it, until the next prompt', async () => {
     await writeFile(file, [
       assistant('before', []),

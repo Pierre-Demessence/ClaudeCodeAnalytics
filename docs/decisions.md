@@ -373,6 +373,21 @@ a message already met in the scan or lies after the stored offset; the first
 copy met when a transcript is read from its start replaces the stored count, so
 the re-read after a `SCAN_FORMAT` bump does not double them.
 
+## Context added per tool: sizes stored, tokens estimated at display
+
+A tool result sits on a later `user` line that names only the call's id, so the
+scan joins it to the `tool_use` of the assistant line, and keeps the calls still
+waiting for their result per transcript in the scan state (the hook scans right
+after a response, so the result usually arrives in the next run). The record
+stores characters, screenshots and result counts per tool, not tokens: the
+estimate (4 characters per token, 1,600 per screenshot) lives in
+`core/contextAdded.ts` and can change without a re-read. Screenshot size is a
+single figure because the image dimensions would mean decoding base64. A
+`tool_reference` block (a deferred tool's name) counts as nothing.
+
+The figure is what a result added, not what it cost: charging it for every later
+turn in the context is the carrying-cost model left in the backlog.
+
 ## Subscription cost from the billing date, not prorated
 
 The Usage card sets what was charged against the usage of the same cycle: the

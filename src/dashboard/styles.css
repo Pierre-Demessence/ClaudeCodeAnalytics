@@ -1315,6 +1315,12 @@ details .table {
   overflow-x: auto;
 }
 
+.shot-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .conversation-table {
   min-width: 760px;
   margin-top: 0;

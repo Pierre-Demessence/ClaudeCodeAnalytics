@@ -24,9 +24,7 @@ Improvements to something that exists.
 - `[forensics]` Skill or command per conversation: a column in "Most expensive conversations" or the skills a conversation ran. `UsageRecord.skill` already holds it.
 - Cost per git branch (`UsageRecord.gitBranch`); the Breakdown tab only shows each conversation's main branch.
 - Weight the per-tool output split by tool input size instead of evenly; needs the input sizes stored per tool call (`core/outputSplit.ts`).
-- `[forensics]` Input side per tool ("where input goes"). Every API call is billed for the whole context, and the transcript only gives per-message totals, so a tool's input cost is an attribution, not a measurement. Two options, sharing the per-tool-call storage of the item above (a `SCAN_FORMAT` bump), here the size of each `tool_result`:
-  1. Context added per tool: the size of each tool's results (images estimated per image), shown as "Playwright added about X tokens to the context" plus a screenshot count. Measured, honest. Scheduled.
-  2. Carrying cost: assume each result stays in the context for the rest of the conversation, so cost = tokens added × later turns × cache-read price, cut short by compaction. A dollar figure per tool, but a model, not an observation.
+- `[forensics]` Carrying cost per tool ("where input goes"). Every API call is billed for the whole context, so a tool's input cost is an attribution, not a measurement: assume each result stays in the context for the rest of the conversation, so cost = tokens added × later turns × cache-read price, cut short by compaction. A dollar figure per tool, but a model, not an observation. The sizes per result are stored (`UsageRecord.context`, shown in "Where context grows"); the later turns and compactions are not tied to a result yet.
 
 ### Forecast
 
@@ -62,6 +60,7 @@ Blocked until more history exists, so the result can be judged.
 
 ## Technical debt
 
+- `[forensics]` "By skill or command" lists `${name}` and `…` as skills on the local data (seen in the Breakdown tab, last 4 weeks). Probably a `Skill` call or slash command whose name was never substituted; find the source line and decide whether `parseSkillSignal` should ignore such names (`src/core/transcript.ts`). Unchecked.
 - `[forensics]` Cache flushes of subagents: detection skips them because parallel subagents interleave in a session; it needs `agentId` stored per record (a `SCAN_FORMAT` bump).
 - `[forensics]` A subagent whose `.meta.json` does not exist yet when its transcript is first scanned stays "Unknown": the scan reads the type once per file and later scans only read appended lines (`src/collector/scan.ts`). Not seen on the real data (0 of 125 files).
 - The Docker dashboard shares the `proxy` network with other containers, which can reach its API by IP (Vite always allows IP hosts, and a request without `Origin` passes the POST check). A dedicated network joined only by Traefik would close this; it needs a change in `S:\Dev\DockerInfra\compose.yml`.

@@ -18,6 +18,14 @@ export interface ApiEvent {
   ts: string;
 }
 
+/** What the results of one tool's calls sent back into the context. Sizes only. */
+export interface ToolContext {
+  /** Text length of the results, in characters. */
+  chars: number;
+  images: number;
+  results: number;
+}
+
 /** One deduplicated assistant message, as stored by the collector. No content. */
 export interface UsageRecord {
   /** The subagent's type (`Explore`, `general-purpose`, …); present only on a subagent's message, and not when its metadata file was missing. */
@@ -25,6 +33,8 @@ export interface UsageRecord {
   cacheRead: number;
   cacheWrite1h: number;
   cacheWrite5m: number;
+  /** Size of the results of this message's tool calls, by tool name. Absent until a result is read. */
+  context?: Record<string, ToolContext>;
   /** Raw working directory; its drive letter's case can vary within a session. */
   cwd?: string;
   /** `low`…`max`; absent on subagent messages. */

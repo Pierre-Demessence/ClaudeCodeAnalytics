@@ -124,6 +124,29 @@ describe('breakdown', () => {
     });
   });
 
+  it('shows the context each tool added, with its screenshots', () => {
+    render(
+      <Breakdown summary={summary([
+        rec(HOUR_MS, { context: { Read: { chars: 8_000_000, images: 0, results: 4 } } }),
+        rec(2 * HOUR_MS, { context: { mcp__plugin_playwright_playwright__browser_take_screenshot: { chars: 0, images: 625, results: 625 } } }),
+      ])}
+      />,
+      { wrapper: TipProvider },
+    );
+    const context = card('Where context grows');
+    expect(context.textContent).toContain('3m input tokens');
+    expect(within(context).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual([
+      'Read–2m67%',
+      'MCP playwright6251m33%',
+      'All tool results6253m100%',
+    ]);
+  });
+
+  it('says so when no tool result was sized in the period', () => {
+    render(<Breakdown summary={summary([rec(HOUR_MS)])} />, { wrapper: TipProvider });
+    expect(card('Where context grows').textContent).toContain('No tool results in this period.');
+  });
+
   it('lists conversations by title, falling back to project and branch', () => {
     render(<Breakdown summary={summary(records)} />);
     const rows = within(card('Most expensive conversations')).getAllByRole('row').slice(1);
