@@ -1035,17 +1035,38 @@ details .table {
   color: var(--text-primary);
 }
 
-.breakdown-grid,
-.breakdown-side {
+/* Cards side by side on 12 columns; a cell's card fills the row height. */
+.card-grid {
   display: grid;
   gap: 20px;
-  align-content: start;
+}
+
+.card-cell {
+  display: grid;
+  min-width: 0;
+}
+
+.card-cell>.card {
+  height: 100%;
 }
 
 @media (min-width: 900px) {
-  .breakdown-grid {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    align-items: start;
+  .card-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+
+  .span-4 {
+    grid-column: span 4;
+  }
+
+  .span-6 {
+    grid-column: span 6;
+  }
+
+
+  .span-12 {
+    grid-column: span 12;
   }
 }
 
@@ -1201,18 +1222,6 @@ details .table {
 }
 
 /* Breakdown output cards: every bucket has its own texture as well as a label; hatching marks the tool estimate. */
-.breakdown-pair {
-  display: grid;
-  gap: 20px;
-  align-items: start;
-}
-
-@media (min-width: 900px) {
-  .breakdown-pair {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 .output-bar {
   display: flex;
   height: 28px;
@@ -1482,18 +1491,6 @@ details .table {
 .heatmap-scale .heat-cell {
   width: 22px;
   height: 14px;
-}
-
-.usage-grid {
-  display: grid;
-  gap: 20px;
-  align-items: start;
-}
-
-@media (min-width: 900px) {
-  .usage-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 .stats {

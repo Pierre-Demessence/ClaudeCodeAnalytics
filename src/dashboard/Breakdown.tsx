@@ -5,6 +5,7 @@ import type { Summary } from '@/dashboard/api';
 import type { Series } from '@/dashboard/models';
 
 import { familyOf } from '@/core/family';
+import { CardGrid, Cell } from '@/dashboard/CardGrid';
 import { formatDateTime, formatDollars, formatDuration, formatPercent } from '@/dashboard/format';
 import { ModelRatiosCard } from '@/dashboard/ModelRatios';
 import { SERIES } from '@/dashboard/models';
@@ -105,35 +106,37 @@ export function Breakdown({ summary }: { summary: Summary }) {
         ? <p className="empty">No usage in this period.</p>
         : (
             <>
-              <div className="breakdown-grid">
-                <section className="card">
-                  <h2>By project</h2>
-                  <table className="project-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Project</th>
-                        <th scope="col">Cost by model</th>
-                        <th scope="col">Cost</th>
-                        <th scope="col">Share</th>
-                        <th scope="col">Cache</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {projects.map(project => (
-                        <tr key={project.path}>
-                          <th scope="row" {...tip(project.path)}>{project.name}</th>
-                          <td className="project-bar"><ModelBar byModel={project.byModel} width={percentOf(project.cost, largestProject)} /></td>
-                          <td><strong>{formatDollars(project.cost)}</strong></td>
-                          <td>{formatPercent(percentOf(project.cost, total.cost))}</td>
-                          <td className="secondary">{formatPercent(project.cacheShare * 100)}</td>
+              <CardGrid>
+                <Cell span={12}>
+                  <section className="card">
+                    <h2>By project</h2>
+                    <table className="project-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Project</th>
+                          <th scope="col">Cost by model</th>
+                          <th scope="col">Cost</th>
+                          <th scope="col">Share</th>
+                          <th scope="col">Cache</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <Legend series={SERIES.filter(s => families.has(s.family))} />
-                </section>
+                      </thead>
+                      <tbody>
+                        {projects.map(project => (
+                          <tr key={project.path}>
+                            <th scope="row" {...tip(project.path)}>{project.name}</th>
+                            <td className="project-bar"><ModelBar byModel={project.byModel} width={percentOf(project.cost, largestProject)} /></td>
+                            <td><strong>{formatDollars(project.cost)}</strong></td>
+                            <td>{formatPercent(percentOf(project.cost, total.cost))}</td>
+                            <td className="secondary">{formatPercent(project.cacheShare * 100)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <Legend series={SERIES.filter(s => families.has(s.family))} />
+                  </section>
+                </Cell>
 
-                <div className="breakdown-side">
+                <Cell span={4}>
                   <section className="card">
                     <h2>Main agent vs subagents</h2>
                     <span className="agent-bar" role="img" aria-label={`Main agent ${formatPercent(percentOf(agents.main, total.cost))}, subagents ${formatPercent(percentOf(agents.subagents, total.cost))}`}>
@@ -161,7 +164,9 @@ export function Breakdown({ summary }: { summary: Summary }) {
                       </>
                     )}
                   </section>
+                </Cell>
 
+                <Cell span={4}>
                   <section className="card">
                     <h2>By effort level</h2>
                     <p className="note">Share of the main agent's cost; subagents record no effort.</p>
@@ -174,7 +179,9 @@ export function Breakdown({ summary }: { summary: Summary }) {
                       {' of output tokens, subagents included.'}
                     </p>
                   </section>
+                </Cell>
 
+                <Cell span={4}>
                   <section className="card">
                     <h2>By surface</h2>
                     <ShareBars
@@ -182,13 +189,15 @@ export function Breakdown({ summary }: { summary: Summary }) {
                       total={total.cost}
                     />
                   </section>
-                </div>
-              </div>
+                </Cell>
 
-              <div className="breakdown-pair">
-                <OutputCard output={breakdown.output} />
-                <SkillCard breakdown={breakdown} />
-              </div>
+                <Cell span={6}>
+                  <OutputCard output={breakdown.output} />
+                </Cell>
+                <Cell span={6}>
+                  <SkillCard breakdown={breakdown} />
+                </Cell>
+              </CardGrid>
 
               <ModelRatiosCard ratios={summary.modelRatios} />
 

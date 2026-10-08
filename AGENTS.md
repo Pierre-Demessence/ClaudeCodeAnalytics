@@ -56,6 +56,9 @@ Run lint, test and build before considering work done.
 - Theme: `data-theme` on `<html>`. Dark variables exist twice in `styles.css`
   (OS media query and `[data-theme='dark']`): change both. The storage key
   `cca-theme` is also read by the inline script in `index.html`.
+- Cards side by side go in `CardGrid`/`Cell` (`dashboard/CardGrid.tsx`, 12
+  columns, spans 4/6/12), never a bespoke grid: a row is as tall as its tallest
+  cell, so pair cards of similar height or the shorter one leaves a gap.
 - Icons: Lucide (`lucide-react`), `aria-hidden` next to their text; never
   text symbols (✓ ! ▲ ⓘ) or emoji.
 - Charts: never color alone. Each model family has a fixed color slot and an
