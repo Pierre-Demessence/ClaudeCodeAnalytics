@@ -4,8 +4,10 @@ import type { BreakdownPeriod } from '@/core/summary';
 import type { Summary } from '@/dashboard/api';
 import type { Series } from '@/dashboard/models';
 
+import { familyOf } from '@/core/family';
 import { formatDateTime, formatDollars, formatDuration, formatPercent } from '@/dashboard/format';
-import { familyOf, SERIES } from '@/dashboard/models';
+import { ModelRatiosCard } from '@/dashboard/ModelRatios';
+import { SERIES } from '@/dashboard/models';
 import { OutputCard, SkillCard } from '@/dashboard/OutputCards';
 import { Legend, Swatch } from '@/dashboard/Patterns';
 import { InfoTip } from '@/dashboard/Tip';
@@ -181,6 +183,8 @@ export function Breakdown({ summary }: { summary: Summary }) {
                 <OutputCard output={breakdown.output} />
                 <SkillCard breakdown={breakdown} />
               </div>
+
+              <ModelRatiosCard ratios={summary.modelRatios} />
 
               <section className="card">
                 <div className="card-head">

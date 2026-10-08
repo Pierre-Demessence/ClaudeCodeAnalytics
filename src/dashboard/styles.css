@@ -549,6 +549,81 @@ small {
   font-size: 0.95rem;
 }
 
+/* One line comparing models; each term carries its pattern swatch as well as its name. */
+.model-ratio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.model-ratio-lead {
+  color: var(--text-secondary);
+}
+
+.ratio-term,
+.ratio-family {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ratio-term {
+  font-weight: 600;
+}
+
+/* The two model columns are names, not numbers. */
+.ratio-table th:nth-child(-n + 2),
+.ratio-table td:nth-child(-n + 2) {
+  text-align: left;
+}
+
+/* Active use left per model: the family of the latest message gets a thicker border and a "last used" label, not just a color. */
+.family-hours-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.family-hours-lead {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.family-hours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.family-hours li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.family-hours li.current {
+  padding: 2px 9px;
+  border: 2px solid var(--text-primary);
+}
+
+.family-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-secondary);
+}
+
 .limit-number {
   font-size: 2.75rem;
   font-weight: 700;

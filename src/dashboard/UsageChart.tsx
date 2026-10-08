@@ -3,12 +3,13 @@ import type { TooltipContentProps } from 'recharts';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
+import type { Family } from '@/core/family';
 import type { Summary } from '@/dashboard/api';
-import type { Family } from '@/dashboard/models';
 import type { Bucket, Metric, Period } from '@/dashboard/usageData';
 
+import { familyOf } from '@/core/family';
 import { formatTokens, formatUsd, formatUsdShort } from '@/dashboard/format';
-import { familyOf, SERIES } from '@/dashboard/models';
+import { SERIES } from '@/dashboard/models';
 import { Legend, Swatch } from '@/dashboard/Patterns';
 import { Toggle } from '@/dashboard/Toggle';
 import { toBuckets } from '@/dashboard/usageData';

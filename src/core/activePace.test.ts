@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
+import type { FamilyPace } from './activeTime.ts';
 import type { UsageRecord } from './types.ts';
 
-import { activeHourlyPace, activeTimeLeft } from './activePace.ts';
+import { activeHourlyPace, activeLeftByFamily, activeTimeLeft } from './activePace.ts';
 import { HOUR_MS } from './calibration.ts';
 import { messageCost } from './pricing.ts';
 
@@ -61,6 +62,26 @@ describe('activeHourlyPace', () => {
   it('is undefined when every message is unpriced', () => {
     const unpriced = [record(0), record(10)].map(r => ({ ...r, model: 'unknown-model' }));
     expect(activeHourlyPace(unpriced, START, START + HOUR_MS)).toBeUndefined();
+  });
+});
+
+describe('activeLeftByFamily', () => {
+  const paces: FamilyPace[] = [
+    { activeMs: HOUR_MS, family: 'opus', pace: 10 },
+    { activeMs: 1, family: 'sonnet', lowConfidence: true, pace: 5 },
+  ];
+
+  it('turns each family pace into active time left', () => {
+    // 20 % left at 2 %/$ is $10: 1 hour at $10/hour, 2 hours at $5/hour.
+    const left = activeLeftByFamily({ k: 2, paces, used: 80 });
+    expect(left).toHaveLength(2);
+    expect(left).toContainEqual({ family: 'opus', ms: HOUR_MS });
+    expect(left).toContainEqual({ family: 'sonnet', lowConfidence: true, ms: 2 * HOUR_MS });
+  });
+
+  it('is empty at the limit or without a calibration', () => {
+    expect(activeLeftByFamily({ k: 2, paces, used: 100 })).toEqual([]);
+    expect(activeLeftByFamily({ k: undefined, paces, used: 50 })).toEqual([]);
   });
 });
 

@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { familyOf, modelLabel } from '@/dashboard/models';
-
-describe('familyOf', () => {
-  it('groups models by family', () => {
-    expect(familyOf('claude-opus-5-5')).toBe('opus');
-    expect(familyOf('claude-haiku-4-5-20251001')).toBe('haiku');
-    expect(familyOf('claude-mystery-1')).toBe('other');
-  });
-});
+import { modelLabel } from '@/dashboard/models';
 
 describe('modelLabel', () => {
   it('turns ids into readable names', () => {

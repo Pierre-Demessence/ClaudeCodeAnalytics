@@ -1,9 +1,12 @@
+import type { FamilyActiveLeft } from './activePace.ts';
 import type { Activity } from './activity.ts';
 import type { UsageRow } from './aggregate.ts';
 import type { Breakdown } from './breakdown.ts';
 import type { Calibration } from './calibration.ts';
+import type { Family } from './family.ts';
 import type { WindowForecast } from './forecast.ts';
 import type { Limits } from './limits.ts';
+import type { ModelRatio } from './modelRatio.ts';
 import type { MultiplierCheck } from './multipliers.ts';
 import type { WeekPacing } from './pacing.ts';
 import type { PlanFitInput } from './planFit.ts';
@@ -12,14 +15,17 @@ import type { WeekShare } from './share.ts';
 import type { ApiEvent, Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
 import type { WeekHistory } from './weekHistory.ts';
 
-import { activeHourlyPace, activeTimeLeft } from './activePace.ts';
+import { activeHourlyPace, activeLeftByFamily, activeTimeLeft } from './activePace.ts';
+import { familyPaces } from './activeTime.ts';
 import { buildActivity } from './activity.ts';
 import { aggregate, createCostIndex, dailyCostSeries, dayKey, startOfDay } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { dedupeHits, hitScope } from './events.ts';
+import { familyOf } from './family.ts';
 import { forecastWindow } from './forecast.ts';
 import { buildLimits } from './limits.ts';
+import { modelRatios } from './modelRatio.ts';
 import { buildMultipliers } from './multipliers.ts';
 import { weekPacing } from './pacing.ts';
 import { buildPlanFitInput } from './planFit.ts';
@@ -61,6 +67,8 @@ export type BreakdownPeriod = 'week' | 'fourWeeks' | 'all';
 export interface FiveHourSession {
   /** Active use (ms) left before the limit at the usual active pace; needs a 5-hour calibration. */
   activeLeftMs?: number;
+  /** The same if only one model family were used, at that family's own pace. */
+  activeLeftByFamily?: FamilyActiveLeft[];
   /** % now, estimated from usage since the reading. */
   estimatedNow?: number;
   forecast?: WindowForecast;
@@ -75,6 +83,8 @@ export interface FiveHourSession {
 export interface CurrentWeek {
   /** Active use (ms) left before the limit at the usual active pace; needs a calibration. */
   activeLeftMs?: number;
+  /** The same if only one model family were used, at that family's own pace. */
+  activeLeftByFamily?: FamilyActiveLeft[];
   /** Weekly % now, estimated from usage since a stale reading. */
   estimatedNow?: number;
   forecast?: WindowForecast;
@@ -98,6 +108,8 @@ export interface DashboardSummary {
   calibration?: Calibration;
   /** The current weekly window, from its reading or, without one yet, from the last known reset. */
   current?: CurrentWeek;
+  /** The model family of the latest message. */
+  currentFamily?: Family;
   /** Usage per local day and model, for the last weeks. */
   daily: UsageRow[];
   /** The plan the latest reading reports, whether or not it is the active one. */
@@ -114,6 +126,8 @@ export interface DashboardSummary {
   limitThreshold: number;
   /** Limit drift and the readings table. */
   limits: Limits;
+  /** How many hours of a lighter model equal an hour of a heavier one, in the user's usage of the last 4 weeks. */
+  modelRatios: ModelRatio[];
   /** Measured against advertised multipliers between neighbouring plans. */
   multipliers: MultiplierCheck[];
   plan: Plan;
@@ -202,6 +216,13 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const sessionWindows = fiveHourWindows({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots });
   const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
   const activePace = activeHourlyPace(records, now - TYPICAL_DAYS * DAY_MS, now);
+  const paceByFamily = familyPaces(records, now - TYPICAL_DAYS * DAY_MS, now);
+  // A loop, not Math.max(...): spreading a year of records overflows the call stack.
+  let latestRecord: UsageRecord | undefined;
+  for (const record of records) {
+    if (!latestRecord || Date.parse(record.ts) > Date.parse(latestRecord.ts))
+      latestRecord = record;
+  }
 
   const weeks = weeklyShares(snapshots, costBetween, calibration && { k: calibration.k, plan }, planHistory, now);
   const typicalBase = typicalWeek(weeks, plan);
@@ -229,7 +250,9 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
           windowMs: FIVE_HOURS_MS,
         });
       }
-      fiveHourSession.activeLeftMs = activeTimeLeft({ k: fiveHourCalibration?.k, pace: activePace, used: fiveHourSession.estimatedNow ?? fiveHour });
+      const fiveHourUsed = fiveHourSession.estimatedNow ?? fiveHour;
+      fiveHourSession.activeLeftMs = activeTimeLeft({ k: fiveHourCalibration?.k, pace: activePace, used: fiveHourUsed });
+      fiveHourSession.activeLeftByFamily = activeLeftByFamily({ k: fiveHourCalibration?.k, paces: paceByFamily, used: fiveHourUsed });
     }
 
     const latestReset = Date.parse(latest.weeklyResetsAt);
@@ -272,6 +295,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
 
       const resetsAtIso = new Date(resetsAt).toISOString();
       current = {
+        activeLeftByFamily: activeLeftByFamily({ k: calibration?.k, paces: paceByFamily, used: estimatedNow ?? used }),
         activeLeftMs: activeTimeLeft({ k: calibration?.k, pace: activePace, used: estimatedNow ?? used }),
         estimatedNow,
         forecast,
@@ -334,6 +358,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     breakdown,
     calibration,
     current,
+    currentFamily: latestRecord && familyOf(latestRecord.model),
     daily,
     detected,
     detectedPlan: detected && detected !== plan ? detected : undefined,
@@ -343,6 +368,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     generatedAt: nowIso,
     limits: buildLimits(limitsInput),
     limitThreshold,
+    modelRatios: modelRatios(records, now - TYPICAL_DAYS * DAY_MS, now, timeZone),
     multipliers: buildMultipliers(limitsInput),
     plan,
     planFit: buildPlanFitInput({ calibrationK: calibration?.k, fiveHourK: fiveHourCalibration?.k, plan, planHistory, sessionWindows, weekHistory, weekLimitThreshold }),

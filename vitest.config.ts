@@ -12,7 +12,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/dashboard/main.tsx', 'src/collector/cli.ts'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/dashboard/main.tsx', 'src/collector/cli.ts', 'src/collector/backtest/cli.ts'],
       include: ['src/**/*.{ts,tsx}'],
       provider: 'v8',
     },

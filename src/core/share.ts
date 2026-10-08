@@ -24,7 +24,7 @@ export interface TypicalWeek {
 }
 
 /** A last reading closer to reset than this is taken as final. */
-const FINAL_READING_MS = 12 * 3_600_000;
+export const FINAL_READING_MS = 12 * 3_600_000;
 
 /** Final weekly % of every completed window that has readings. */
 export function weeklyShares(

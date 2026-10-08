@@ -99,15 +99,16 @@ to the family's cost. Pace = cost / active hours. Measured rather than scaled by
 price: Opus can run slower per message, so the ratio of prices is not the ratio
 of paces. The price ratio is only the fallback for thin data.
 
-**Mix.** The "usual mix" headline uses each family's share of active time over
-the last 14 days: pace_mix = Σ share_f × pace_f. Per-family figures answer "if I
-only use X".
+**Mix.** The "usual mix" headline is the pooled pace of the last 28 days, which
+equals Σ share_f × pace_f with each family's share of active time over those
+days. Per-family figures answer "if I only use X".
 
 **Model ratios (2b).** The ratio of two families' paces from stage 2. Its
-price-per-token part comes from the price table (input/output blend at the
-family's observed token mix); the rest is the ratio of tokens per active hour.
+price-per-token part is dollars per token of every kind at the mix each
+family was used with, so that price × tokens per active hour equals the hours
+ratio exactly; the rest is the ratio of tokens per active hour.
 The range is a bootstrap over active days with a small seeded PRNG
-(deterministic). Shown as one line on the limit cards and as a table (price,
+(deterministic). Shown as one line under the two limit cards (it does not depend on the window) and as a table (price,
 tokens per hour, hours per hour) on the Breakdown tab, next to the existing
 Opus-to-Sonnet what-if, which re-prices the same tokens and so measures a
 different thing. Selection bias (harder work goes to Opus) is stated in the UI.
@@ -133,9 +134,11 @@ cost are already in every record. No change to persisted data.
 behavior). No messages in the period: no profile, flat fallback. Pace 0 or `k`
 missing: no value, never an infinite time left.
 
-**Backtest ground truth.** Weekly: the last reading of the week (or the "est."
-value of `weekHistory.ts`). 5-hour: the window's peak (`sessions.ts`). A limit
-hit is as `weekHistory` and `sessions` already define it (thresholds 98 / 95).
+**Backtest ground truth.** Weekly: the last reading of a completed week, when
+taken within 12 h of its reset (`FINAL_READING_MS`); other weeks are left out
+rather than estimated. 5-hour: the highest reading of a completed window, final
+when the last reading is within 30 min of the reset or no message came after
+it. A limit hit uses the configured thresholds (98 weekly, 95 5-hour).
 
 **Risks.** Replaying `buildSummary` ~200 times over a year of records may be slow;
 if so, build the cost index once and pass it in. The schedule profile may not beat
@@ -145,24 +148,24 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 
 ### Stage 1: backtest
 
-- [ ] Baseline: run lint, test and build; note existing warnings
-- [ ] `core/backtest.ts` with tests (synthetic records and readings, known errors)
-- [ ] `collector/backtest/cli.ts` and the `backtest` npm script, read-only
-- [ ] Run on the real data; record the baseline scores in the final report
+- [x] Baseline: run lint, test and build; note existing warnings
+- [x] `core/backtest.ts` with tests (synthetic records and readings, known errors)
+- [x] `collector/backtest/cli.ts` and the `backtest` npm script, read-only
+- [x] Run on the real data; record the baseline scores in the final report
 
 ### Stage 2: pace per model
 
-- [ ] Move `familyOf` (and its test) to `core/`, update importers
-- [ ] `core/activeTime.ts`: active ms and cost per family, with tests (gaps, idle, parallel sessions, unpriced model)
-- [ ] Per-family pace, thin-data fallback and mix, with tests
-- [ ] `summary.ts`: expose per-family active time left on both limit cards
-- [ ] `Overview.tsx`: per-family hours, current family highlighted, pattern + label, `InfoTip` for the fallback; update `Overview.test.tsx`
-- [ ] Backtest unchanged or better; check in the browser
+- [x] Move `familyOf` (and its test) to `core/`, update importers
+- [x] `core/activeTime.ts`: active ms and cost per family, with tests (gaps, idle, parallel sessions, unpriced model)
+- [x] Per-family pace, thin-data fallback and mix, with tests
+- [x] `summary.ts`: expose per-family active time left on both limit cards
+- [x] `Overview.tsx`: per-family hours, current family highlighted, pattern + label, `InfoTip` for the fallback; update `Overview.test.tsx`
+- [x] Backtest unchanged or better; check in the browser
 
 ### Stage 2b: model ratios
 
-- [ ] `core/modelRatio.ts`: pairwise ratio, same-day pairing, seeded bootstrap range, price × volume split, with tests (known ratios, thin data, no overlap days)
-- [ ] `summary.ts` exposes the ratios; Overview line and Breakdown table, with `InfoTip` on the bias and the split; tests
+- [x] `core/modelRatio.ts`: pairwise ratio, same-day pairing, seeded bootstrap range, price × volume split, with tests (known ratios, thin data, no overlap days)
+- [x] `summary.ts` exposes the ratios; Overview line and Breakdown table, with `InfoTip` on the bias and the split; tests
 - [ ] Check in the browser
 
 ### Stage 3: expected active hours (gated on the backtest)
@@ -179,4 +182,7 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 - [ ] `docs/backlog.md`: delete "Weekday-aware daily usage" and the bootstrap item if stage 3 ships
 - [ ] Delete this plan in the final commit, naming its path in the message
 
-Status: not started; awaiting approval.
+Status: stages 1 and 2 committed, stage 2b done (uncommitted), all in the `forecast-backtest` worktree. The data
+dir holds about a week of readings, so the backtest has one completed weekly
+window and a dozen 5-hour windows: stage 3 cannot be judged yet (see its gate).
+Next: stage 3, once enough completed weeks exist.

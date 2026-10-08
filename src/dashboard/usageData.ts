@@ -1,9 +1,9 @@
 import type { Activity, Outlier } from '@/core/activity';
 import type { UsageRow } from '@/core/aggregate';
-import type { Family } from '@/dashboard/models';
+import type { Family } from '@/core/family';
 
+import { familyOf } from '@/core/family';
 import { formatDay, formatDuration, formatTokens } from '@/dashboard/format';
-import { familyOf } from '@/dashboard/models';
 
 const HEAT_STEPS = 5;
 

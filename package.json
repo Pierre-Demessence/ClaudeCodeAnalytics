@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "dashboard": "vite build && vite preview --open",
     "docker:up": "docker compose up -d --build",
+    "backtest": "node src/collector/backtest/cli.ts",
     "collect": "node src/collector/cli.ts",
     "hook:install": "node src/collector/cli.ts install-hook",
     "lint": "eslint --cache .",
