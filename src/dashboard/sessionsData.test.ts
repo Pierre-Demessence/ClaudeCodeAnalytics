@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { FiveHourWindow } from '@/core/sessions';
 
-import { formatSessionDay, formatSpan, peakText, projectsText, timelineRows } from '@/dashboard/sessionsData';
+import { formatSessionDay, formatSpan, nowMark, peakText, projectsText, timelineRows } from '@/dashboard/sessionsData';
 
 function win(start: string, end: string, extra: Partial<FiveHourWindow> = {}): FiveHourWindow {
   return { cost: 0, end, messages: 0, projects: [], source: 'reading', start, ...extra };
@@ -56,6 +56,20 @@ describe('timelineRows', () => {
   it('leaves out windows outside the day', () => {
     const rows = timelineRows([win('2026-10-01T08:00:00.000Z', '2026-10-01T13:00:00.000Z')], ['2026-10-02'], 'UTC');
     expect(rows[0]!.parts).toEqual([]);
+  });
+});
+
+describe('nowMark', () => {
+  it('places now on its local day, as a % of that day', () => {
+    // 22:00 in Paris (UTC+2).
+    const mark = nowMark(Date.parse('2026-10-03T20:00:00Z'), 'Europe/Paris');
+    expect(mark.day).toBe('2026-10-03');
+    expect(mark.left).toBeCloseTo(22 / 24 * 100);
+  });
+
+  it('measures a 25-hour day when the clocks go back', () => {
+    // Sun 25 Oct 2026 in Paris runs 25 hours; 13:00 local is 14 hours in.
+    expect(nowMark(Date.parse('2026-10-25T12:00:00Z'), 'Europe/Paris').left).toBeCloseTo(14 / 25 * 100);
   });
 });
 

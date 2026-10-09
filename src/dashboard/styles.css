@@ -1760,6 +1760,48 @@ button.info-tip:hover {
   line-height: 1.2;
 }
 
+.session-day.today {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.session-day-relative {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* A wide transparent hit area around a 2px line, capped by a dot above the track. */
+.session-now-mark {
+  position: absolute;
+  top: -4px;
+  bottom: 0;
+  z-index: 2;
+  width: 10px;
+  transform: translateX(-50%);
+}
+
+.session-now-mark::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: var(--text-primary);
+}
+
+.session-now-mark::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-primary);
+}
+
 .session-track {
   position: relative;
   height: 44px;
@@ -1947,7 +1989,8 @@ button.info-tip:hover {
     gap: 6px;
   }
 
-  .session-day {
+  .session-day,
+  .session-day-relative {
     font-size: 0.7rem;
   }
 

@@ -1,6 +1,6 @@
 import type { FiveHourWindow } from '@/core/sessions';
 
-import { startOfDay } from '@/core/aggregate';
+import { dayKey, startOfDay } from '@/core/aggregate';
 import { DAY_MS } from '@/core/calibration';
 import { formatPercent } from '@/dashboard/format';
 
@@ -58,6 +58,13 @@ export function timelineRows(windows: readonly FiveHourWindow[], days: readonly 
   });
 }
 
+/** The local day of `now` and its position on that day's row, in % of the day (DST days run 23 or 25 hours). */
+export function nowMark(now: number, timeZone: string): { day: string; left: number } {
+  const day = dayKey(now, timeZone);
+  const from = startOfDay(day, timeZone);
+  return { day, left: (now - from) / (startOfDay(nextDay(day), timeZone) - from) * 100 };
+}
+
 const dayFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC', weekday: 'short' });
 
 /** "Fri 25 Sept" for a local day `YYYY-MM-DD`. */
@@ -65,7 +72,7 @@ export const formatSessionDay = (day: string) => dayFormat.format(new Date(`${da
 
 const timeFormats = new Map<string, Intl.DateTimeFormat>();
 
-export function formatTime(iso: string, timeZone: string): string {
+export function formatTime(iso: string | number, timeZone: string): string {
   let format = timeFormats.get(timeZone);
   if (!format) {
     format = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', minute: '2-digit', timeZone });

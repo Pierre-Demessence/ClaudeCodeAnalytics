@@ -9,8 +9,9 @@ import type { Summary } from '@/dashboard/api';
 import { dayKey } from '@/core/aggregate';
 import { BlockedIcon } from '@/dashboard/BlockedIcon';
 import { formatDollars, formatPercent, formatUsd } from '@/dashboard/format';
-import { formatSessionDay, formatSpan, formatTime, peakText, projectsText, timelineRows } from '@/dashboard/sessionsData';
+import { formatSessionDay, formatSpan, formatTime, nowMark, peakText, projectsText, timelineRows } from '@/dashboard/sessionsData';
 import { InfoTip } from '@/dashboard/Tip';
+import { useNow } from '@/dashboard/useNow';
 import { useTip } from '@/dashboard/useTip';
 
 const HOURS = [0, 3, 6, 9, 12, 15, 18, 21];
@@ -83,6 +84,10 @@ function Timeline({ summary }: { summary: Summary }) {
   const tip = useTip();
   // The hovered or focused window's start; its block(s) stay lit while the rest dim.
   const [active, setActive] = useState<string>();
+  // From the browser clock, so the mark moves between data reloads.
+  const now = useNow();
+  const mark = nowMark(now, timeZone);
+  const nowText = `Now ${formatTime(now, timeZone)}`;
   return (
     <section className="card">
       <div className="card-head">
@@ -100,8 +105,12 @@ function Timeline({ summary }: { summary: Summary }) {
                 </div>
                 {timelineRows(windows, days, timeZone).map(row => (
                   <div className="session-row" key={row.day}>
-                    <span className="session-day">{formatSessionDay(row.day)}</span>
+                    <span className={`session-day${row.day === mark.day ? ' today' : ''}`}>
+                      {formatSessionDay(row.day)}
+                      {row.day >= mark.day && <span className="session-day-relative">{row.day === mark.day ? 'today' : 'tomorrow'}</span>}
+                    </span>
                     <div className="session-track">
+                      {row.day === mark.day && <span aria-label={nowText} className="session-now-mark" role="img" style={{ left: `${mark.left}%` }} {...tip(nowText)} />}
                       {row.parts.map(({ continuesLeft, continuesRight, fillWidth, hasLabel, left, width, window }) => {
                         const tipProps = tip(windowTip(window, timeZone));
                         const dimmed = active !== undefined && active !== window.start;

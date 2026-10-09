@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApiEvent, Snapshot, UsageRecord } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
@@ -62,6 +62,35 @@ describe('sessions tab', () => {
     expect(rows[1]!.querySelector('.session-peak-icon svg')).toBeTruthy();
     expect(rows[0]!.querySelector('.session-peak-icon svg')).toBeNull();
     expect(rows[0]!.querySelector('.session-peak-bar.capped')).toBeNull();
+  });
+
+  describe('today and now', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('names today and marks the current time on its row', () => {
+      vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
+      renderTab(summary([rec(30 * HOUR_MS)]));
+      const timeline = card('5-hour sessions, last 7 days');
+      const today = timeline.querySelector('.session-day.today')!;
+      expect(today.textContent).toBe('Sat 3 Octtoday');
+      expect(timeline.querySelectorAll('.session-day-relative')).toHaveLength(1);
+      const marks = timeline.querySelectorAll<HTMLElement>('.session-now-mark');
+      expect(marks).toHaveLength(1);
+      expect(marks[0]!.style.left).toBe('50%');
+      expect(marks[0]!.closest('.session-row')).toBe(today.closest('.session-row'));
+      expect(tipOf(marks[0]!)).toBe('Now 12:00');
+    });
+
+    it('adds tomorrow above today while the window in progress runs past midnight', () => {
+      // 22:00, in a window opened at 21:30 that ends at 02:30.
+      const late = NOW + 10 * HOUR_MS;
+      vi.useFakeTimers({ now: late, toFake: ['Date'] });
+      const data = { ...buildSummary({ endpointEnabled: true, events: [], now: late, planHistory: [], records: [rec(-9.5 * HOUR_MS)], snapshots: [], timeZone: 'UTC' }), status: {} };
+      renderTab(data);
+      const days = [...card('5-hour sessions, last 7 days').querySelectorAll('.session-day')].map(day => day.textContent);
+      expect(days.slice(0, 2)).toEqual(['Sun 4 Octtomorrow', 'Sat 3 Octtoday']);
+      expect(days).toHaveLength(8);
+    });
   });
 
   it('follows a custom threshold', () => {

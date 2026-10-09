@@ -39,7 +39,7 @@ export interface FiveHourWindow {
 }
 
 export interface Sessions {
-  /** The local days shown, newest first. */
+  /** The local days shown, newest first: the last 7, plus tomorrow while the window in progress runs into it. */
   days: string[];
   /** Medians leave out the window in progress; the cost median also leaves out windows without Claude Code messages. */
   stats: { blocked: number; capped: number; count: number; medianCost?: number; medianPeak?: number };
@@ -189,9 +189,11 @@ export function buildSessions({ timeZone, ...input }: SessionsInput): Sessions {
     .filter(w => Date.parse(w.end) > from)
     .filter(w => w.messages > 0 || (w.peak ?? 0) >= MIN_UNTRACKED_PEAK);
 
+  const tomorrow = new Date(today + DAY_MS).toISOString().slice(0, 10);
+  const runsIntoTomorrow = shown.some(w => w.inProgress && Date.parse(w.end) > startOfDay(tomorrow, timeZone));
   const done = shown.filter(w => !w.inProgress);
   return {
-    days,
+    days: runsIntoTomorrow ? [tomorrow, ...days] : days,
     windows: shown,
     stats: {
       blocked: shown.filter(w => w.limitHits).length,

@@ -123,6 +123,13 @@ describe('range and details', () => {
     ]);
   });
 
+  it('adds tomorrow on top while the window in progress runs past midnight', () => {
+    // 22:00 Paris; the window opened at 21:30 ends at 02:30 on Sun 4 Oct.
+    const result = sessions([rec('2026-10-03T19:30:00Z')], [], { now: Date.parse('2026-10-03T20:00:00Z') });
+    expect(result.days).toEqual(['2026-10-04', '2026-10-03', '2026-10-02', '2026-10-01', '2026-09-30', '2026-09-29', '2026-09-28', '2026-09-27']);
+    expect(result.windows[0]!.inProgress).toBe(true);
+  });
+
   it('lists projects by cost, each conversation under the directory it started in', () => {
     const { windows } = sessions([
       rec('2026-10-02T01:00:00Z', { cwd: 'S:\\Dev\\app' }),
