@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Summary } from '@/dashboard/api';
 
-import { addReading, deleteReading, loadSummary, refreshNow, saveSettings } from '@/dashboard/api';
+import { addReading, deleteReading, loadStoredSummary, loadSummary, refreshNow, saveSettings } from '@/dashboard/api';
 import { Breakdown } from '@/dashboard/Breakdown';
 import { Calibration } from '@/dashboard/Calibration';
 import { Header } from '@/dashboard/Header';
@@ -50,9 +50,20 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void run(loadSummary);
+    // Paint the stored data at once, then import new transcripts and replace it.
+    // `run` never rejects, so a failed first request still leads to the full one.
+    // A refresh or save started meanwhile is newer: the full load must not supersede it.
+    let cancelled = false;
+    const storedRequest = latestRequestRef.current + 1;
+    void run(loadStoredSummary).then(() => {
+      if (!cancelled && latestRequestRef.current === storedRequest)
+        void run(loadSummary);
+    });
     const timer = setInterval(() => void run(loadSummary), RELOAD_MS);
-    return () => clearInterval(timer);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [run]);
 
   return (

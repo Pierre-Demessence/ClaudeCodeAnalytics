@@ -14,6 +14,24 @@ describe('dayKey', () => {
     expect(dayKey(ms, 'UTC')).toBe('2026-10-01');
     expect(dayKey(ms, 'Europe/Paris')).toBe('2026-10-02');
   });
+
+  // The cache is keyed on 15-minute slots, so it must agree with Intl at every
+  // instant, including DST changes and zones with 30- and 45-minute offsets.
+  it.each([
+    'Europe/Paris',
+    'Asia/Kathmandu',
+    'Asia/Kolkata',
+    'Australia/Lord_Howe',
+    'Pacific/Chatham',
+  ])('matches Intl.DateTimeFormat every 7 minutes of 2026 in %s', (timeZone) => {
+    const reference = new Intl.DateTimeFormat('en-CA', { day: '2-digit', month: '2-digit', timeZone, year: 'numeric' });
+    const mismatches: number[] = [];
+    for (let ms = Date.UTC(2026, 0, 1); ms < Date.UTC(2027, 0, 1); ms += 7 * 60_000) {
+      if (dayKey(ms, timeZone) !== reference.format(ms))
+        mismatches.push(ms);
+    }
+    expect(mismatches).toEqual([]);
+  });
 });
 
 describe('aggregate', () => {

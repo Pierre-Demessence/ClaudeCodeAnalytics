@@ -13,8 +13,9 @@ export interface ManualReading {
 
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-async function request(path: string, body?: unknown): Promise<Summary> {
-  const response = await fetch(`/api${path}?tz=${encodeURIComponent(timeZone)}`, body === undefined
+async function request(path: string, body?: unknown, params: Record<string, string> = {}): Promise<Summary> {
+  const query = new URLSearchParams({ tz: timeZone, ...params });
+  const response = await fetch(`/api${path}?${query}`, body === undefined
     ? undefined
     : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' }, method: 'POST' });
   const json = await response.json() as Summary | { error?: string };
@@ -24,6 +25,9 @@ async function request(path: string, body?: unknown): Promise<Summary> {
 }
 
 export const loadSummary = () => request('/summary');
+
+/** The summary of the data already stored, without importing transcripts first: fast, possibly a little behind. */
+export const loadStoredSummary = () => request('/summary', undefined, { collect: '0' });
 
 /** Imports transcripts and calls the endpoint now, ignoring the throttle. */
 export const refreshNow = () => request('/collect', {});

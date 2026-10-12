@@ -196,7 +196,9 @@ async function handle(req: IncomingMessage, res: ServerResponse, lockWaitMs: num
   if (req.method === 'GET' && url.pathname === '/summary') {
     // Opening the dashboard imports new transcripts; the endpoint keeps its throttle.
     // A failed run is recorded in the status, which the summary shows.
-    await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
+    // `collect=0` answers from the stored data at once: the dashboard's first paint.
+    if (url.searchParams.get('collect') !== '0')
+      await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
     return send(res, 200, await summary(store, timeZone));
   }
   if (req.method === 'GET' && url.pathname === '/widget') {

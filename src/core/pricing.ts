@@ -27,13 +27,21 @@ const CACHE_WRITE_5M = 1.25;
 const CACHE_WRITE_1H = 2;
 const FAST_MODE = 2;
 
+// Runs per record many times per summary, on a handful of distinct models;
+// unknown models are cached too (`undefined`).
+const priceCache = new Map<string, ModelPrice | undefined>();
+
 export function priceFor(model: string): ModelPrice | undefined {
+  if (priceCache.has(model))
+    return priceCache.get(model);
   let best: string | undefined;
   for (const prefix of Object.keys(PRICES)) {
     if (model.startsWith(prefix) && (!best || prefix.length > best.length))
       best = prefix;
   }
-  return best ? PRICES[best] : undefined;
+  const price = best ? PRICES[best] : undefined;
+  priceCache.set(model, price);
+  return price;
 }
 
 /** API-equivalent cost in USD of each token kind of a message. */

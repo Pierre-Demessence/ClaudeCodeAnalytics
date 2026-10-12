@@ -98,8 +98,13 @@ export async function scanTranscripts(claudeDir: string, records: Map<string, Us
   // Messages met in this scan: `mergeRecord` adds up their tool calls only among these.
   const seen = new Set<string>();
 
-  for (const file of await listTranscripts(projectsDir)) {
-    const info = await stat(file);
+  // Each stat costs milliseconds on a Docker bind mount: run them together,
+  // then process the files in listing order.
+  const files = await listTranscripts(projectsDir);
+  const infos = await Promise.all(files.map(file => stat(file)));
+
+  for (const [index, file] of files.entries()) {
+    const info = infos[index]!;
     const id = relative(projectsDir, file);
     const previous = state[id];
     if (previous && previous.offset === info.size && previous.mtimeMs === info.mtimeMs)

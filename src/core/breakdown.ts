@@ -104,12 +104,21 @@ export interface Breakdown {
   total: { cost: number; messages: number };
 }
 
+const projectCache = new Map<string, { name: string; path: string }>();
+
 /** A working directory as a project: drive letter lower-cased, named by its last segment. */
 export function projectOf(cwd: string | undefined, folder: string): { name: string; path: string } {
   if (!cwd)
     return { name: folder, path: folder };
-  const path = cwd.replace(/^[a-z]:/i, drive => drive.toLowerCase()).replace(/(?<=.)[\\/]+$/, '');
-  return { name: path.split(/[\\/]/).at(-1) || path, path };
+  // Called per record on a few dozen distinct directories. Callers only read
+  // the result or spread it, so the cached object is shared.
+  let project = projectCache.get(cwd);
+  if (!project) {
+    const path = cwd.replace(/^[a-z]:/i, drive => drive.toLowerCase()).replace(/(?<=.)[\\/]+$/, '');
+    project = { name: path.split(/[\\/]/).at(-1) || path, path };
+    projectCache.set(cwd, project);
+  }
+  return project;
 }
 
 /**
@@ -190,7 +199,7 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
   const effort = new Map<string, number>();
   const surfaces = new Map<string | undefined, number>();
   const subagentTypes = new Map<string | undefined, SubagentTypeCost>();
-  const conversations = new Map<string, ConversationCost & { branches: Map<string, number> }>();
+  const conversations = new Map<string, ConversationCost & { branches: Map<string, number>; endMs: number; startMs: number }>();
   let output = 0;
   let thinking = 0;
   const split = { reply: 0, thinking: 0, untracked: 0 };
@@ -211,10 +220,13 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
     output += record.output;
     thinking += record.thinking ?? 0;
     for (const part of splitOutput(record)) {
-      if (part.kind === 'tool')
-        toolTokens.set(toolLabel(part.name!), (toolTokens.get(toolLabel(part.name!)) ?? 0) + part.tokens);
-      else
+      if (part.kind === 'tool') {
+        const label = toolLabel(part.name!);
+        toolTokens.set(label, (toolTokens.get(label) ?? 0) + part.tokens);
+      }
+      else {
         split[part.kind] += part.tokens;
+      }
     }
     for (const [name, size] of Object.entries(record.context ?? {})) {
       const label = toolLabel(name);
@@ -260,17 +272,21 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
     if (record.sessionId) {
       let conversation = conversations.get(record.sessionId);
       if (!conversation) {
-        conversation = { ...project, branches: new Map(), byModel: {}, cost: 0, end: record.ts, messages: 0, sessionId: record.sessionId, start: record.ts, subagentCost: 0, title: titles[record.sessionId]?.title };
+        conversation = { ...project, branches: new Map(), byModel: {}, cost: 0, end: record.ts, endMs: ms, messages: 0, sessionId: record.sessionId, start: record.ts, startMs: ms, subagentCost: 0, title: titles[record.sessionId]?.title };
         conversations.set(record.sessionId, conversation);
       }
       addTo(conversation, record.model, cost);
       conversation.messages++;
       if (record.sidechain)
         conversation.subagentCost += cost;
-      if (ms < Date.parse(conversation.start))
+      if (ms < conversation.startMs) {
         conversation.start = record.ts;
-      if (ms > Date.parse(conversation.end))
+        conversation.startMs = ms;
+      }
+      if (ms > conversation.endMs) {
         conversation.end = record.ts;
+        conversation.endMs = ms;
+      }
       if (record.gitBranch)
         conversation.branches.set(record.gitBranch, (conversation.branches.get(record.gitBranch) ?? 0) + 1);
     }
@@ -305,7 +321,7 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
       tokens: contextTools.reduce((sum, tool) => sum + tool.tokens, 0),
       tools: contextTools.slice(0, TOP_TOOLS),
     },
-    conversations: [...conversations.values()].sort(byCost).slice(0, TOP_CONVERSATIONS).map(({ branches, ...conversation }) => {
+    conversations: [...conversations.values()].sort(byCost).slice(0, TOP_CONVERSATIONS).map(({ branches, endMs: _end, startMs: _start, ...conversation }) => {
       let branch: string | undefined;
       for (const [name, count] of branches) {
         if (!branch || count > branches.get(branch)!)

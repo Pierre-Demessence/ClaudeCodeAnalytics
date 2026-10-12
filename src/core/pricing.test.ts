@@ -25,6 +25,11 @@ describe('priceFor', () => {
 
   it('returns undefined for unknown models', () => {
     expect(priceFor('claude-unknown-9')).toBeUndefined();
+    expect(priceFor('claude-unknown-9')).toBeUndefined();
+  });
+
+  it('returns the same answer on repeated calls', () => {
+    expect(priceFor('claude-opus-5-5')).toBe(priceFor('claude-opus-5-5'));
   });
 });
 

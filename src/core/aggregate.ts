@@ -15,15 +15,33 @@ export interface UsageRow {
 
 const dayFormats = new Map<string, Intl.DateTimeFormat>();
 
+// Every real time zone changes date only on a 15-minute boundary (offsets such
+// as +5:30, +5:45 and Lord Howe's 30-minute DST shift are multiples of 15
+// minutes), so one result serves a whole 15-minute slot. Grows by about 96
+// entries per day of history per zone.
+const SLOT_MS = 900_000;
+const daySlots = new Map<string, Map<number, string>>();
+
 /** `YYYY-MM-DD` of an instant in a time zone. */
 export function dayKey(ms: number, timeZone: string): string {
-  let format = dayFormats.get(timeZone);
-  if (!format) {
-    // en-CA formats dates as YYYY-MM-DD.
-    format = new Intl.DateTimeFormat('en-CA', { day: '2-digit', month: '2-digit', timeZone, year: 'numeric' });
-    dayFormats.set(timeZone, format);
+  let slots = daySlots.get(timeZone);
+  if (!slots) {
+    slots = new Map();
+    daySlots.set(timeZone, slots);
   }
-  return format.format(ms);
+  const slot = Math.floor(ms / SLOT_MS);
+  let day = slots.get(slot);
+  if (day === undefined) {
+    let format = dayFormats.get(timeZone);
+    if (!format) {
+      // en-CA formats dates as YYYY-MM-DD.
+      format = new Intl.DateTimeFormat('en-CA', { day: '2-digit', month: '2-digit', timeZone, year: 'numeric' });
+      dayFormats.set(timeZone, format);
+    }
+    day = format.format(ms);
+    slots.set(slot, day);
+  }
+  return day;
 }
 
 /** First instant of a local day (`YYYY-MM-DD`) in a time zone. */

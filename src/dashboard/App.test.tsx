@@ -122,6 +122,45 @@ describe('app', () => {
     vi.useRealTimers();
   });
 
+  it('paints the stored summary first, then replaces it with the imported one', async () => {
+    let finishFull!: (response: Response) => void;
+    const fetch = vi.fn((url: string) => url.includes('collect=0')
+      ? Promise.resolve(Response.json({ ...summary(), plan: 'pro' }))
+      : new Promise<Response>((resolve) => { finishFull = resolve; }));
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Weekly limit' });
+    expect(document.querySelector('.plan-badge')!.textContent).toBe('Pro');
+    // While the full request runs, the page stays and shows the busy state.
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Loading…')).toBeNull();
+    expect(screen.getByText('Updating…')).toBeTruthy();
+    expect(new URL(fetch.mock.calls[0]![0], 'http://x').searchParams.get('collect')).toBe('0');
+    expect(new URL(fetch.mock.calls[1]![0], 'http://x').searchParams.has('collect')).toBe(false);
+    await act(async () => finishFull(Response.json({ ...summary(), plan: 'max5' })));
+    expect(document.querySelector('.plan-badge')!.textContent).toBe('Max 5×');
+    expect(screen.queryByText('Updating…')).toBeNull();
+  });
+
+  it('shows no error when the stored summary fails but the full one succeeds', async () => {
+    const fetch = vi.fn(async (url: string) => url.includes('collect=0')
+      ? Response.json({ error: 'stored failed' }, { status: 500 })
+      : Response.json(summary()));
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Weekly limit' })).toBeTruthy();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows the error when both requests fail', async () => {
+    const fetch = vi.fn(async () => Response.json({ error: 'both failed' }, { status: 500 }));
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect((await screen.findByRole('alert')).textContent).toContain('both failed');
+  });
+
   it('shows the server error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'boom' }, { status: 500 })));
     render(<App />);

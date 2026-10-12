@@ -49,6 +49,19 @@ describe('api routes', () => {
     expect(await response.json()).toMatchObject({ endpointEnabled: false, plan: 'pro', timeZone: 'Europe/Paris' });
   });
 
+  it('answers /summary?collect=0 from the stored data without running the collector', async () => {
+    const statusFile = join(process.env.CCA_DATA_DIR!, 'status.json');
+    await rm(statusFile, { force: true });
+    const stored = await fetch(`${base}/summary?collect=0`);
+    expect(stored.status).toBe(200);
+    expect(await stored.json()).toMatchObject({ endpointEnabled: false });
+    await expect(readFile(statusFile)).rejects.toThrow();
+
+    // Without the parameter the collector runs and records its status.
+    expect((await fetch(`${base}/summary`)).status).toBe(200);
+    await expect(readFile(statusFile, 'utf8')).resolves.toContain('lastRunAt');
+  });
+
   it('serves the two widget rows', async () => {
     const response = await fetch(`${base}/widget`);
     expect(response.status).toBe(200);
