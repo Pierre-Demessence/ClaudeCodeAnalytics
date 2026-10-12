@@ -125,4 +125,6 @@ Run lint, test and build before considering work done.
   the endpoint keeps its throttle however many widgets poll. The page may call
   only the commands listed in `src-tauri/capabilities/default.json`; the dashboard
   URL lives in `src-tauri/src/lib.rs` alone. Clicks never come from the page (it
-  gets no real mouse input in the taskbar): `clicks.rs` handles them.
+  gets no real mouse input in the taskbar): `clicks.rs` handles them. The hook swallows
+  presses and releases on the widget, or the taskbar opens its own menu beneath it.
+  A second launch exits (single-instance plugin): quit the installed widget first.

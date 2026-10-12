@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindow, WebviewWind
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_opener::OpenerExt;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
 
 const DASHBOARD_HOST: &str = "analytics.claudecode.localhost";
 const DASHBOARD_URL: &str = "http://analytics.claudecode.localhost/";
@@ -74,7 +75,15 @@ fn show_menu(window: &WebviewWindow) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, MENU_QUIT, "Quit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(app, &[&open, &autostart, &separator, &quit])?;
-    window.popup_menu(&menu)
+    // A menu closes at once unless its owner is the foreground window; the
+    // click that would have made it so is swallowed by the hook.
+    if let Ok(hwnd) = window.hwnd() {
+        let _ = unsafe { SetForegroundWindow(HWND(hwnd.0 as _)) };
+    }
+    clicks::set_menu_open(true);
+    let shown = window.popup_menu(&menu);
+    clicks::set_menu_open(false);
+    shown
 }
 
 fn on_menu_event(app: &AppHandle, id: &str) {
@@ -159,6 +168,8 @@ fn watch(app: &AppHandle) {
 
 pub fn run() {
     tauri::Builder::default()
+        // First: a second launch exits at once, so there is one widget and one mouse hook.
+        .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,

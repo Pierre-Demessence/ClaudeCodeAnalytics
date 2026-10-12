@@ -99,7 +99,9 @@ npm run widget:build   # builds the installer in src-tauri/target/release/bundle
 ```
 
 Click the readout to open the dashboard; right-click it for "Start with Windows"
-and "Quit". `npm run widget:dev` runs it from the source.
+and "Quit". `npm run widget:dev` runs it from the source. Only one widget runs
+at a time: a second launch exits at once, so quit the installed one (right-click,
+Quit) before `widget:dev`.
 
 ## Scripts
 

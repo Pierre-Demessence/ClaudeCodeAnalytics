@@ -52,7 +52,6 @@ Improvements to something that exists.
 - `[widget]` The widget text follows the Windows apps theme (`prefers-color-scheme`), the taskbar follows `SystemUsesLightTheme`; with the two set differently, dark text lands on a dark taskbar. Read the system value in Rust and pass it to the page. It also reads `scale_factor()` before the window is on the taskbar's monitor, so mixed-DPI setups settle one 3 s tick late.
 - `[widget]` Harden the widget webview: a CSP (`default-src 'self'`, `connect-src ipc: http://ipc.localhost`) instead of `csp: null`, and a shape check on the `fetch_widget` answer in `main.ts` instead of the `as WidgetView` cast.
 - `[widget]` Rewrite the widget as a pure Win32/Rust window drawn with GDI or Direct2D instead of a WebView2 page: about 10 MB instead of the current 95 MB (6 processes: the browser, renderer and two utility processes of WebView2 are the floor, with the GPU already off in `lib.rs`). It would drop the TS front end (`src/widget/`, `view.ts`) and its tests for text and bar drawing in Rust, and the Chromium input and rendering quirks inside the taskbar; `Claude-Code-Usage-Monitor` does this (`src/native_interop.rs`, `src/window/`).
-- `[widget]` Run one widget at a time: a second launch (the installed one plus `widget:dev`, or a double click) adds a second window and a second mouse hook, so every click opens two dashboards. Needs a single-instance guard (`tauri-plugin-single-instance`, a new crate) or a named mutex.
 
 ## Waiting for data
 
