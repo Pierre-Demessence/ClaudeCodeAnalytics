@@ -5,8 +5,15 @@
   --limit: #d9480f;
 }
 
+/* `data-theme` is the taskbar's theme (set from Rust); the media query is the fallback until then. */
+:root[data-theme='dark'] {
+  --text: #fff;
+  --accent: #58a6ff;
+  --limit: #ff922b;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --text: #fff;
     --accent: #58a6ff;
     --limit: #ff922b;

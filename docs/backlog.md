@@ -49,7 +49,7 @@ Improvements to something that exists.
 ### Taskbar widget
 
 - `[widget]` The taskbar widget docks only into a bottom taskbar on the primary monitor (`dock.rs:40-42`: `x` comes from the tray's left edge, the height from the whole taskbar). A side or top taskbar would clip it; fall back to a floating window near the tray, and dock into each monitor's secondary taskbar.
-- `[widget]` The widget text follows the Windows apps theme (`prefers-color-scheme`), the taskbar follows `SystemUsesLightTheme`; with the two set differently, dark text lands on a dark taskbar. Read the system value in Rust and pass it to the page. It also reads `scale_factor()` before the window is on the taskbar's monitor, so mixed-DPI setups settle one 3 s tick late.
+- `[widget]` The widget reads `scale_factor()` before the window is on the taskbar's monitor (`dock.rs:41`), so mixed-DPI setups settle one 3 s tick late.
 - `[widget]` Harden the widget webview: a CSP (`default-src 'self'`, `connect-src ipc: http://ipc.localhost`) instead of `csp: null`, and a shape check on the `fetch_widget` answer in `main.ts` instead of the `as WidgetView` cast.
 - `[widget]` Rewrite the widget as a pure Win32/Rust window drawn with GDI or Direct2D instead of a WebView2 page: about 10 MB instead of the current 95 MB (6 processes: the browser, renderer and two utility processes of WebView2 are the floor, with the GPU already off in `lib.rs`). It would drop the TS front end (`src/widget/`, `view.ts`) and its tests for text and bar drawing in Rust, and the Chromium input and rendering quirks inside the taskbar; `Claude-Code-Usage-Monitor` does this (`src/native_interop.rs`, `src/window/`).
 

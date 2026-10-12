@@ -127,4 +127,5 @@ Run lint, test and build before considering work done.
   URL lives in `src-tauri/src/lib.rs` alone. Clicks never come from the page (it
   gets no real mouse input in the taskbar): `clicks.rs` handles them. The hook swallows
   presses and releases on the widget, or the taskbar opens its own menu beneath it.
+  The text colors follow the taskbar's theme (`taskbar_theme`), not the apps' one.
   A second launch exits (single-instance plugin): quit the installed widget first.

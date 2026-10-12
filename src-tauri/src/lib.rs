@@ -1,5 +1,6 @@
 mod clicks;
 mod dock;
+mod theme;
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -176,12 +177,13 @@ pub fn run() {
             None,
         ))
         .manage(Current(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![fetch_widget])
+        .invoke_handler(tauri::generate_handler![fetch_widget, theme::taskbar_theme])
         .on_menu_event(|app, event| on_menu_event(app, event.id().as_ref()))
         .setup(|app| {
             let handle = app.handle().clone();
             create_window(&handle)?;
             clicks::start(handle.clone(), on_click);
+            theme::watch(handle.clone());
             thread::spawn(move || loop {
                 thread::sleep(WATCH_EVERY);
                 let on_main = handle.clone();
