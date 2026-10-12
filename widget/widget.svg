@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="48" viewBox="0 0 200 48">
+  <!--
+    The look of the readout, in logical pixels (200 x 48); double-brace placeholders
+    are filled by src/template.rs; the colors follow the taskbar's theme.
+    A debug build redraws when this file is saved.
+  -->
+  <defs>
+    <!-- The limit is signalled by the hatching as well as the color. -->
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="{{limit}}" fill-opacity="0.55"/>
+      <rect width="3" height="6" fill="{{limit}}"/>
+    </pattern>
+    <!-- Gaps at 25%, 50% and 75% of the 64px bars: the taskbar shows through, on fill and track alike. -->
+    <mask id="gaps" maskUnits="userSpaceOnUse" x="22" y="0" width="64" height="48">
+      <rect x="22" y="0" width="64" height="48" fill="#fff"/>
+      <rect x="37" y="0" width="1" height="48" fill="#000"/>
+      <rect x="53" y="0" width="1" height="48" fill="#000"/>
+      <rect x="69" y="0" width="1" height="48" fill="#000"/>
+    </mask>
+  </defs>
+
+  <!-- Almost transparent, not transparent: a fully transparent pixel lets clicks through to the taskbar. -->
+  <rect width="200" height="48" fill="#000" fill-opacity="0.01"/>
+
+  <g font-family="Segoe UI Variable Text, Segoe UI" font-size="12" fill="{{text}}" opacity="{{rows_opacity}}">
+    <text x="4" y="19">5h</text>
+    <g mask="url(#gaps)">
+      <rect x="22" y="10.5" width="64" height="9" rx="2" fill="{{text}}" fill-opacity="0.25"/>
+      <rect x="22" y="10.5" width="{{fill_1}}" height="9" rx="2" fill="{{paint_1}}"/>
+    </g>
+    <text x="126" y="19" text-anchor="end" font-weight="{{weight_1}}">{{percent_1}}</text>
+    <text x="132" y="19" fill-opacity="0.6">•</text>
+    <text x="140" y="19">{{reset_1}}</text>
+
+    <text x="4" y="36">7d</text>
+    <g mask="url(#gaps)">
+      <rect x="22" y="27.5" width="64" height="9" rx="2" fill="{{text}}" fill-opacity="0.25"/>
+      <rect x="22" y="27.5" width="{{fill_2}}" height="9" rx="2" fill="{{paint_2}}"/>
+    </g>
+    <text x="126" y="36" text-anchor="end" font-weight="{{weight_2}}">{{percent_2}}</text>
+    <text x="132" y="36" fill-opacity="0.6">•</text>
+    <text x="140" y="36">{{reset_2}}</text>
+  </g>
+
+  <!-- Lucide `wifi-off`: the values are old because the dashboard cannot be reached. -->
+  <g opacity="{{offline_opacity}}" transform="translate(184 18) scale(0.5)" fill="none" stroke="{{text}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20h.01"/>
+    <path d="M8.5 16.429a5 5 0 0 1 7 0"/>
+    <path d="M5 12.859a10 10 0 0 1 5.17-2.69"/>
+    <path d="M19 12.859a10 10 0 0 0-2.007-1.523"/>
+    <path d="M2 8.82a15 15 0 0 1 4.177-2.643"/>
+    <path d="M22 8.82a15 15 0 0 0-11.288-3.764"/>
+    <path d="m2 2 20 20"/>
+  </g>
+</svg>

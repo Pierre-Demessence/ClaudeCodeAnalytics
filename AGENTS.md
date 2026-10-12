@@ -9,8 +9,11 @@ transcripts and the plan-limit endpoint.
 - Dashboard: `npm run dashboard` (build + preview) or `npm run dev`
 - Always-on dashboard: `npm run docker:up` (rebuild + restart the container
   at `http://analytics.claudecode.localhost`, behind Traefik)
-- Taskbar widget: `npm run widget:dev` (run it) / `npm run widget:build` (NSIS
-  installer in `src-tauri/target/release/bundle/`); needs Rust, from `mise.toml`
+- Taskbar widget: `npm run widget:dev` (debug build, redraws when
+  `widget/widget.svg` is saved) / `npm run widget:install` (release build copied
+  to `%LOCALAPPDATA%Claude Code Analytics Widget` and started) /
+  `npm run widget:test` (`cargo test` + `clippy -D warnings`); needs Rust, from
+  `mise.toml`
 - Collector: `npm run collect` (`-- --force` ignores the endpoint throttle)
 - Backtest: `npm run backtest` (`-- --weeks 8 --step-hours 6`) replays the
   forecasts on the data dir, read-only, and scores them against the final %
@@ -31,9 +34,10 @@ Run lint, test and build before considering work done.
   store, lock, hook installer; entry `cli.ts` (also run by the Claude Code hook).
 - `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview.
 - `src/dashboard/` — React app (`main.tsx` entry).
-- `src/widget/` — the taskbar widget's front end (plain TS, `main.ts` entry, own
-  `vite.widget.config.ts`); `core/widget.ts` holds its pure logic.
-- `src-tauri/` — the widget's Rust shell (Tauri): window docking, mouse hook for clicks, right-click menu, autostart.
+- `widget/` — the taskbar widget, one native Rust process (no webview): `widget.svg`
+  is its look, `src/` the logic (`view` texts and flags, `template` fills the SVG,
+  `render` draws it with resvg, `fetch`, `dock`, `window` with the click and menu
+  handling, `theme`, `autostart`); `core/widget.ts` builds the API's answer.
 - `docs/` — `backlog.md`, `decisions.md`, `plans/`.
 - `Dockerfile`, `docker-compose.yml` — the always-on dashboard behind Traefik.
 
@@ -120,12 +124,15 @@ Run lint, test and build before considering work done.
   `vitest.config.ts`.
 - The app name comes from `brand.json`; never hard-code it in `index.html`.
 - The taskbar widget never reads the OAuth token and calls nothing but
-  `GET /api/widget`, through the Rust command `fetch_widget` (the webview has no
-  network access of its own). That route runs the collector like `/summary`, so
-  the endpoint keeps its throttle however many widgets poll. The page may call
-  only the commands listed in `src-tauri/capabilities/default.json`; the dashboard
-  URL lives in `src-tauri/src/lib.rs` alone. Clicks never come from the page (it
-  gets no real mouse input in the taskbar): `clicks.rs` handles them. The hook swallows
-  presses and releases on the widget, or the taskbar opens its own menu beneath it.
-  The text colors follow the taskbar's theme (`taskbar_theme`), not the apps' one.
-  A second launch exits (single-instance plugin): quit the installed widget first.
+  `GET /api/widget` (`widget/src/fetch.rs`: plain HTTP/1.0 to `127.0.0.1:80` with
+  the real `Host`, since Windows does not resolve `*.localhost`). That route runs the
+  collector like `/summary`, so the endpoint keeps its throttle however many widgets
+  poll. The dashboard URL lives in `widget/src/window.rs` and `fetch.rs` alone.
+  `resetsAtMs` is epoch milliseconds so Rust needs no date parser.
+- `widget.svg` has `{{placeholders}}` filled by `template.rs`; its background rect is
+  almost transparent on purpose (a fully transparent pixel lets the click through to
+  the taskbar). Colors follow the taskbar's theme (`SystemUsesLightTheme`), not the
+  apps' one. The golden images in `widget/tests/snapshots/` use Windows' Segoe UI;
+  review a changed one by eye, then `UPDATE_SNAPSHOTS=1 cargo test` rewrites them.
+- A second launch exits (named mutex): quit the installed widget first. The exe is
+  locked while it runs, so `widget:install` refuses until it is quit.

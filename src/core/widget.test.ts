@@ -4,7 +4,7 @@ import type { DashboardSummary } from './summary.ts';
 import type { Snapshot } from './types.ts';
 
 import { buildSummary } from './summary.ts';
-import { formatResetIn, widgetView } from './widget.ts';
+import { widgetView } from './widget.ts';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -24,32 +24,11 @@ function summary(overrides: Partial<Input> = {}): Input {
   };
 }
 
-describe('formatResetIn', () => {
-  it('keeps hours and minutes, rounding down, so 2h59 never reads 2h', () => {
-    expect(formatResetIn(2 * HOUR + 59 * MIN + 40_000)).toBe('2h59m');
-    expect(formatResetIn(HOUR)).toBe('1h00m');
-  });
-
-  it('keeps days and hours from one day', () => {
-    expect(formatResetIn(2 * DAY + 5 * HOUR + 59 * MIN)).toBe('2d05h');
-    expect(formatResetIn(DAY)).toBe('1d00h');
-    expect(formatResetIn(DAY - 1)).toBe('23h59m');
-  });
-
-  it('shows minutes alone below an hour and <1m below a minute', () => {
-    expect(formatResetIn(45 * MIN + 59_000)).toBe('45m');
-    expect(formatResetIn(MIN)).toBe('1m');
-    expect(formatResetIn(MIN - 1)).toBe('<1m');
-    expect(formatResetIn(0)).toBe('<1m');
-    expect(formatResetIn(-5 * MIN)).toBe('<1m');
-  });
-});
-
 describe('widgetView', () => {
   it('reads both windows with their limits and reset times', () => {
     const view = widgetView(summary(), now);
-    expect(view.fiveHour).toMatchObject({ estimated: false, limit: 95, percent: 42, resetsAt: iso(now + 2 * HOUR + 59 * MIN + 40_000) });
-    expect(view.weekly).toMatchObject({ estimated: false, limit: 98, percent: 59, resetsAt: iso(now + 2 * DAY + 5 * HOUR) });
+    expect(view.fiveHour).toMatchObject({ estimated: false, limit: 95, percent: 42, resetsAtMs: now + 2 * HOUR + 59 * MIN + 40_000 });
+    expect(view.weekly).toMatchObject({ estimated: false, limit: 98, percent: 59, resetsAtMs: now + 2 * DAY + 5 * HOUR });
     expect(view.generatedAt).toBe(iso(now));
   });
 
@@ -92,7 +71,7 @@ describe('widgetView on a real summary', () => {
 
   it('keeps an open window with its reset time', () => {
     const view = build([reading({ fiveHour: 42, fiveHourResetsAt: iso(now + 2 * HOUR) })]);
-    expect(view.fiveHour).toMatchObject({ percent: 42, resetsAt: iso(now + 2 * HOUR) });
+    expect(view.fiveHour).toMatchObject({ percent: 42, resetsAtMs: now + 2 * HOUR });
   });
 
   it('shows 0% once the window of the last reading has reset, before the next reading', () => {

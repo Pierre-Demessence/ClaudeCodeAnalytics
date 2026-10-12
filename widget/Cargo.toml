@@ -1,0 +1,37 @@
+[package]
+name = "cca-widget"
+version = "1.0.0"
+description = "Taskbar widget for Claude Code Analytics"
+edition = "2021"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+
+[dependencies]
+resvg = { version = "0.48.1", default-features = false, features = [
+  "text",
+  "memmap-fonts"
+] }
+serde = { version = "1.0.229", features = [ "derive" ] }
+serde_json = "1.0.154"
+windows = { version = "0.62.2", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Security",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Registry",
+  "Win32_System_Threading",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging"
+] }
+
+[build-dependencies]
+embed-resource = "3.0.12"
+
+[dev-dependencies]
+png = "0.18.1"

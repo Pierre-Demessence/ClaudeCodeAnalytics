@@ -91,17 +91,20 @@ run `npm run docker:up` again after changing the code.
 A small readout docked in the taskbar, left of the notification area: the 5-hour
 and weekly usage as a bar, a percent and the time to reset (`2h59m`, `2d05h`).
 It reads the dashboard's `/api/widget`, so the always-on dashboard must run.
+It is one small native process (about 10 MB) drawn from `widget/widget.svg`.
 Needs [Rust](https://www.rust-lang.org/) (`mise install`) and the Visual Studio
 C++ build tools.
 
 ```sh
-npm run widget:build   # builds the installer in src-tauri/target/release/bundle/nsis
+npm run widget:install   # builds, copies the exe to %LOCALAPPDATA%\Claude Code Analytics Widget, starts it
 ```
 
 Click the readout to open the dashboard; right-click it for "Start with Windows"
-and "Quit". `npm run widget:dev` runs it from the source. Only one widget runs
-at a time: a second launch exits at once, so quit the installed one (right-click,
-Quit) before `widget:dev`.
+and "Quit". `npm run widget:dev` runs a debug build from the source, which redraws
+when `widget/widget.svg` is saved. Only one widget runs at a time: a second launch
+exits at once, so quit the installed one (right-click, Quit) before `widget:dev`
+or a new `widget:install`. A widget installed by the old Tauri build can
+be removed with the `uninstall.exe` in the same folder first.
 
 ## Scripts
 
@@ -114,7 +117,8 @@ Quit) before `widget:dev`.
 | `npm run collect`      | Run the collector once (`-- --force` skips the throttle). |
 | `npm run hook:install` | Print or (`-- --apply`) install the Claude Code hook.     |
 | `npm run widget:dev`   | Run the taskbar widget from the source.                   |
-| `npm run widget:build` | Build the taskbar widget's installer.                     |
+| `npm run widget:install` | Build the taskbar widget and install it for the user.   |
+| `npm run widget:test`  | Test and lint the widget (`cargo test`, `clippy`).        |
 | `npm run build`        | Type-check, then build.                                   |
 | `npm run lint`         | Lint with ESLint (`lint:fix` to auto-fix).                |
 | `npm test`             | Run Vitest once (`test:watch`, `test:coverage`).          |

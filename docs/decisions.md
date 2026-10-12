@@ -399,23 +399,26 @@ then. Rejected: prorating the price over the days with data, which reads $6 for 
 $20 Pro plan ten days into a cycle; it remains the fallback without the date.
 Assumes monthly billing and list prices, in dollars before VAT.
 
-## The taskbar widget fetches in Rust and polls `/api/widget`
+## The taskbar widget is a native Rust process drawing an SVG
 
-The widget's one request is a Rust command with `analytics.claudecode.localhost`
-pinned to `127.0.0.1`: Windows does not resolve `*.localhost` subdomains (only
-browsers do), and a command leaves the webview no network access at all.
-Rejected: `tauri-plugin-http` with a URL scope, which needs the same pin and
-exposes a general fetch; a hosts-file entry, which lives outside the repo.
+The widget is one Win32 process: `resvg` renders `widget.svg` (the look, with
+placeholders) into a bitmap that a layered child window of the taskbar shows
+(`UpdateLayeredWindow`), about 10 MB. As a native child of the taskbar it gets real
+mouse messages, so no mouse hook is needed and its right click never reaches the
+taskbar's own menu. Rejected: WebView2 through Tauri (95 MB in 6 processes, and
+Chromium never got real mouse input inside the taskbar, which forced a system-wide
+`WH_MOUSE_LL` hook); Blitz (HTML/CSS, but pre-alpha and drawn on the GPU); Slint (its
+winit-owned window is an unproven fit for reparenting into the taskbar); GDI text on a color key or alpha
+bitmap (no antialiased text on transparency). The exe is installed by copying it, with
+no installer, and "Start with Windows" is a `Run` registry value.
+
+## The taskbar widget fetches over plain HTTP on loopback and polls `/api/widget`
+
+The widget's one request is a hand-written HTTP/1.0 `GET` to `127.0.0.1:80` with
+`Host: analytics.claudecode.localhost`: Windows does not resolve `*.localhost`
+subdomains (only browsers do), and Traefik routes on the `Host` header. HTTP/1.0
+means the answer is never chunked. Rejected: an HTTP client crate (`reqwest` is most of
+the build for one request); a hosts-file entry, which lives outside the repo.
 The widget polls a dedicated route that runs the collector rather than reading
 the data dir itself, so readings keep arriving while the PC is idle and the
 token stays in the collector.
-
-## The widget's clicks come from a mouse hook, not the page
-
-A web page docked in the taskbar never receives real mouse input (hover, click,
-right-click), though the same events posted as window messages reach it; the
-cause inside WebView2 was not found. `clicks.rs` hooks the mouse system-wide
-(`WH_MOUSE_LL`) and acts on clicks that land on the widget's window. Rejected:
-JS `click` and `contextmenu` handlers, which never fire there; a tray icon,
-which the right-click menu replaces. The hook only reacts to clicks on the
-widget, never stores or logs positions.
