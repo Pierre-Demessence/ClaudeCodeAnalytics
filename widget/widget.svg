@@ -22,7 +22,7 @@
   <!-- Almost transparent, not transparent: a fully transparent pixel lets clicks through to the taskbar. -->
   <rect width="200" height="48" fill="#000" fill-opacity="0.01"/>
 
-  <g font-family="Segoe UI Variable Text, Segoe UI" font-size="12" fill="{{text}}" opacity="{{rows_opacity}}">
+  <g font-family="Segoe UI Variable, Segoe UI" font-size="12.5" fill="{{text}}" stroke="{{text}}" stroke-width="0.3" stroke-linejoin="round" opacity="{{rows_opacity}}">
     <text x="4" y="19">5h</text>
     <g mask="url(#gaps)">
       <rect x="22" y="10.5" width="64" height="9" rx="2" fill="{{text}}" fill-opacity="0.25"/>
