@@ -29,3 +29,8 @@ coverage
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Taskbar widget
+dist-widget
+src-tauri/target
+src-tauri/gen

@@ -49,6 +49,14 @@ describe('api routes', () => {
     expect(await response.json()).toMatchObject({ endpointEnabled: false, plan: 'pro', timeZone: 'Europe/Paris' });
   });
 
+  it('serves the two widget rows', async () => {
+    const response = await fetch(`${base}/widget`);
+    expect(response.status).toBe(200);
+    const view = await response.json() as Record<string, unknown>;
+    expect(view).toMatchObject({ fiveHour: { estimated: false, limit: 95 }, weekly: { estimated: false, limit: 98 } });
+    expect(Object.keys(view).sort()).toEqual(['fiveHour', 'generatedAt', 'weekly']);
+  });
+
   it('saves settings and manual readings', async () => {
     const settings = await post('/settings', { planHistory: [{ from: '2026-01-01T00:00:00Z', plan: 'max5', source: 'manual' }] });
     expect(await settings.json()).toMatchObject({ plan: 'max5' });

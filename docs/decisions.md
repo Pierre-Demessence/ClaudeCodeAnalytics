@@ -398,3 +398,24 @@ list price on each billing date, the day of the month the subscription started
 then. Rejected: prorating the price over the days with data, which reads $6 for a
 $20 Pro plan ten days into a cycle; it remains the fallback without the date.
 Assumes monthly billing and list prices, in dollars before VAT.
+
+## The taskbar widget fetches in Rust and polls `/api/widget`
+
+The widget's one request is a Rust command with `analytics.claudecode.localhost`
+pinned to `127.0.0.1`: Windows does not resolve `*.localhost` subdomains (only
+browsers do), and a command leaves the webview no network access at all.
+Rejected: `tauri-plugin-http` with a URL scope, which needs the same pin and
+exposes a general fetch; a hosts-file entry, which lives outside the repo.
+The widget polls a dedicated route that runs the collector rather than reading
+the data dir itself, so readings keep arriving while the PC is idle and the
+token stays in the collector.
+
+## The widget's clicks come from a mouse hook, not the page
+
+A web page docked in the taskbar never receives real mouse input (hover, click,
+right-click), though the same events posted as window messages reach it; the
+cause inside WebView2 was not found. `clicks.rs` hooks the mouse system-wide
+(`WH_MOUSE_LL`) and acts on clicks that land on the widget's window. Rejected:
+JS `click` and `contextmenu` handlers, which never fire there; a tray icon,
+which the right-click menu replaces. The hook only reacts to clicks on the
+widget, never stores or logs positions.

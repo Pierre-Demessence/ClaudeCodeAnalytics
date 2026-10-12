@@ -86,7 +86,23 @@ external `proxy` network. The container restarts with Docker Desktop, mounts
 keeps running on the host. The container serves the version it was built from:
 run `npm run docker:up` again after changing the code.
 
+### Taskbar widget (Windows)
+
+A small readout docked in the taskbar, left of the notification area: the 5-hour
+and weekly usage as a bar, a percent and the time to reset (`2h59m`, `2d05h`).
+It reads the dashboard's `/api/widget`, so the always-on dashboard must run.
+Needs [Rust](https://www.rust-lang.org/) (`mise install`) and the Visual Studio
+C++ build tools.
+
+```sh
+npm run widget:build   # builds the installer in src-tauri/target/release/bundle/nsis
+```
+
+Click the readout to open the dashboard; right-click it for "Start with Windows"
+and "Quit". `npm run widget:dev` runs it from the source.
+
 ## Scripts
+
 
 | Script                 | Description                                               |
 | ---------------------- | --------------------------------------------------------- |
@@ -95,6 +111,8 @@ run `npm run docker:up` again after changing the code.
 | `npm run docker:up`    | Build and (re)start the always-on Docker dashboard.       |
 | `npm run collect`      | Run the collector once (`-- --force` skips the throttle). |
 | `npm run hook:install` | Print or (`-- --apply`) install the Claude Code hook.     |
+| `npm run widget:dev`   | Run the taskbar widget from the source.                   |
+| `npm run widget:build` | Build the taskbar widget's installer.                     |
 | `npm run build`        | Type-check, then build.                                   |
 | `npm run lint`         | Lint with ESLint (`lint:fix` to auto-fix).                |
 | `npm test`             | Run Vitest once (`test:watch`, `test:coverage`).          |

@@ -27,5 +27,5 @@
     "skipLibCheck": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src/core", "src/dashboard"]
+  "include": ["src/core", "src/dashboard", "src/widget"]
 }

@@ -10,6 +10,7 @@ import { waitForLock } from '../collector/lock.ts';
 import { claudeDir, dataDir, Store } from '../collector/store.ts';
 import { PLANS } from '../core/plans.ts';
 import { buildSummary } from '../core/summary.ts';
+import { widgetView } from '../core/widget.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_RESET_AHEAD_MS = 7 * 86_400_000 + 60_000;
@@ -197,6 +198,11 @@ async function handle(req: IncomingMessage, res: ServerResponse, lockWaitMs: num
     // A failed run is recorded in the status, which the summary shows.
     await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
     return send(res, 200, await summary(store, timeZone));
+  }
+  if (req.method === 'GET' && url.pathname === '/widget') {
+    // The taskbar widget polls this: it keeps the endpoint readings coming while the PC is idle.
+    await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
+    return send(res, 200, widgetView(await summary(store, timeZone), Date.now()));
   }
   if (req.method === 'POST' && url.pathname === '/collect') {
     await readBody(req);

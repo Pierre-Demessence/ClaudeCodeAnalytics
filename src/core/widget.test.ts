@@ -1,0 +1,113 @@
+import { describe, expect, it } from 'vitest';
+
+import type { DashboardSummary } from './summary.ts';
+import type { Snapshot } from './types.ts';
+
+import { buildSummary } from './summary.ts';
+import { formatResetIn, widgetView } from './widget.ts';
+
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
+const now = Date.parse('2026-10-12T15:00:00Z');
+const iso = (ms: number) => new Date(ms).toISOString();
+
+type Input = Pick<DashboardSummary, 'current' | 'fiveHourSession' | 'limitThreshold' | 'weekLimitThreshold'>;
+
+function summary(overrides: Partial<Input> = {}): Input {
+  return {
+    current: { pacing: {} as never, readAt: iso(now - HOUR), resetsAt: iso(now + 2 * DAY + 5 * HOUR), source: 'endpoint', weekly: 59 },
+    fiveHourSession: { percent: 42, readAt: iso(now - 10 * MIN), resetsAt: iso(now + 2 * HOUR + 59 * MIN + 40_000) },
+    limitThreshold: 95,
+    weekLimitThreshold: 98,
+    ...overrides,
+  };
+}
+
+describe('formatResetIn', () => {
+  it('keeps hours and minutes, rounding down, so 2h59 never reads 2h', () => {
+    expect(formatResetIn(2 * HOUR + 59 * MIN + 40_000)).toBe('2h59m');
+    expect(formatResetIn(HOUR)).toBe('1h00m');
+  });
+
+  it('keeps days and hours from one day', () => {
+    expect(formatResetIn(2 * DAY + 5 * HOUR + 59 * MIN)).toBe('2d05h');
+    expect(formatResetIn(DAY)).toBe('1d00h');
+    expect(formatResetIn(DAY - 1)).toBe('23h59m');
+  });
+
+  it('shows minutes alone below an hour and <1m below a minute', () => {
+    expect(formatResetIn(45 * MIN + 59_000)).toBe('45m');
+    expect(formatResetIn(MIN)).toBe('1m');
+    expect(formatResetIn(MIN - 1)).toBe('<1m');
+    expect(formatResetIn(0)).toBe('<1m');
+    expect(formatResetIn(-5 * MIN)).toBe('<1m');
+  });
+});
+
+describe('widgetView', () => {
+  it('reads both windows with their limits and reset times', () => {
+    const view = widgetView(summary(), now);
+    expect(view.fiveHour).toMatchObject({ estimated: false, limit: 95, percent: 42, resetsAt: iso(now + 2 * HOUR + 59 * MIN + 40_000) });
+    expect(view.weekly).toMatchObject({ estimated: false, limit: 98, percent: 59, resetsAt: iso(now + 2 * DAY + 5 * HOUR) });
+    expect(view.generatedAt).toBe(iso(now));
+  });
+
+  it('uses the estimate over the reading, and flags it', () => {
+    const base = summary();
+    const view = widgetView(summary({
+      current: { ...base.current!, estimatedNow: 61 },
+      fiveHourSession: { ...base.fiveHourSession!, estimatedNow: 47 },
+    }), now);
+    expect(view.fiveHour).toMatchObject({ estimated: true, percent: 47 });
+    expect(view.weekly).toMatchObject({ estimated: true, percent: 61 });
+  });
+
+  it('shows an idle 5-hour window once its reset has passed', () => {
+    const view = widgetView(summary({ fiveHourSession: { percent: 80, readAt: iso(now - 6 * HOUR), resetsAt: iso(now - HOUR) } }), now);
+    expect(view.fiveHour).toEqual({ estimated: false, limit: 95, percent: 0 });
+  });
+
+  it('shows an idle 5-hour window for a reading with no window', () => {
+    const view = widgetView(summary({ fiveHourSession: { percent: 0, readAt: iso(now - HOUR) } }), now);
+    expect(view.fiveHour).toEqual({ estimated: false, limit: 95, percent: 0 });
+  });
+
+  it('shows an idle 5-hour window when only the week is known, as buildSummary reports an expired window', () => {
+    const view = widgetView(summary({ fiveHourSession: undefined }), now);
+    expect(view.fiveHour).toEqual({ estimated: false, limit: 95, percent: 0 });
+    expect(view.weekly.percent).toBe(59);
+  });
+
+  it('leaves a window unknown without any reading', () => {
+    const view = widgetView(summary({ current: undefined, fiveHourSession: undefined }), now);
+    expect(view.fiveHour).toEqual({ estimated: false, limit: 95 });
+    expect(view.weekly).toEqual({ estimated: false, limit: 98 });
+  });
+});
+
+describe('widgetView on a real summary', () => {
+  const build = (snapshots: Snapshot[]) => widgetView(buildSummary({ endpointEnabled: true, now, planHistory: [], records: [], snapshots, timeZone: 'UTC' }), now);
+  const reading = (extra: Partial<Snapshot>): Snapshot => ({ source: 'endpoint', ts: iso(now - 20 * MIN), weekly: 59, weeklyResetsAt: iso(now + 2 * DAY), ...extra });
+
+  it('keeps an open window with its reset time', () => {
+    const view = build([reading({ fiveHour: 42, fiveHourResetsAt: iso(now + 2 * HOUR) })]);
+    expect(view.fiveHour).toMatchObject({ percent: 42, resetsAt: iso(now + 2 * HOUR) });
+  });
+
+  it('shows 0% once the window of the last reading has reset, before the next reading', () => {
+    const view = build([reading({ fiveHour: 80, fiveHourResetsAt: iso(now - 10 * MIN) })]);
+    expect(view.fiveHour).toEqual({ estimated: false, limit: 95, percent: 0 });
+  });
+
+  it('shows 0% for a reading that reports no window', () => {
+    const view = build([reading({ fiveHour: 0 })]);
+    expect(view.fiveHour).toEqual({ estimated: false, limit: 95, percent: 0 });
+  });
+
+  it('leaves both rows unknown with no reading at all', () => {
+    const view = build([]);
+    expect(view.fiveHour.percent).toBeUndefined();
+    expect(view.weekly.percent).toBeUndefined();
+  });
+});

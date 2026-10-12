@@ -9,6 +9,8 @@ transcripts and the plan-limit endpoint.
 - Dashboard: `npm run dashboard` (build + preview) or `npm run dev`
 - Always-on dashboard: `npm run docker:up` (rebuild + restart the container
   at `http://analytics.claudecode.localhost`, behind Traefik)
+- Taskbar widget: `npm run widget:dev` (run it) / `npm run widget:build` (NSIS
+  installer in `src-tauri/target/release/bundle/`); needs Rust, from `mise.toml`
 - Collector: `npm run collect` (`-- --force` ignores the endpoint throttle)
 - Backtest: `npm run backtest` (`-- --weeks 8 --step-hours 6`) replays the
   forecasts on the data dir, read-only, and scores them against the final %
@@ -29,6 +31,9 @@ Run lint, test and build before considering work done.
   store, lock, hook installer; entry `cli.ts` (also run by the Claude Code hook).
 - `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview.
 - `src/dashboard/` — React app (`main.tsx` entry).
+- `src/widget/` — the taskbar widget's front end (plain TS, `main.ts` entry, own
+  `vite.widget.config.ts`); `core/widget.ts` holds its pure logic.
+- `src-tauri/` — the widget's Rust shell (Tauri): window docking, mouse hook for clicks, right-click menu, autostart.
 - `docs/` — `backlog.md`, `decisions.md`, `plans/`.
 - `Dockerfile`, `docker-compose.yml` — the always-on dashboard behind Traefik.
 
@@ -114,3 +119,10 @@ Run lint, test and build before considering work done.
 - Keep the `@/*` alias in sync across `tsconfig.json`, `vite.config.ts` and
   `vitest.config.ts`.
 - The app name comes from `brand.json`; never hard-code it in `index.html`.
+- The taskbar widget never reads the OAuth token and calls nothing but
+  `GET /api/widget`, through the Rust command `fetch_widget` (the webview has no
+  network access of its own). That route runs the collector like `/summary`, so
+  the endpoint keeps its throttle however many widgets poll. The page may call
+  only the commands listed in `src-tauri/capabilities/default.json`; the dashboard
+  URL lives in `src-tauri/src/lib.rs` alone. Clicks never come from the page (it
+  gets no real mouse input in the taskbar): `clicks.rs` handles them.
