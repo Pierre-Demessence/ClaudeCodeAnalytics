@@ -19,6 +19,7 @@ import { Usage } from '@/dashboard/Usage';
 import { Weeks } from '@/dashboard/Weeks';
 
 const RELOAD_MS = 5 * 60_000;
+const RETRY_MS = 30_000;
 
 export function App() {
   const [summary, setSummary] = useState<Summary>();
@@ -62,12 +63,19 @@ export function App() {
       if (!cancelled && latestRequestRef.current === storedRequest)
         void run(loadSummary);
     });
-    const timer = setInterval(() => void run(loadSummary), RELOAD_MS);
     return () => {
       cancelled = true;
-      clearInterval(timer);
     };
   }, [run]);
+
+  // Without a usable token the collector only reads a file, so look again soon: the
+  // reading should resume as soon as Claude Code has refreshed the token.
+  const result = summary?.status.endpointResult;
+  const waitingForToken = summary?.endpointEnabled && (result === 'expired' || result === 'no-token');
+  useEffect(() => {
+    const timer = setInterval(() => void run(loadSummary), waitingForToken ? RETRY_MS : RELOAD_MS);
+    return () => clearInterval(timer);
+  }, [run, waitingForToken]);
 
   return (
     <TipProvider>

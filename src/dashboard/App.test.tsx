@@ -122,6 +122,25 @@ describe('app', () => {
     vi.useRealTimers();
   });
 
+  it('reloads every 30 seconds while the token is expired, every 5 minutes otherwise', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let result = 'expired';
+    const fetch = vi.fn(async (_url: string) => Response.json({ ...summary(), status: { ...summary().status, endpointResult: result } }));
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Weekly limit' });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    await act(async () => vi.advanceTimersByTime(30_000));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+
+    result = 'ok';
+    await act(async () => vi.advanceTimersByTime(30_000));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
+    await act(async () => vi.advanceTimersByTime(60_000));
+    expect(fetch).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
+  });
+
   it('paints the stored summary first, then replaces it with the imported one', async () => {
     let finishFull!: (response: Response) => void;
     const fetch = vi.fn((url: string) => url.includes('collect=0')
