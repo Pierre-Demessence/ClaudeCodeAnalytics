@@ -1,8 +1,9 @@
 import { CircleX } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Summary } from '@/dashboard/api';
 
+import { anonymizeSummary, useAnonymize } from '@/dashboard/anonymize';
 import { addReading, deleteReading, loadStoredSummary, loadSummary, refreshNow, saveSettings } from '@/dashboard/api';
 import { Breakdown } from '@/dashboard/Breakdown';
 import { Calibration } from '@/dashboard/Calibration';
@@ -25,6 +26,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const tab = useTab();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { anonymous, toggle: toggleAnonymous } = useAnonymize();
+  const shown = useMemo(() => summary && (anonymous ? anonymizeSummary(summary) : summary), [anonymous, summary]);
 
   // Overlapping requests (auto-reload during a save) may finish out of order: only the latest one counts.
   const latestRequestRef = useRef(0);
@@ -70,10 +73,12 @@ export function App() {
     <TipProvider>
       <PatternDefs />
       <Header
+        anonymous={anonymous}
         busy={busy}
         onRefresh={() => void run(refreshNow)}
+        onToggleAnonymous={toggleAnonymous}
         onToggleTheme={toggleTheme}
-        summary={summary}
+        summary={shown}
         tab={tab}
         theme={theme}
       />
@@ -84,22 +89,22 @@ export function App() {
             {error}
           </p>
         )}
-        {summary
+        {shown
           ? (
               <>
-                {tab === 'overview' && <Overview summary={summary} />}
-                {tab === 'usage' && <Usage summary={summary} />}
-                {tab === 'breakdown' && <Breakdown summary={summary} />}
-                {tab === 'sessions' && <Sessions summary={summary} />}
-                {tab === 'weeks' && <Weeks summary={summary} />}
-                {tab === 'plans' && <Plans summary={summary} />}
+                {tab === 'overview' && <Overview summary={shown} />}
+                {tab === 'usage' && <Usage summary={shown} />}
+                {tab === 'breakdown' && <Breakdown summary={shown} />}
+                {tab === 'sessions' && <Sessions summary={shown} />}
+                {tab === 'weeks' && <Weeks summary={shown} />}
+                {tab === 'plans' && <Plans summary={shown} />}
                 {tab === 'calibration' && (
                   <Calibration
                     busy={busy}
                     onAddReading={reading => run(() => addReading(reading))}
                     onDeleteReading={ts => run(() => deleteReading(ts))}
                     onSaveSettings={settings => run(() => saveSettings(settings))}
-                    summary={summary}
+                    summary={shown}
                   />
                 )}
               </>

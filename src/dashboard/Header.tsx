@@ -1,4 +1,4 @@
-import { Moon, Sun } from 'lucide-react';
+import { Eye, EyeOff, Moon, Sun } from 'lucide-react';
 
 import type { Summary } from '@/dashboard/api';
 import type { TabId } from '@/dashboard/tabs';
@@ -11,18 +11,21 @@ import { useNow } from '@/dashboard/useNow';
 import { useTip } from '@/dashboard/useTip';
 
 interface Props {
+  anonymous: boolean;
   busy: boolean;
   summary?: Summary;
   tab: TabId;
   theme: Theme;
   onRefresh: () => void;
+  onToggleAnonymous: () => void;
   onToggleTheme: () => void;
 }
 
-export function Header({ busy, onRefresh, onToggleTheme, summary, tab, theme }: Props) {
+export function Header({ anonymous, busy, onRefresh, onToggleAnonymous, onToggleTheme, summary, tab, theme }: Props) {
   const now = useNow();
   const tip = useTip();
   const readAt = summary?.current?.readAt;
+  const anonymousLabel = anonymous ? 'Show project names and titles' : 'Hide project names and titles';
   const themeLabel = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
   return (
     <header className="app-header">
@@ -48,6 +51,9 @@ export function Header({ busy, onRefresh, onToggleTheme, summary, tab, theme }: 
             type="button"
           >
             Refresh
+          </button>
+          <button aria-label={anonymousLabel} aria-pressed={anonymous} className="icon-button" onClick={onToggleAnonymous} type="button" {...tip(anonymousLabel)}>
+            {anonymous ? <EyeOff aria-hidden="true" size={18} /> : <Eye aria-hidden="true" size={18} />}
           </button>
           <button aria-label={themeLabel} className="icon-button" onClick={onToggleTheme} type="button" {...tip(themeLabel)}>
             {theme === 'dark' ? <Sun aria-hidden="true" size={18} /> : <Moon aria-hidden="true" size={18} />}

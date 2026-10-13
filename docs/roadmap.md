@@ -6,9 +6,7 @@ Order of the milestones. A milestone that needs design gets its own plan in
 
 ## Next
 
-Independent of each other; ordered by value for effort.
-
-1. **Anonymize toggle**: last, so it also masks the views above.
+Nothing scheduled.
 
 ## Waiting for data
 

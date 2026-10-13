@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Summary } from '@/dashboard/api';
@@ -14,7 +14,7 @@ function summary(): Summary {
 }
 
 function renderHeader(props: Partial<Parameters<typeof Header>[0]> = {}) {
-  render(<Header busy={false} onRefresh={vi.fn()} onToggleTheme={vi.fn()} summary={summary()} tab="usage" theme="light" {...props} />);
+  render(<Header anonymous={false} busy={false} onRefresh={vi.fn()} onToggleAnonymous={vi.fn()} onToggleTheme={vi.fn()} summary={summary()} tab="usage" theme="light" {...props} />);
 }
 
 describe('header', () => {
@@ -41,5 +41,14 @@ describe('header', () => {
   it('offers the light theme while dark', () => {
     renderHeader({ theme: 'dark' });
     expect(screen.getByRole('button', { name: 'Switch to light theme' })).toBeTruthy();
+  });
+
+  it('shows the anonymize state as pressed and calls the toggle', () => {
+    const onToggleAnonymous = vi.fn();
+    renderHeader({ anonymous: true, onToggleAnonymous });
+    const button = screen.getByRole('button', { name: 'Show project names and titles' });
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(button);
+    expect(onToggleAnonymous).toHaveBeenCalledOnce();
   });
 });
