@@ -130,6 +130,19 @@ describe('collect', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
+  it('does not spend the throttle on an expired token, so the refreshed one is used at once', async () => {
+    const credentialsPath = join(claudeDir, '.credentials.json');
+    await writeFile(credentialsPath, JSON.stringify({ claudeAiOauth: { accessToken: 'old', expiresAt: NOW - 1000 } }));
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect((await new Store(dataDir).loadStatus()).endpointResult).toBe('expired');
+
+    await writeFile(credentialsPath, JSON.stringify({ claudeAiOauth: { accessToken: 'new', expiresAt: NOW + 3_600_000 } }));
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW + 60_000 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect((await new Store(dataDir).loadStatus()).endpointResult).toBe('ok');
+  });
+
   it('records endpoint failures without failing the run', async () => {
     const failing = vi.fn(async () => new Response('', { status: 429 }));
     const result = await collect({ claudeDir, dataDir, fetchImpl: failing, now: NOW });

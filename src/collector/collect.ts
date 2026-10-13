@@ -78,8 +78,11 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
     const lastAttempt = status.lastEndpointAttemptAt ? Date.parse(status.lastEndpointAttemptAt) : 0;
     const due = options.force || now - lastAttempt >= settings.throttleMinutes * 60_000;
     if (settings.endpointEnabled && due) {
-      status.lastEndpointAttemptAt = status.lastRunAt;
       const credentials = await readCredentials(options.claudeDir, now);
+      // Only a real request spends the throttle: unusable credentials cost a file read,
+      // and the refreshed token must be tried at the next poll, not 15 minutes later.
+      if (typeof credentials !== 'string')
+        status.lastEndpointAttemptAt = status.lastRunAt;
       const snapshot = typeof credentials === 'string'
         ? credentials
         : await fetchUsage(credentials, status.claudeCodeVersion ?? FALLBACK_CLAUDE_CODE_VERSION, now, options.fetchImpl);
