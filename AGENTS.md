@@ -78,6 +78,9 @@ Run lint, test and build before considering work done.
   the full text of shortened names. Explain a metric only when its meaning
   isn't obvious, through visible helper text or an `InfoTip` icon; plain
   labels, headers and subtitles get no tooltip.
+- Claude Design: one canvas for the project, "Claude Code Analytics redesign"
+  (<https://claude.ai/artifact/Fw9e29WbgMikfa9CK5WyfV>). A new design is a page in
+  it (board files named by feature), never a new artifact.
 
 ## Invariants
 
