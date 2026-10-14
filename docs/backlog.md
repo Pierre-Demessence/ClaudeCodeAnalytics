@@ -43,7 +43,9 @@ Improvements to something that exists.
 
 - Convert between plans with the measured multipliers (Plans tab, "How far to trust the conversions") when both plans have enough weeks, instead of the advertised ones.
 - The what-if only moves Opus work to Sonnet; other shifts (Sonnet to Haiku, a lower effort) would reuse the same linear `shift` per week and session.
-- An upper bound for capped weeks: fill the hidden time at the week's own pace before the cutoff, next to the typical-pace estimate (`docs/plans/uncapped-demand.md`).
+- An upper bound for capped weeks: fill the hidden time at the week's own pace before the cutoff, next to the typical-pace estimate (`src/core/planFit.ts`).
+- The current week's pace without the limit on the Overview, next to the forecast (which predicts the real, capped % at reset). Deferred from `docs/plans/uncapped-weeks.md`.
+- Capped 5-hour sessions' estimate without the limit on the Sessions tab, as the Weeks tab does for weeks. `FitSession` (`src/core/planFit.ts`) needs a `start` to join on.
 
 ### Taskbar widget
 
