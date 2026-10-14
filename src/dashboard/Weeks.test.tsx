@@ -47,6 +47,13 @@ const snapshots = [
 const renderTab = (data: Summary) => render(<TipProvider><Weeks summary={data} /></TipProvider>);
 const card = (name: string) => screen.getByRole('heading', { name }).closest('section')!;
 
+/** The week ended by the 100% reading, with an estimate of 212% without the limit; the week before has no percent. */
+function withUncapped(data: Summary): Summary {
+  const finished = data.weekHistory.weeks.find(w => w.percent === 100)!;
+  const fit = { cost: 40, demand: 212, estimated: true, floor: 100, hiddenHours: 86.4, shift: 0, start: finished.start };
+  return { ...data, planFit: { ...data.planFit, weeks: [fit] } };
+}
+
 describe('weeks tab', () => {
   afterEach(cleanup);
 
@@ -131,6 +138,37 @@ describe('weeks tab', () => {
     renderTab(summary(records, snapshots));
     expect(tipOf(screen.getByRole('button', { name: 'About the weekly timeline' }))).toContain('Thu 07:00');
     expect(tipOf(screen.getByRole('button', { name: 'About sessions' }))).toContain('5-hour windows started in the week');
+  });
+
+  describe('estimate without the limit', () => {
+    it('shows no second figure when the estimate equals the readings', () => {
+      const data = summary(records, snapshots);
+      renderTab({ ...data, planFit: { ...data.planFit, weeks: data.planFit.weeks.map(w => ({ ...w, demand: w.floor })) } });
+      expect(document.querySelector('.wk-uncapped')).toBeNull();
+      const cells = within(card('Week list')).getAllByRole('row').slice(1).map(row => row.querySelectorAll('td')[5]!.textContent);
+      expect(cells).toEqual(['', '', '']);
+    });
+
+    it('writes the estimate under the peak, in the list and under the median peak', () => {
+      renderTab(withUncapped(summary(records, snapshots)));
+      const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
+      expect(lines[1]!.querySelector('.wk-uncapped')!.textContent).toBe('≈ 212%');
+      expect(lines[0]!.querySelector('.wk-uncapped')).toBeNull();
+      const rows = within(card('Week list')).getAllByRole('row').slice(1);
+      expect(rows[1]!.querySelectorAll('td')[5]!.textContent).toBe('≈ 212%');
+      expect(rows[0]!.querySelectorAll('td')[5]!.textContent).toBe('');
+      const stats = screen.getByRole('region', { name: 'Weeks summary' });
+      expect(within(stats).getByText('median peak').closest('.card')!.textContent).toContain('≈ 212% without the limit');
+    });
+
+    it('keeps the reading as the bar and the hit icon, and explains the estimate in a tooltip', () => {
+      renderTab(withUncapped(summary(records, snapshots)));
+      const line = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)')[1]!;
+      expect(line.querySelector<HTMLElement>('.week-bar.hit')!.style.width).toBe('100%');
+      expect(line.querySelector('.wk-percent svg')).toBeTruthy();
+      expect(line.querySelector('.wk-percent strong')!.textContent).toBe('100%');
+      expect(tipOf(line.querySelector('.wk-uncapped')!)).toContain('At least 100%: 3.6 days were hidden');
+    });
   });
 
   describe('rate-limit hits seen in the transcripts', () => {

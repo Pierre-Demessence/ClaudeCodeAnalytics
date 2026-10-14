@@ -32,7 +32,7 @@ export function FitChart({ input, onPlanChange, plan, share, timeZone }: Props) 
         <span className="card-head-spacer" />
         <span className="card-subtitle">Week starting date; % of the weekly limit</span>
         <InfoTip label="About the estimates">
-          A week that reached the limit, or began before you subscribed, shows only part of what you would have used. The hidden days are filled at your typical pace, the average of your weeks before the limit slowed you down. The solid part is the minimum your readings show; the hatched part is the estimate.
+          A week that reached the limit, or began before you subscribed, shows only part of what you would have used. The hidden days are filled at your typical pace, the average of your weeks before the limit slowed you down. The solid part is the minimum your readings show; the hatched part is the estimate without the limit. The Weeks tab shows the same estimate next to each week's reading.
         </InfoTip>
       </div>
       <div className="fit-chart-scroll">

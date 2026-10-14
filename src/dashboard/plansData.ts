@@ -25,7 +25,7 @@ export const shareText = (share: number) => (share === 1 ? 'All Opus work on Son
 const floored = (percent: number) => formatPercent(Math.floor(percent));
 
 /** A percent whose estimate and minimum differ at the displayed precision. */
-const differs = (percent: number, floor: number) => formatPercent(percent) !== formatPercent(floor);
+export const differs = (percent: number, floor: number) => formatPercent(percent) !== formatPercent(floor);
 
 export interface EstimateText {
   /** "≈ 190%" when the estimate is above the minimum, else the plain %. */
@@ -117,7 +117,7 @@ export interface ChartBar {
 }
 
 /** "3.6 days", "1 day". */
-function daysText(hours: number): string {
+export function daysText(hours: number): string {
   const days = Math.round(hours / 24 * 10) / 10;
   return `${days} ${days === 1 ? 'day' : 'days'}`;
 }

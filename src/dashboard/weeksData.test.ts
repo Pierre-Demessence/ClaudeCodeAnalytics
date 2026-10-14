@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import type { FitWeek, PlanFitInput } from '@/core/planFit';
 import type { WeekRow } from '@/core/weekHistory';
 
-import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText } from '@/dashboard/weeksData';
+import { chartBars } from '@/dashboard/plansData';
+import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 function week(extra: Partial<WeekRow> = {}): WeekRow {
   return { blockedSessions: 0, cappedSessions: 0, cost: 0, days: [], end: '2026-10-08T05:00:00.000Z', messages: 0, projectCount: 0, projects: [], sessions: 0, source: 'reading', start: '2026-10-01T05:00:00.000Z', ...extra };
@@ -54,5 +56,51 @@ describe('labels', () => {
     expect(projectsText(week())).toBe('–');
     expect(projectsText(week({ projectCount: 2, projects: [p('a'), p('b')] }))).toBe('a, b');
     expect(projectsText(week({ projectCount: 7, projects: [p('a'), p('b'), p('c'), p('d'), p('e')] }))).toBe('a, b +5');
+  });
+});
+
+describe('estimate without the limit', () => {
+  const fitWeek = (extra: Partial<FitWeek> = {}): FitWeek => ({ cost: 0, demand: 212, estimated: true, floor: 99, hiddenHours: 86.4, shift: 0, start: '2026-10-01T05:00:00.000Z', ...extra });
+  const input = (weeks: FitWeek[]): PlanFitInput => ({ plan: 'pro', sessions: [], weeks });
+
+  it('joins the estimate of a finished week above its reading', () => {
+    expect(uncappedOf(input([fitWeek()]), week({ percent: 99 }))?.demand).toBe(212);
+    expect(uncappedText(212.4)).toBe('≈ 212%');
+  });
+
+  it('has none when the estimate equals the reading, or the week is in progress or has no percent', () => {
+    expect(uncappedOf(input([fitWeek({ demand: 99.2 })]), week({ percent: 99 }))).toBeUndefined();
+    expect(uncappedOf(input([fitWeek()]), week({ inProgress: true, percent: 99 }))).toBeUndefined();
+    expect(uncappedOf(input([fitWeek()]), week())).toBeUndefined();
+    expect(uncappedOf(input([]), week({ percent: 99 }))).toBeUndefined();
+  });
+
+  it('gives the median of the estimates only when it exceeds the median peak', () => {
+    const weeks = [fitWeek({ demand: 190, floor: 90, start: 'a' }), fitWeek({ demand: 196, floor: 99, start: 'b' }), fitWeek({ demand: 40, floor: 40, start: 'c' })];
+    expect(uncappedMedian(input(weeks), 90)).toBe(190);
+    expect(uncappedMedian(input(weeks), 190)).toBeUndefined();
+    expect(uncappedMedian(input(weeks), undefined)).toBeUndefined();
+  });
+
+  it('says how many days were hidden and why', () => {
+    const limited = week({ blockedSessions: 2, percent: 99, pressureAt: '2026-10-03T10:00:00.000Z' });
+    expect(uncappedTip(limited, fitWeek(), 'UTC')).toBe('At least 99%: 3.6 days were hidden (the limit was close by Sat 3 Oct 10:00, 2 sessions blocked by a 5-hour limit) and filled at your typical pace.');
+    expect(uncappedTip(week({ percent: 99 }), fitWeek(), 'UTC')).toContain('(before you subscribed)');
+    expect(uncappedTip(week({ limitHits: ['2026-10-04T08:00:00.000Z'], percent: 99 }), fitWeek(), 'UTC')).toContain('the weekly limit was hit on Sun 4 Oct 08:00');
+  });
+
+  it('equals the Plans chart bar of the same week and the Typical week of the current plan', () => {
+    const weeks = [fitWeek({ start: '2026-09-17T05:00:00.000Z' }), fitWeek({ demand: 60, floor: 60, start: '2026-09-24T05:00:00.000Z' }), fitWeek({ demand: 150, floor: 100, start: '2026-10-01T05:00:00.000Z' })];
+    const planFit = input(weeks);
+    const bars = chartBars(planFit, 'pro', 0, 'UTC');
+    weeks.forEach((fit, i) => {
+      const row = week({ percent: fit.floor, start: fit.start });
+      const uncapped = uncappedOf(planFit, row);
+      if (uncapped)
+        expect(uncappedText(uncapped.demand).replace(' ', '')).toBe(bars[i]!.label);
+      else
+        expect(bars[i]!.label).toBe(`${Math.round(fit.demand)}%`);
+    });
+    expect(uncappedMedian(planFit, 60)).toBe(150);
   });
 });

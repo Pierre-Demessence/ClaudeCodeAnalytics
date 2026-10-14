@@ -1,8 +1,11 @@
+import type { FitWeek, PlanFitInput } from '@/core/planFit';
 import type { WeekRow } from '@/core/weekHistory';
 
 import { dayKey } from '@/core/aggregate';
 import { DAY_MS } from '@/core/calibration';
+import { evaluatePlans } from '@/core/planFit';
 import { formatDollars, formatPercent } from '@/dashboard/format';
+import { daysText, differs } from '@/dashboard/plansData';
 import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
 
 /** Upper bounds of heat levels 1 to 4: the costliest day split in five equal steps. Empty before any cost. */
@@ -61,6 +64,37 @@ export function percentText(week: WeekRow): string {
   if (week.percent === undefined)
     return '–';
   return `${week.percentEstimated ? '~' : ''}${formatPercent(week.percent)}`;
+}
+
+/** The Plans tab's estimate for a finished week, when it exceeds the reading at the displayed precision; the same numbers as the Plans chart on the current plan. */
+export function uncappedOf(planFit: PlanFitInput, week: WeekRow): FitWeek | undefined {
+  if (week.inProgress || week.percent === undefined)
+    return undefined;
+  const fit = planFit.weeks.find(w => w.start === week.start);
+  return fit && differs(fit.demand, week.percent) ? fit : undefined;
+}
+
+/** "≈ 212%". */
+export const uncappedText = (percent: number) => `≈ ${formatPercent(percent)}`;
+
+/** The median of the finished weeks' estimates on the current plan, when it exceeds `medianPercent`; the Plans tab's "Typical week". */
+export function uncappedMedian(planFit: PlanFitInput, medianPercent: number | undefined): number | undefined {
+  if (medianPercent === undefined)
+    return undefined;
+  const typical = evaluatePlans(planFit).find(fit => fit.plan === planFit.plan)?.typical;
+  return typical !== undefined && differs(typical, medianPercent) ? typical : undefined;
+}
+
+/** Why a week's estimate is above its reading: how long was hidden, and by what. */
+export function uncappedTip(week: WeekRow, fit: FitWeek, timeZone: string): string {
+  const when = (iso: string) => `${formatSessionDay(dayKey(Date.parse(iso), timeZone))} ${formatTime(iso, timeZone)}`;
+  const firstHit = week.limitHits?.[0];
+  const reasons = [
+    week.pressureAt ? `the limit was close by ${when(week.pressureAt)}` : firstHit && `the weekly limit was hit on ${when(firstHit)}`,
+    week.blockedSessions > 0 && `${week.blockedSessions} ${week.blockedSessions === 1 ? 'session' : 'sessions'} blocked by a 5-hour limit`,
+  ].filter(Boolean);
+  const why = reasons.length > 0 ? reasons.join(', ') : 'before you subscribed';
+  return `At least ${formatPercent(fit.floor)}: ${daysText(fit.hiddenHours)} were hidden (${why}) and filled at your typical pace.`;
 }
 
 /** Up to two project names, then "+n". */

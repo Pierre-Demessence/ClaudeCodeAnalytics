@@ -2265,7 +2265,7 @@ button.info-tip:hover {
 
 .wk-row {
   display: grid;
-  grid-template-columns: 8.5em minmax(0, 1fr) 17.5em;
+  grid-template-columns: 8.5rem minmax(0, 1fr) 19rem;
   align-items: center;
   gap: 16px;
 }
@@ -2356,25 +2356,49 @@ button.info-tip:hover {
 
 .wk-percent {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 8em;
+  grid-template-columns: 4.5rem 3.5rem 3.3rem 5rem;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wk-percent .week-track {
-  height: 14px;
+  height: 10px;
 }
 
-.wk-percent .week-value {
+.wk-percent-head {
+  white-space: nowrap;
+}
+
+.wk-percent-head span:first-child {
+  grid-column: 1 / 4;
+  text-align: center;
+}
+
+.wk-flags {
   display: flex;
   align-items: center;
-  text-align: left;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.wk-flags .icon-inline {
+  margin: 0;
+}
+
+.wk-peak {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wk-uncapped {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .wk-blocked-mark {
   display: inline-flex;
   align-items: center;
-  margin-left: 4px;
   font-weight: 600;
 }
 
@@ -2446,6 +2470,7 @@ button.info-tip:hover {
   }
 
   .wk-percent {
+    grid-template-columns: minmax(0, 1fr) 3.5rem 3.3rem 5rem;
     grid-column: 1 / -1;
     grid-row: 3;
   }

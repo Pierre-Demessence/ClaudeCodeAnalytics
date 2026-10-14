@@ -9,7 +9,7 @@ import { formatDollars, formatInteger, formatPercent, formatUsd } from '@/dashbo
 import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
 import { InfoTip } from '@/dashboard/Tip';
 import { useTip } from '@/dashboard/useTip';
-import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText } from '@/dashboard/weeksData';
+import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 const HitIcon = ({ size = 14 }: { size?: number }) => <TriangleAlert aria-hidden="true" className="icon-inline icon-critical" size={size} />;
 
@@ -29,7 +29,8 @@ function weekTip(week: WeekRow, timeZone: string): string {
 }
 
 function Stats({ summary }: { summary: Summary }) {
-  const { weekHistory: { stats, weeks }, weekLimitThreshold } = summary;
+  const { planFit, weekHistory: { stats, weeks }, weekLimitThreshold } = summary;
+  const uncapped = uncappedMedian(planFit, stats.medianPercent);
   return (
     <section aria-label="Weeks summary" className="session-stats">
       <div className="card">
@@ -64,6 +65,7 @@ function Stats({ summary }: { summary: Summary }) {
               : 'Median of the finished weeks\' peak weekly %, estimates included, on your current plan. The tick on every bar marks it.'}
           </InfoTip>
         </span>
+        {uncapped !== undefined && <span className="wk-uncapped">{`${uncappedText(uncapped)} without the limit`}</span>}
       </div>
       <div className="card">
         <strong>{stats.medianCost === undefined ? '–' : formatDollars(stats.medianCost)}</strong>
@@ -77,7 +79,7 @@ function Stats({ summary }: { summary: Summary }) {
 }
 
 function Timeline({ summary }: { summary: Summary }) {
-  const { timeZone, weekHistory: { stats, weeks }, weekLimitThreshold } = summary;
+  const { planFit, timeZone, weekHistory: { stats, weeks }, weekLimitThreshold } = summary;
   const tip = useTip();
   const bounds = heatBounds(weeks);
   const maxDay = Math.max(0, ...weeks.flatMap(w => w.days.map(cost => cost ?? 0)));
@@ -103,47 +105,54 @@ function Timeline({ summary }: { summary: Summary }) {
                   <div aria-hidden="true" className="wk-days">
                     {headers.map(day => <span key={day}>{day}</span>)}
                   </div>
-                  <span className="wk-percent-head">Peak weekly %</span>
-                </div>
-                {weeks.map(week => (
-                  <div className="wk-row" key={week.start}>
-                    <span className="wk-label" {...tip(weekTip(week, timeZone))}>
-                      {formatSessionDay(dayKey(Date.parse(week.start), timeZone))}
-                      {week.inProgress && <span className="wk-now">now</span>}
-                    </span>
-                    <div className="wk-cells">
-                      {week.days.map((cost, i) => (
-                        <div className={cost === null ? 'wk-cell later' : `wk-cell heat-${heatLevel(cost, bounds)}`} key={headers[i]}>
-                          {cost !== null && cost > 0 && <span className="wk-fill" style={{ height: `${cost / maxDay * 100}%` }} />}
-                          <span className="wk-cell-text">{cost === null ? '' : formatDollars(cost)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="wk-meta">
-                      {`${formatUsd(week.cost)} · ${week.sessions} sessions · ${formatInteger(week.messages)} messages · ${projectsText(week)}`}
-                    </p>
-                    <div className="wk-percent">
-                      <span className="week-track">
-                        {week.percent !== undefined && (
-                          <span className={week.hit ? 'week-bar hit' : week.percentEstimated ? 'week-bar estimated' : 'week-bar'} style={{ width: `${Math.min(week.percent, 100)}%` }} />
-                        )}
-                        {stats.medianPercent !== undefined && (
-                          <span className="week-typical" style={{ left: `${Math.min(stats.medianPercent, 100)}%` }} {...tip(`Typical week: ${formatPercent(stats.medianPercent)}`, { focusable: false })} />
-                        )}
-                      </span>
-                      <span className="week-value">
-                        <strong>{percentText(week)}</strong>
-                        {week.hit && <HitIcon />}
-                        {(week.blockedSessions > 0 || week.limitHits) && (
-                          <span className="wk-blocked-mark" {...tip(blockedTip(week, timeZone))}>
-                            <BlockedIcon />
-                            {week.blockedSessions + (week.limitHits?.length ?? 0)}
-                          </span>
-                        )}
-                      </span>
-                    </div>
+                  <div className="wk-percent wk-percent-head">
+                    <span>Peak weekly %</span>
+                    <span>Without limit</span>
                   </div>
-                ))}
+                </div>
+                {weeks.map((week) => {
+                  const uncapped = uncappedOf(planFit, week);
+                  return (
+                    <div className="wk-row" key={week.start}>
+                      <span className="wk-label" {...tip(weekTip(week, timeZone))}>
+                        {formatSessionDay(dayKey(Date.parse(week.start), timeZone))}
+                        {week.inProgress && <span className="wk-now">now</span>}
+                      </span>
+                      <div className="wk-cells">
+                        {week.days.map((cost, i) => (
+                          <div className={cost === null ? 'wk-cell later' : `wk-cell heat-${heatLevel(cost, bounds)}`} key={headers[i]}>
+                            {cost !== null && cost > 0 && <span className="wk-fill" style={{ height: `${cost / maxDay * 100}%` }} />}
+                            <span className="wk-cell-text">{cost === null ? '' : formatDollars(cost)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="wk-meta">
+                        {`${formatUsd(week.cost)} · ${week.sessions} sessions · ${formatInteger(week.messages)} messages · ${projectsText(week)}`}
+                      </p>
+                      <div className="wk-percent">
+                        <span className="week-track">
+                          {week.percent !== undefined && (
+                            <span className={week.hit ? 'week-bar hit' : week.percentEstimated ? 'week-bar estimated' : 'week-bar'} style={{ width: `${Math.min(week.percent, 100)}%` }} />
+                          )}
+                          {stats.medianPercent !== undefined && (
+                            <span className="week-typical" style={{ left: `${Math.min(stats.medianPercent, 100)}%` }} {...tip(`Typical week: ${formatPercent(stats.medianPercent)}`, { focusable: false })} />
+                          )}
+                        </span>
+                        <span className="wk-flags">
+                          {week.hit && <HitIcon />}
+                          {(week.blockedSessions > 0 || week.limitHits) && (
+                            <span className="wk-blocked-mark" {...tip(blockedTip(week, timeZone))}>
+                              <BlockedIcon />
+                              {week.blockedSessions + (week.limitHits?.length ?? 0)}
+                            </span>
+                          )}
+                        </span>
+                        <strong className="wk-peak">{percentText(week)}</strong>
+                        {uncapped && <span className="wk-uncapped" {...tip(uncappedTip(week, uncapped, timeZone))}>{uncappedText(uncapped.demand)}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <ul className="legend session-legend">
                 {legend.map((text, i) => (
@@ -179,7 +188,7 @@ function Timeline({ summary }: { summary: Summary }) {
 }
 
 function List({ summary }: { summary: Summary }) {
-  const { limitThreshold, timeZone, weekHistory: { weeks } } = summary;
+  const { limitThreshold, planFit, timeZone, weekHistory: { weeks } } = summary;
   const tip = useTip();
   return (
     <section className="card">
@@ -210,40 +219,48 @@ function List({ summary }: { summary: Summary }) {
                     </th>
                     <th scope="col">Peak %</th>
                     <th scope="col">
+                      Without the limit
+                      <InfoTip label="About without the limit">The peak % plus the days a limit or a missing subscription hid, filled at your typical pace. The same estimate as the Plans tab, on your current plan.</InfoTip>
+                    </th>
+                    <th scope="col">
                       Source
                       <InfoTip label="About source">{'Reading: the peak % comes from a reading of the week.\nEstimated: no reading, so it comes from the transcripts and the calibration.'}</InfoTip>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {weeks.map(week => (
-                    <tr key={week.start}>
-                      <th scope="row">
-                        {formatWeekRange(week, timeZone)}
-                        {week.inProgress && <span className="session-now">in progress</span>}
-                      </th>
-                      <td {...(week.projects.length > 0 ? tip(week.projects.map(p => p.path).join('\n')) : {})}>{projectsText(week)}</td>
-                      <td className="wk-sessions-cell">
-                        {week.sessions}
-                        {week.cappedSessions > 0 && (
-                          <span className="wk-capped">
-                            <HitIcon size={13} />
-                            {week.cappedSessions}
-                          </span>
-                        )}
-                        {week.blockedSessions > 0 && (
-                          <span className="wk-blocked-sessions">
-                            <BlockedIcon size={13} />
-                            {week.blockedSessions}
-                          </span>
-                        )}
-                      </td>
-                      <td>{formatInteger(week.messages)}</td>
-                      <td><strong>{formatUsd(week.cost)}</strong></td>
-                      <td><strong>{percentText(week)}</strong></td>
-                      <td className="secondary">{week.source}</td>
-                    </tr>
-                  ))}
+                  {weeks.map((week) => {
+                    const uncapped = uncappedOf(planFit, week);
+                    return (
+                      <tr key={week.start}>
+                        <th scope="row">
+                          {formatWeekRange(week, timeZone)}
+                          {week.inProgress && <span className="session-now">in progress</span>}
+                        </th>
+                        <td {...(week.projects.length > 0 ? tip(week.projects.map(p => p.path).join('\n')) : {})}>{projectsText(week)}</td>
+                        <td className="wk-sessions-cell">
+                          {week.sessions}
+                          {week.cappedSessions > 0 && (
+                            <span className="wk-capped">
+                              <HitIcon size={13} />
+                              {week.cappedSessions}
+                            </span>
+                          )}
+                          {week.blockedSessions > 0 && (
+                            <span className="wk-blocked-sessions">
+                              <BlockedIcon size={13} />
+                              {week.blockedSessions}
+                            </span>
+                          )}
+                        </td>
+                        <td>{formatInteger(week.messages)}</td>
+                        <td><strong>{formatUsd(week.cost)}</strong></td>
+                        <td><strong>{percentText(week)}</strong></td>
+                        <td {...(uncapped ? tip(uncappedTip(week, uncapped, timeZone)) : {})}>{uncapped ? uncappedText(uncapped.demand) : ''}</td>
+                        <td className="secondary">{week.source}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
