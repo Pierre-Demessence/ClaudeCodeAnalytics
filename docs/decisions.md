@@ -246,10 +246,9 @@ stops almost at once, so the window is as good as spent. Estimates never count.
 
 A week has its own threshold (setting, 98% by default, 50–100): 5% of a week is
 hours of budget, so a run is not stopped at once at 95%, but a week read at 98%
-is as good as spent. Only the Weeks tab's "hit" and the Plans tab's demand
-estimate use it (`weekHistory.ts`, `planFit.ts`). The forecast, the "Limit
-reached" verdict and a plan's "weeks over" stay at 100%: they predict or compare
-against the real wall, not the user's behaviour near it.
+is as good as spent. Only the Weeks tab's "hit" uses it (`weekHistory.ts`). The
+forecast, the "Limit reached" verdict and a plan's "weeks over" stay at 100%:
+they predict or compare against the real wall, not the user's behaviour near it.
 
 ## Calibration tab: drift against the median, not the fit
 
@@ -299,11 +298,20 @@ if all Opus ran on Sonnet, so any share between 0 and 1 is linear and the
 browser recomputes it without a server round trip. It assumes limits scale with
 API price across models, the least certain for Opus versus Sonnet.
 
-A week that reached 100% on the current plan, or a session whose reading hit the
-limit threshold, only shows 100: its demand is `max(100, k × cost)` when
-calibrated, otherwise the capped 100 as a lower bound. A week that was capped on
-a previous plan and a session estimated from transcripts (already capped at 100)
-are not lifted.
+A week or session that hit its limit only shows what fit under it, so a plan's
+demand is `max(reading, % at the cutoff + hidden hours × typical pace)`. The
+hidden time is what the limit, or a missing subscription, kept out of the
+readings: a week's tail after its pressure point (the first reading at 90%, or a
+weekly hit) and the rest of each capped 5-hour session inside its observed
+time; a week's time before the subscription; a session's tail after its cap.
+The pace is pooled, Σ % at the cutoff over Σ observed hours across the
+comparison, so idle days count and one week cannot set it; under 72 h (weeks) or
+10 h (sessions) observed it is not used and the reading stands. The usage after
+the pressure point is left out of the pace: it is the slowed tail the estimate
+replaces. Rejected: raising a capped week with `k × cost` (that cost stopped at
+the same limit and only repeats the reading, without the claude.ai use); the week's
+own pre-cap pace (assumes full speed through holidays: an upper bound, in the
+backlog); a setting for the 90% (no data to tune it with).
 
 ## Accepted risks: append-only transcripts, non-atomic lock on Docker
 

@@ -47,7 +47,7 @@ Everything stays on your machine. Data comes from two places:
 - Plan setting with history; the plan is also detected from Claude Code's login.
 - Tabs: Overview (limits and pacing), Usage (subscription vs API prices, charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents), Sessions (past 5-hour windows),
-  Weeks (past weekly windows), Plans (which plan would have fit the last 12 weeks, an Opus-to-Sonnet what-if, and how far the advertised plan multipliers match your own weeks) and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
+  Weeks (past weekly windows), Plans (which plan would have fit the last 12 weeks, with the demand a limit hid estimated at your typical pace, an Opus-to-Sonnet what-if, and how far the advertised plan multipliers match your own weeks) and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
 - Light and dark themes: follows the OS until you pick one in the header.
 - Colorblind-friendly: every series has a texture and a label, not just a color.
 

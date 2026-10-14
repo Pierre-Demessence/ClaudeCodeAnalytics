@@ -132,6 +132,40 @@ describe('final percent', () => {
   });
 });
 
+describe('pressure point', () => {
+  const share = (percent: number, plan: 'max5' | 'pro' = 'max5') => ({ estimated: false, percent, plan, resetsAt: iso(weekStart(1) + WEEK_MS) });
+  const reading = (weekly: number, day: number) => ({ ...snap(1, weekly), ts: iso(weekStart(1) + day * DAY_MS) });
+
+  it('is the first reading of the window at 90%, whatever the later ones say', () => {
+    const snapshots = [reading(95, 4), reading(70, 1), reading(91, 3), reading(100, 5)];
+    expect(weeks({ shares: [share(100)], snapshots }).weeks[0]).toMatchObject({ pressureAt: iso(weekStart(1) + 3 * DAY_MS), pressurePercent: 91 });
+  });
+
+  it('converts the reading from the plan of the window to the current plan', () => {
+    // The window was read on Pro, where 92% crossed the point; it is 18.4% of Max 5×.
+    const snapshots = [reading(92, 3)];
+    expect(weeks({ plan: 'max5', shares: [share(92, 'pro')], snapshots }).weeks[0]).toMatchObject({ pressurePercent: 92 / 5 });
+  });
+
+  it('is absent for a window that never reached it', () => {
+    const row = weeks({ shares: [share(89)], snapshots: [reading(89, 3)] }).weeks[0]!;
+    expect(row.pressureAt).toBeUndefined();
+    expect(row.pressurePercent).toBeUndefined();
+  });
+
+  it('is the message where k × cost so far reaches 90% for a week estimated from transcripts', () => {
+    // $20 per message at 2.4 %/$ is 48% each: the second one crosses.
+    const records = [rec(weekStart(1) + 3 * DAY_MS), rec(weekStart(1) + DAY_MS), rec(weekStart(1) + 5 * DAY_MS)];
+    const row = weeks({ calibrationK: 2.4, records }).weeks[0]!;
+    expect(row).toMatchObject({ pressureAt: iso(weekStart(1) + 3 * DAY_MS), source: 'estimated' });
+    expect(row.pressurePercent).toBeCloseTo(96);
+  });
+
+  it('is absent for an estimated week that stays under it', () => {
+    expect(weeks({ calibrationK: 2.4, records: [rec(weekStart(1) + DAY_MS)] }).weeks[0]!.pressureAt).toBeUndefined();
+  });
+});
+
 describe('hit', () => {
   const share = (percent: number) => ({ estimated: false, percent, plan: 'max5' as const, resetsAt: iso(weekStart(1) + WEEK_MS) });
 

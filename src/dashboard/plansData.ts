@@ -3,7 +3,7 @@ import type { Plan } from '@/core/types';
 import type { BoxKind } from '@/dashboard/VerdictBox';
 
 import { dayKey } from '@/core/aggregate';
-import { weekPercents } from '@/core/planFit';
+import { weekFloors, weekPercents } from '@/core/planFit';
 import { PLAN_LABELS } from '@/core/plans';
 import { formatDay, formatDollars, formatPercent } from '@/dashboard/format';
 
@@ -23,6 +23,26 @@ export const shareText = (share: number) => (share === 1 ? 'All Opus work on Son
 
 /** Rounded down, so a busiest week just under half the limit never reads "50%". */
 const floored = (percent: number) => formatPercent(Math.floor(percent));
+
+/** A percent whose estimate and minimum differ at the displayed precision. */
+const differs = (percent: number, floor: number) => formatPercent(percent) !== formatPercent(floor);
+
+export interface EstimateText {
+  /** "≈ 190%" when the estimate is above the minimum, else the plain %. */
+  main: string;
+  /** "at least 71%", only with an estimate. */
+  minimum?: string;
+}
+
+/** An estimated % with its minimum: "≈ 190%" over "at least 71%". */
+export function estimateText(percent: number, floor: number): EstimateText {
+  return differs(percent, floor)
+    ? { main: `≈ ${formatPercent(percent)}`, minimum: `at least ${formatPercent(floor)}` }
+    : { main: formatPercent(percent) };
+}
+
+/** "≈ 29%" when `percent` is an estimate above its minimum, else "29%"; rounded down like `floored`. */
+const flooredEstimate = (percent: number, floor: number) => `${differs(percent, floor) ? '≈ ' : ''}${floored(percent)}`;
 
 /** "≈ 13×", or a dash without a calibrated budget. */
 export const valueText = (ratio: number | undefined) => (ratio === undefined ? '–' : `≈ ${Math.round(ratio)}×`);
@@ -53,7 +73,7 @@ export function cardVerdict(fit: PlanFit, input: PlanFitInput, timeZone: string)
     case 'close':
       return { detail: overText(fit, input, timeZone, false), title: 'Close.' };
     case 'tooBig':
-      return { detail: `Your busiest week used only ${floored(fit.busiest)} of it; a typical week leaves ${unused}% unused.`, title: 'Too big.' };
+      return { detail: `Your busiest week used only ${flooredEstimate(fit.busiest, fit.busiestFloor)} of it; a typical week leaves ${unused}% unused.`, title: 'Too big.' };
     case 'tooSmall':
       return { detail: overText(fit, input, timeZone, false), title: 'Too small.' };
   }
@@ -63,11 +83,11 @@ export function cardVerdict(fit: PlanFit, input: PlanFitInput, timeZone: string)
 export function bestVerdict(fit: PlanFit, input: PlanFitInput, timeZone: string): VerdictText {
   switch (fit.verdict) {
     case 'fits':
-      return { detail: `A typical week uses ${formatPercent(fit.typical)} of it and your busiest week ${formatPercent(fit.busiest)}.`, title: 'Fits every week and session.' };
+      return { detail: `A typical week uses ${estimateText(fit.typical, fit.typicalFloor).main} of it and your busiest week ${estimateText(fit.busiest, fit.busiestFloor).main}.`, title: 'Fits every week and session.' };
     case 'close':
       return { detail: overText(fit, input, timeZone, true), title: 'Close.' };
     case 'tooBig':
-      return { detail: `Your busiest week used only ${floored(fit.busiest)} of it.`, title: 'More than you need.' };
+      return { detail: `Your busiest week used only ${flooredEstimate(fit.busiest, fit.busiestFloor)} of it.`, title: 'More than you need.' };
     case 'tooSmall':
       return { detail: overText(fit, input, timeZone, true), title: 'Too small, but the nearest match.' };
   }
@@ -86,6 +106,8 @@ export function switchText(best: PlanFit, current: PlanFit): { action?: string; 
 
 export interface ChartBar {
   estimated: boolean;
+  /** Height of the solid part, % of the chart: the minimum. Present when the estimate holds hidden time. */
+  floorHeight?: number;
   /** Bar height, % of the chart. */
   height: number;
   label: string;
@@ -94,21 +116,34 @@ export interface ChartBar {
   tip: string;
 }
 
+/** "3.6 days", "1 day". */
+function daysText(hours: number): string {
+  const days = Math.round(hours / 24 * 10) / 10;
+  return `${days} ${days === 1 ? 'day' : 'days'}`;
+}
+
 /** The weeks as bars on `plan`, with `share` of the Opus work moved to Sonnet. */
 export function chartBars(input: PlanFitInput, plan: Plan, share: number, timeZone: string): ChartBar[] {
   const percents = weekPercents(input, plan, share);
+  const floors = weekFloors(input, plan, share);
   return input.weeks.map((week, i) => {
     const percent = percents[i]!;
+    const floor = floors[i]!;
     const over = percent >= 100;
+    const hidden = differs(percent, floor);
     const day = formatDay(dayKey(Date.parse(week.start), timeZone));
-    const note = week.estimated ? ' Estimated: not a final reading, or the limit was reached and this is the transcript estimate.' : '';
+    const { main } = estimateText(percent, floor);
+    const note = hidden
+      ? ` At least ${formatPercent(floor)}: ${daysText(week.hiddenHours)} were hidden (by the limit or before you subscribed) and filled at your typical pace.`
+      : week.estimated ? ' Estimated: not a final reading.' : '';
     return {
       estimated: week.estimated && !over,
+      floorHeight: hidden ? Math.min(floor, CHART_CAP) / CHART_CAP * 100 : undefined,
       height: Math.min(percent, CHART_CAP) / CHART_CAP * 100,
-      label: formatPercent(percent),
+      label: hidden ? main.replace(' ', '') : main,
       over,
       start: week.start,
-      tip: `Week of ${day}: ${formatPercent(percent)} of the ${PLAN_LABELS[plan]} limit${over ? ', over it' : ''}.${note}`,
+      tip: `Week of ${day}: ${main} of the ${PLAN_LABELS[plan]} limit${over ? ', over it' : ''}.${note}`,
     };
   });
 }

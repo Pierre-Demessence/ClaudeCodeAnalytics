@@ -7,6 +7,7 @@ import { dayKey } from '@/core/aggregate';
 import { PLAN_LABELS, PLANS } from '@/core/plans';
 import { formatDay } from '@/dashboard/format';
 import { chartBars } from '@/dashboard/plansData';
+import { InfoTip } from '@/dashboard/Tip';
 import { Toggle } from '@/dashboard/Toggle';
 import { useTip } from '@/dashboard/useTip';
 
@@ -30,6 +31,9 @@ export function FitChart({ input, onPlanChange, plan, share, timeZone }: Props) 
         <Toggle label="Plan shown in the chart" onChange={onPlanChange} options={PLANS.map(p => [p, PLAN_LABELS[p]])} value={plan} />
         <span className="card-head-spacer" />
         <span className="card-subtitle">Week starting date; % of the weekly limit</span>
+        <InfoTip label="About the estimates">
+          A week that reached the limit, or began before you subscribed, shows only part of what you would have used. The hidden days are filled at your typical pace, the average of your weeks before the limit slowed you down. The solid part is the minimum your readings show; the hatched part is the estimate.
+        </InfoTip>
       </div>
       <div className="fit-chart-scroll">
         <ol className="fit-chart">
@@ -42,6 +46,7 @@ export function FitChart({ input, onPlanChange, plan, share, timeZone }: Props) 
               <span className="fit-plot">
                 <span className="fit-limit" />
                 <span className={bar.over ? 'fit-bar over' : bar.estimated ? 'fit-bar estimated' : 'fit-bar'} style={{ height: `${bar.height}%` }} />
+                {bar.floorHeight !== undefined && <span className={bar.over ? 'fit-bar fit-bar-floor over' : 'fit-bar fit-bar-floor'} style={{ height: `${bar.floorHeight}%` }} />}
               </span>
               <span className="fit-bar-date">{formatDay(dayKey(Date.parse(bar.start), timeZone))}</span>
             </li>
@@ -55,7 +60,7 @@ export function FitChart({ input, onPlanChange, plan, share, timeZone }: Props) 
         </li>
         <li>
           <span className="legend-swatch estimated" />
-          estimated: not a final reading, or the limit was reached and this is the transcript estimate
+          estimated: not a final reading, or time the limit hid filled at your typical pace (the solid part is the minimum)
         </li>
         <li>
           <span className="legend-swatch over" />

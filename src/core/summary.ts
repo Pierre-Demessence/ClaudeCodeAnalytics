@@ -377,7 +377,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     modelRatios: modelRatios(records, now - TYPICAL_DAYS * DAY_MS, now, timeZone),
     multipliers: buildMultipliers(limitsInput),
     plan,
-    planFit: buildPlanFitInput({ calibrationK: calibration?.k, fiveHourK: fiveHourCalibration?.k, plan, planHistory, sessionWindows, weekHistory, weekLimitThreshold }),
+    planFit: buildPlanFitInput({ calibrationK: calibration?.k, plan, planHistory, sessionWindows, subscriptionStart: input.subscriptionStart, weekHistory }),
     planHistory,
     planSource: (planHistory.findLast(period => Date.parse(period.from) <= now) ?? planHistory[0])?.source,
     sessions,

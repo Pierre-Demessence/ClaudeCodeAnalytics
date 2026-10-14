@@ -1,8 +1,8 @@
 import type { FiveHourWindow } from './sessions.ts';
 import type { Plan, PlanPeriod } from './types.ts';
-import type { WeekHistory } from './weekHistory.ts';
+import type { WeekHistory, WeekRow } from './weekHistory.ts';
 
-import { WEEK_MS } from './calibration.ts';
+import { HOUR_MS, WEEK_MS } from './calibration.ts';
 import { convertPercent, PLAN_PRICES, planAt, PLANS } from './plans.ts';
 import { median } from './stats.ts';
 
@@ -14,6 +14,10 @@ export const TOO_BIG_BELOW = 50;
 export const CLOSE_MAX_WEEKS = 2;
 /** Share of sessions over the limit up to which a plan is close rather than too small. */
 export const CLOSE_MAX_SESSION_SHARE = 0.1;
+/** Observed hours the comparison weeks need together before their pace fills the hidden time. */
+export const MIN_OBSERVED_WEEK_HOURS = 72;
+/** Observed hours the sessions need together before their pace fills the hidden time. */
+export const MIN_OBSERVED_SESSION_HOURS = 10;
 /** A week or session at this % of a limit has hit it. */
 const LIMIT = 100;
 const WEEKS_PER_MONTH = 52 / 12;
@@ -21,10 +25,14 @@ const WEEKS_PER_MONTH = 52 / 12;
 export interface FitWeek {
   /** API-equivalent dollars of the week. */
   cost: number;
-  /** Final % on the current plan; the transcript estimate when the limit was reached and the estimate is higher. */
+  /** Estimated demand on the current plan: the final % plus the time the limit, or a missing subscription, hid at the typical pace. */
   demand: number;
-  /** Not a final reading. */
+  /** Not a final reading, or `demand` exceeds `floor`. */
   estimated: boolean;
+  /** The final %, on the current plan: the minimum the week took. */
+  floor: number;
+  /** Hours of the week that the limit, a capped session or a missing subscription hid. */
+  hiddenHours: number;
   /** Share of the cost saved if all Opus ran on Sonnet, 0 to 1. */
   shift: number;
   /** ISO. */
@@ -32,9 +40,11 @@ export interface FitWeek {
 }
 
 export interface FitSession {
-  /** Peak % of a finished 5-hour window on the current plan, as `FitWeek.demand`. */
+  /** Estimated peak % of a finished 5-hour window on the current plan, as `FitWeek.demand`. */
   demand: number;
   estimated: boolean;
+  /** The window's peak, on the current plan. */
+  floor: number;
   shift: number;
 }
 
@@ -56,6 +66,8 @@ export interface PlanFit {
   apiValueRatio?: number;
   /** Highest weekly %. */
   busiest: number;
+  /** Highest weekly minimum: the busiest week took at least this much. */
+  busiestFloor: number;
   /** ISO starts of the weeks over the limit, oldest first. */
   overWeeks: string[];
   plan: Plan;
@@ -64,6 +76,8 @@ export interface PlanFit {
   sessionsOver: number;
   /** Median weekly %. */
   typical: number;
+  /** Median weekly minimum. */
+  typicalFloor: number;
   verdict: FitVerdict;
   weeksOver: number;
 }
@@ -71,9 +85,14 @@ export interface PlanFit {
 /** A demand after moving `share` of the Opus work to Sonnet. */
 export const shifted = (demand: number, share: number, shift: number): number => demand * (1 - share * shift);
 
-/** Each week's % of `plan`'s limit, with `share` of the Opus work moved to Sonnet. */
+/** Each week's estimated % of `plan`'s limit, with `share` of the Opus work moved to Sonnet. */
 export function weekPercents(input: PlanFitInput, plan: Plan, share: number): number[] {
   return input.weeks.map(week => convertPercent(shifted(week.demand, share, week.shift), input.plan, plan));
+}
+
+/** Each week's minimum % of `plan`'s limit, as `weekPercents` has the estimates. */
+export function weekFloors(input: PlanFitInput, plan: Plan, share: number): number[] {
+  return input.weeks.map(week => convertPercent(shifted(week.floor, share, week.shift), input.plan, plan));
 }
 
 function verdictOf(weeksOver: number, sessionsOver: number, sessions: number, busiest: number): FitVerdict {
@@ -84,10 +103,13 @@ function verdictOf(weeksOver: number, sessionsOver: number, sessions: number, bu
 
 /** How each plan would have held the weeks and sessions of `input`, Pro first. */
 export function evaluatePlans(input: PlanFitInput, share = 0): PlanFit[] {
-  const weekCosts = input.weeks.map(week => shifted(week.cost, share, week.shift));
+  // The hidden part of a week is the cost of its extra %, at the current plan's dollars per %.
+  const dollarsPerPercent = input.weeklyBudget === undefined ? 0 : input.weeklyBudget / LIMIT;
+  const weekCosts = input.weeks.map(week => shifted(week.cost + (week.demand - week.floor) * dollarsPerPercent, share, week.shift));
   const demandCost = median(weekCosts) ?? 0;
   return PLANS.map((plan): PlanFit => {
     const percents = weekPercents(input, plan, share);
+    const floors = weekFloors(input, plan, share);
     const overWeeks = input.weeks.filter((_, i) => percents[i]! >= LIMIT).map(week => week.start);
     const sessionsOver = input.sessions.filter(s => convertPercent(shifted(s.demand, share, s.shift), input.plan, plan) >= LIMIT).length;
     const busiest = Math.max(0, ...percents);
@@ -96,11 +118,13 @@ export function evaluatePlans(input: PlanFitInput, share = 0): PlanFit[] {
     return {
       apiValueRatio: budget === undefined ? undefined : Math.min(demandCost, budget) * WEEKS_PER_MONTH / PLAN_PRICES[plan],
       busiest,
+      busiestFloor: Math.max(0, ...floors),
       overWeeks,
       plan,
       price: PLAN_PRICES[plan],
       sessionsOver,
       typical: median(percents) ?? 0,
+      typicalFloor: median(floors) ?? 0,
       verdict: verdictOf(overWeeks.length, sessionsOver, input.sessions.length, busiest),
       weeksOver: overWeeks.length,
     };
@@ -117,43 +141,109 @@ export function bestPlan(fits: readonly PlanFit[]): PlanFit {
 export interface PlanFitSource {
   /** % of the weekly limit per dollar, when calibrated. */
   calibrationK?: number;
-  /** % of the 5-hour limit per dollar, when calibrated. */
-  fiveHourK?: number;
   plan: Plan;
   planHistory: readonly PlanPeriod[];
   /** Every 5-hour window, as `fiveHourWindows` builds them. */
   sessionWindows: readonly FiveHourWindow[];
+  /** Epoch ms of the subscription's start: what happened before it is not the user's demand. */
+  subscriptionStart?: number;
   weekHistory: WeekHistory;
-  /** Weekly % from which a week counts as capped. */
-  weekLimitThreshold: number;
+}
+
+const hours = (ms: number) => Math.max(0, ms) / HOUR_MS;
+
+/** A pace in %/hour from pooled usage and observed time; absent when too little time was observed. */
+function pooledPace(percent: number, observedHours: number, minHours: number): number | undefined {
+  return observedHours >= minHours ? percent / observedHours : undefined;
+}
+
+interface WeekSpan {
+  /** The % when the demand stopped showing, on the current plan. */
+  cutoffPercent: number;
+  hiddenHours: number;
+  observedHours: number;
+  week: WeekRow;
+}
+
+/**
+ * Splits a week into the time its usage shows the demand (observed) and the
+ * time it does not (hidden): before the subscription, after the cutoff (the
+ * pressure point or a weekly hit, whichever came first), and inside 5-hour
+ * sessions after they were capped.
+ */
+function weekSpan(week: WeekRow, sessionWindows: readonly FiveHourWindow[], subscriptionStart: number | undefined): WeekSpan {
+  const start = Date.parse(week.start);
+  const end = Date.parse(week.end);
+  const observedStart = Math.min(end, Math.max(start, subscriptionStart ?? start));
+  const pressureAt = week.pressureAt === undefined ? Infinity : Date.parse(week.pressureAt);
+  const hitAt = Math.min(Infinity, ...(week.limitHits ?? []).map(ts => Date.parse(ts)));
+  const cutoff = Math.max(observedStart, Math.min(pressureAt, hitAt, end));
+  // The pressure reading stands for the cutoff only when it is the cutoff; after an earlier hit the final % is what the limit froze.
+  const final = week.percent!;
+  const cutoffPercent = pressureAt <= hitAt && week.pressurePercent !== undefined ? Math.min(final, week.pressurePercent) : final;
+  let blocked = 0;
+  for (const window of sessionWindows) {
+    const cappedAt = window.cappedAt === undefined ? undefined : Date.parse(window.cappedAt);
+    if (cappedAt !== undefined && cappedAt >= observedStart && cappedAt < cutoff)
+      blocked += Math.min(Date.parse(window.end), cutoff) - cappedAt;
+  }
+  return {
+    cutoffPercent,
+    hiddenHours: hours(observedStart - start + end - cutoff + blocked),
+    observedHours: hours(cutoff - observedStart - blocked),
+    week,
+  };
 }
 
 /**
  * The finished weeks with a percent and the finished 5-hour windows with a
- * peak since the oldest of those weeks, on the current plan. A week or window
- * that reached its limit threshold stopped there, so its percent is a lower
- * bound: when the transcripts say it took more, that estimate is its demand.
+ * peak since the oldest of those weeks, on the current plan. A reading stops
+ * where a limit stopped the user, so each demand is the reading plus the time
+ * the limit hid, at the user's typical pace (the weeks' and the sessions' own).
  */
-export function buildPlanFitInput({ calibrationK, fiveHourK, plan, planHistory, sessionWindows, weekHistory, weekLimitThreshold }: PlanFitSource): PlanFitInput {
-  const weeks = weekHistory.weeks
+export function buildPlanFitInput({ calibrationK, plan, planHistory, sessionWindows, subscriptionStart, weekHistory }: PlanFitSource): PlanFitInput {
+  const spans = weekHistory.weeks
     .filter(week => !week.inProgress && week.percent !== undefined)
     .reverse()
-    .map((week): FitWeek => {
-      const percent = week.percent!;
-      const demand = percent >= weekLimitThreshold && calibrationK !== undefined ? Math.max(percent, calibrationK * week.cost) : percent;
-      return { cost: week.cost, demand, estimated: week.percentEstimated === true || demand > percent, shift: week.shift ?? 0, start: week.start };
-    });
+    .map(week => weekSpan(week, sessionWindows, subscriptionStart));
+  const weekPace = pooledPace(
+    // A week without observed time has no usage the pace could come from.
+    spans.reduce((sum, span) => sum + (span.observedHours > 0 ? span.cutoffPercent : 0), 0),
+    spans.reduce((sum, span) => sum + span.observedHours, 0),
+    MIN_OBSERVED_WEEK_HOURS,
+  );
+  const weeks = spans.map(({ cutoffPercent, hiddenHours, week }): FitWeek => {
+    const floor = week.percent!;
+    const demand = weekPace === undefined ? floor : Math.max(floor, cutoffPercent + hiddenHours * weekPace);
+    return { cost: week.cost, demand, estimated: week.percentEstimated === true || demand > floor, floor, hiddenHours, shift: week.shift ?? 0, start: week.start };
+  });
 
   // Only the windows that started inside a kept week: the one in progress and weeks without a percent have no say.
   const inKeptWeek = (ms: number) => weeks.some(week => ms >= Date.parse(week.start) && ms < Date.parse(week.start) + WEEK_MS);
-  const sessions = sessionWindows
+  const kept = sessionWindows
     .filter(w => !w.inProgress && w.peak !== undefined && inKeptWeek(Date.parse(w.start)))
     .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
-    .map((w): FitSession => {
-      const peak = convertPercent(w.peak!, planAt(planHistory, w.start), plan);
-      const demand = w.capped && fiveHourK !== undefined ? Math.max(peak, fiveHourK * w.cost) : peak;
-      return { demand, estimated: w.peakEstimated === true || demand > peak, shift: w.shift ?? 0 };
+    .map((w) => {
+      const from = planAt(planHistory, w.start);
+      const cappedAt = w.cappedAt === undefined ? undefined : Date.parse(w.cappedAt);
+      const peak = convertPercent(w.peak!, from, plan);
+      return {
+        capPercent: cappedAt === undefined ? peak : convertPercent(w.capPercent ?? LIMIT, from, plan),
+        hidden: cappedAt === undefined ? 0 : hours(Date.parse(w.end) - cappedAt),
+        observed: hours((cappedAt ?? Date.parse(w.end)) - Date.parse(w.start)),
+        peak,
+        w,
+      };
     });
+  const sessionPace = pooledPace(
+    kept.reduce((sum, s) => sum + s.capPercent, 0),
+    kept.reduce((sum, s) => sum + s.observed, 0),
+    MIN_OBSERVED_SESSION_HOURS,
+  );
+  const sessions = kept.map(({ capPercent, hidden, peak, w }): FitSession => {
+    const demand = sessionPace === undefined || w.cappedAt === undefined ? peak : Math.max(peak, capPercent + hidden * sessionPace);
+    return { demand, estimated: w.peakEstimated === true || demand > peak, floor: peak, shift: w.shift ?? 0 };
+  });
 
   return { plan, sessions, weeklyBudget: calibrationK ? LIMIT / calibrationK : undefined, weeks };
 }

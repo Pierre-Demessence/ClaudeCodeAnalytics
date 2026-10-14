@@ -18,6 +18,10 @@ const RESET_MATCH_MS = 60_000;
 export interface FiveHourWindow {
   /** A reading in the window reached the limit threshold. */
   capped?: true;
+  /** ISO; the earlier of the first reading at the limit threshold and the first rate-limit hit: from there the limit hid the demand. */
+  cappedAt?: string;
+  /** The 5-hour % at `cappedAt`: the reading's value, 100 for a hit. */
+  capPercent?: number;
   cost: number;
   /** ISO; for a window still running, its future end. */
   end: string;
@@ -60,6 +64,8 @@ export interface SessionsInput {
 }
 
 interface Building {
+  capAt?: number;
+  capPercent?: number;
   cost: number;
   end: number;
   messages: number;
@@ -102,8 +108,14 @@ export function fiveHourWindows({ hits = [], k, limitThreshold, now, records, sn
       window = newWindow(end - FIVE_HOURS_MS, end, 'reading');
       anchored.set(end, window);
     }
-    if (snapshot.fiveHour !== undefined)
+    if (snapshot.fiveHour !== undefined) {
       window.peak = Math.max(window.peak ?? 0, snapshot.fiveHour);
+      const readAt = Date.parse(snapshot.ts);
+      if (snapshot.fiveHour >= limitThreshold && (window.capAt === undefined || readAt < window.capAt)) {
+        window.capAt = readAt;
+        window.capPercent = snapshot.fiveHour;
+      }
+    }
   }
   const readingWindows = [...anchored.values()].sort((a, b) => a.start - b.start);
 
@@ -146,11 +158,22 @@ export function fiveHourWindows({ hits = [], k, limitThreshold, now, records, sn
       hitsOf.set(window, [...hitsOf.get(window) ?? [], hit.ts]);
   }
 
+  // A hit stops the window at 100 %, earlier than a reading at the threshold if it came first.
+  for (const [window, times] of hitsOf) {
+    const hitAt = Math.min(...times.map(ts => Math.min(Math.max(Date.parse(ts), window.start), window.end)));
+    if (window.capAt === undefined || hitAt < window.capAt) {
+      window.capAt = hitAt;
+      window.capPercent = 100;
+    }
+  }
+
   return past
     .map((w): FiveHourWindow => {
       const peak = w.source === 'reading' ? w.peak : k !== undefined ? Math.min(100, k * w.cost) : undefined;
       return {
         capped: w.source === 'reading' && peak !== undefined && peak >= limitThreshold ? true : undefined,
+        cappedAt: w.capAt === undefined ? undefined : new Date(w.capAt).toISOString(),
+        capPercent: w.capPercent,
         cost: w.cost,
         end: new Date(w.end).toISOString(),
         inProgress: now < w.end ? true : undefined,

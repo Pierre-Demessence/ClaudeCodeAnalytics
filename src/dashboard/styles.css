@@ -830,6 +830,7 @@ small {
 }
 
 .week-bar.estimated,
+.plan-bar.estimated,
 .legend-swatch.estimated {
   background: repeating-linear-gradient(45deg, var(--accent) 0 2px, var(--estimate-fill) 2px 7px);
 }
@@ -2585,6 +2586,27 @@ button.info-tip:hover {
   height: 12px;
 }
 
+/* The minimum of an estimate is drawn solid over its hatched bar. */
+.plan-bar.plan-bar-floor {
+  background: var(--accent);
+}
+
+.plan-bar.plan-bar-floor.over {
+  background: var(--critical);
+}
+
+.fit-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.fit-minimum {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
 .fit-facts {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -2661,6 +2683,14 @@ button.info-tip:hover {
 
 .fit-bar.estimated {
   background: repeating-linear-gradient(45deg, var(--accent) 0 2px, var(--estimate-fill) 2px 7px);
+}
+
+.fit-bar.fit-bar-floor {
+  background: var(--accent);
+}
+
+.fit-bar.fit-bar-floor.over {
+  background: var(--critical);
 }
 
 .fit-bar-date {

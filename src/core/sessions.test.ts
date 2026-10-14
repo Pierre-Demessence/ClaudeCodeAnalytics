@@ -55,6 +55,43 @@ describe('reading windows', () => {
   });
 });
 
+describe('cap time', () => {
+  const hit = (ts: string, extra: Partial<ApiEvent> = {}): ApiEvent => ({ key: ts, kind: 'limit', limitType: 'five_hour', ts, ...extra });
+  const reset = '2026-10-02T12:50:00.000Z';
+  const readings = [
+    snap('2026-10-02T11:00:00Z', reset, 99),
+    snap('2026-10-02T09:00:00Z', reset, 80),
+    snap('2026-10-02T10:00:00Z', reset, 96),
+  ];
+
+  it('is the first reading at the limit threshold, with its value', () => {
+    expect(fiveHourWindows({ ...base, records: [], snapshots: readings })[0]).toMatchObject({ cappedAt: '2026-10-02T10:00:00.000Z', capPercent: 96 });
+  });
+
+  it('is the first hit, at 100%, when it comes before any reading at the threshold', () => {
+    const late = [snap('2026-10-02T11:00:00Z', reset, 96)];
+    const window = fiveHourWindows({ ...base, hits: [hit('2026-10-02T10:00:00Z', { resetsAt: reset })], records: [], snapshots: late })[0];
+    expect(window).toMatchObject({ cappedAt: '2026-10-02T10:00:00.000Z', capPercent: 100 });
+  });
+
+  it('keeps the reading when it came before the hit', () => {
+    const window = fiveHourWindows({ ...base, hits: [hit('2026-10-02T11:30:00Z', { resetsAt: reset })], records: [], snapshots: readings })[0];
+    expect(window).toMatchObject({ cappedAt: '2026-10-02T10:00:00.000Z', capPercent: 96 });
+  });
+
+  it('is set by a hit on an estimated window, which stays uncapped', () => {
+    const window = fiveHourWindows({ ...base, hits: [hit('2026-10-02T10:00:00Z')], records: [rec('2026-10-02T08:00:00Z')], snapshots: [] })[0];
+    expect(window).toMatchObject({ cappedAt: '2026-10-02T10:00:00.000Z', capPercent: 100, source: 'estimated' });
+    expect(window!.capped).toBeUndefined();
+  });
+
+  it('is absent for a window that never reached the limit', () => {
+    const window = fiveHourWindows({ ...base, records: [], snapshots: [snap('2026-10-02T09:00:00Z', reset, 80)] })[0]!;
+    expect(window.cappedAt).toBeUndefined();
+    expect(window.capPercent).toBeUndefined();
+  });
+});
+
 describe('empty windows', () => {
   it('drops a message-less reading window under 5%, keeps it from 5%', () => {
     const window = (peak: number) => sessions([], [snap('2026-10-02T09:00:00Z', '2026-10-02T12:50:00.000Z', peak)]).windows;

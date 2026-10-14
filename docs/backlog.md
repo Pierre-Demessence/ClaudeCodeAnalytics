@@ -35,8 +35,7 @@ Improvements to something that exists.
 
 ### Calibration
 
-- `[forensics]` Calibration cross-check from observed limit hits: the median cost of limit-hit windows is a capacity estimate, floored by the highest cost of a window that did not hit the limit; compare with the `k × cost` demand of limit-hit weeks. Server overloads are stored (`events.jsonl`) but not shown anywhere.
-- A week or session that reached its limit uses `k × cost` as its demand, which leaves out claude.ai usage (understated); the endpoint's `claudeCodeShare` could scale it up.
+- `[forensics]` Calibration cross-check from observed limit hits: the median cost of limit-hit windows is a capacity estimate, floored by the highest cost of a window that did not hit the limit; compare with the demand estimates of limit-hit weeks. Server overloads are stored (`events.jsonl`) but not shown anywhere.
 
 - `[forensics]` Test the credit scheme cached in `~/.claude.json` (`tengu_amber_tally`: 5-hour credits 10000 / 50000 / 200000 for Pro / Max 5× / Max 20×, and credits per million tokens per model) against the readings: replay the usage under it with the backtest and compare its error with the API-price model. Unverified: units, which token types count, whether the flag is live. Opus 5.5 : Sonnet 5.5 : Haiku 4.5 is 1833 : 1250 : 833 there, against 4 : 2 : 1 by API output price.
 
@@ -44,6 +43,7 @@ Improvements to something that exists.
 
 - Convert between plans with the measured multipliers (Plans tab, "How far to trust the conversions") when both plans have enough weeks, instead of the advertised ones.
 - The what-if only moves Opus work to Sonnet; other shifts (Sonnet to Haiku, a lower effort) would reuse the same linear `shift` per week and session.
+- An upper bound for capped weeks: fill the hidden time at the week's own pace before the cutoff, next to the typical-pace estimate (`docs/plans/uncapped-demand.md`).
 
 ### Taskbar widget
 
@@ -55,6 +55,8 @@ Blocked until more history exists, so the result can be judged.
 
 - Forecast stage 3 (expected active hours from a weekday × hour profile) is paused: the data dir holds about one week of readings, so the backtest cannot tell whether it beats the flat pace. Resume when several completed weeks exist. Plan: `docs/plans/forecast-accuracy.md`.
 - The Plans tab appears only with at least 3 weeks of data. The Plans and what-if enhancements wait for it, since they cannot be tried or evaluated before.
+- Uncapped demand on real data: cut uncapped weeks at 90% after the fact and check how close the typical-pace estimate gets to their real final %. Needs several weeks that never reached the pressure point.
+- A model of how pace slows as a week nears its limit, to replace the fixed 90% pressure point. Needs many weeks to tell slowing down from a quiet week.
 - `[forensics]` Verify against a real transcript that a compaction writes `isCompactSummary` or a `compact_boundary` system entry (none in the local transcripts; `src/core/events.ts` assumes both), and the weekly `quotaLimits.rateLimitType` name (only `five_hour` seen; `hitScope` takes `seven_day`/`week`). Until then the no-gap flush leans on the rewritten-share rule.
 - Price the 4.5-generation models (Opus 4.5, Sonnet 4.5) and long-context premiums if they show up in transcripts; they are flagged as unknown today.
 - Treat a `seven_day.resets_at` of null (if the endpoint ever returns it) as "no usage yet" rather than `bad-shape`.

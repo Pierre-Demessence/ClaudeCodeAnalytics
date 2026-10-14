@@ -16,12 +16,14 @@ const percents = [41, 55, 63, 47, 118, 72, 58, 66, 49, 84, 62, 77];
 const peaks = [12, 35, 48, 22, 64, 71, 18, 55, 112, 41, 29, 66, 38, 52, 24, 77, 45, 33, 60, 19, 88, 43, 27, 104, 58, 36, 50, 31, 69, 40];
 const planFit: PlanFitInput = {
   plan: 'max5',
-  sessions: peaks.map(demand => ({ demand, estimated: false, shift: 0.3 })),
+  sessions: peaks.map(demand => ({ demand, estimated: false, floor: demand, shift: 0.3 })),
   weeklyBudget: 480,
   weeks: percents.map((demand, i) => ({
     cost: demand * 4.8,
     demand,
     estimated: demand > 100,
+    floor: demand,
+    hiddenHours: 0,
     shift: 0.3,
     start: new Date(Date.UTC(2026, 6, 10 + 7 * i, 7)).toISOString(),
   })),
@@ -80,7 +82,7 @@ describe('plans tab', () => {
   });
 
   it('suggests a cheaper plan with what switching saves', () => {
-    const light: PlanFitInput = { ...planFit, plan: 'max20', sessions: [], weeks: planFit.weeks.map(w => ({ ...w, demand: w.demand / 4 })) };
+    const light: PlanFitInput = { ...planFit, plan: 'max20', sessions: [], weeks: planFit.weeks.map(w => ({ ...w, demand: w.demand / 4, floor: w.demand / 4 })) };
     renderTab(summary({ multipliers, plan: 'max20', planFit: light }));
     const best = card('Best plan for your last 12 weeks');
     expect(within(best).getByText('Max 5×')).toBeTruthy();
@@ -97,6 +99,23 @@ describe('plans tab', () => {
     expect(chart.querySelectorAll('.fit-bar.over')).toHaveLength(12);
     fireEvent.click(within(chart).getByRole('button', { name: 'Max 20×' }));
     expect(chart.querySelectorAll('.fit-bar.over')).toHaveLength(0);
+  });
+
+  it('shows an estimate with its minimum on the cards, and draws it solid up to the minimum', () => {
+    // One capped week read 80%, and its 3.5 hidden days fill it to 160%.
+    const weeks = planFit.weeks.map((w, i) => (i === 4 ? { ...w, demand: 160, estimated: true, floor: 80, hiddenHours: 84 } : w));
+    renderTab(summary({ multipliers, plan: 'max5', planFit: { ...planFit, weeks } }));
+    const max5 = card('Max 5×');
+    expect(within(max5).getByText('≈ 160%')).toBeTruthy();
+    // The busiest week took at least as much as the highest minimum (84%, the 10th week).
+    expect(within(max5).getByText('(at least 84%)')).toBeTruthy();
+    expect(max5.querySelectorAll('.plan-bar-floor')).toHaveLength(1);
+    // The typical week is the median of the others, which the hidden week does not move.
+    expect(max5.querySelectorAll('.fit-minimum')).toHaveLength(1);
+    const chart = card('Each past week on');
+    expect(chart.querySelectorAll('.fit-bar-floor')).toHaveLength(1);
+    expect(within(chart).getByText('≈160%')).toBeTruthy();
+    expect(within(chart).getByRole('button', { name: 'About the estimates' })).toBeTruthy();
   });
 
   it('shows the measured multiplier, or says it is not measured', () => {

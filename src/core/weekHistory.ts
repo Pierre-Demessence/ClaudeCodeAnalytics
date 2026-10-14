@@ -10,6 +10,8 @@ import { median } from './stats.ts';
 
 /** Weekly % from which a week counts as having hit the limit: at 5 % of the week left, a run is not stopped at once, but the week is as good as spent. */
 export const DEFAULT_WEEK_LIMIT_THRESHOLD = 98;
+/** Weekly % (of the limit of the plan active then) from which the user is held back by the approaching limit: what happens after it no longer shows the demand. */
+export const PRESSURE_PERCENT = 90;
 /** Weekly windows listed. */
 const HISTORY_WEEKS = 12;
 /** Projects kept per week; `projectCount` has the total. */
@@ -35,6 +37,10 @@ export interface WeekRow {
   percent?: number;
   /** Not a final reading: extended from an early one, estimated now, or from transcripts. */
   percentEstimated?: true;
+  /** ISO; the first reading of the week at `PRESSURE_PERCENT`, or for a week estimated from transcripts the message at which `k × cost so far` reaches it. */
+  pressureAt?: string;
+  /** The weekly % at `pressureAt`, on the current plan. */
+  pressurePercent?: number;
   projectCount: number;
   /** By cost, highest first. */
   projects: { name: string; path: string; cost: number }[];
@@ -82,6 +88,19 @@ interface Building {
   messages: number;
   projects: Map<string, { name: string; path: string; cost: number }>;
   saving: number;
+  /** Time and cost of each message. */
+  spend: { cost: number; ms: number }[];
+}
+
+/** The message at which `k × cost so far` reaches `PRESSURE_PERCENT`. */
+function pressureByCost(spend: readonly { cost: number; ms: number }[], k: number): { at: string; percent: number } | undefined {
+  let total = 0;
+  for (const { cost, ms } of [...spend].sort((a, b) => a.ms - b.ms)) {
+    total += cost;
+    if (k * total >= PRESSURE_PERCENT)
+      return { at: new Date(ms).toISOString(), percent: Math.min(100, k * total) };
+  }
+  return undefined;
 }
 
 /** The last 12 weekly windows: final %, cost per day, sessions and projects. */
@@ -96,7 +115,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     starts.add(start);
   const shown = [...starts].sort((a, b) => b - a).slice(0, HISTORY_WEEKS);
 
-  const building = new Map<number, Building>(shown.map(start => [start, { cost: 0, days: Array.from<number>({ length: 7 }).fill(0), messages: 0, projects: new Map(), saving: 0 }]));
+  const building = new Map<number, Building>(shown.map(start => [start, { cost: 0, days: Array.from<number>({ length: 7 }).fill(0), messages: 0, projects: new Map(), saving: 0, spend: [] }]));
   const projectOf = sessionProjects(records);
   for (const { record, start } of recordStarts) {
     const week = building.get(start);
@@ -106,6 +125,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     week.cost += cost;
     week.saving += sonnetSaving(record);
     week.messages++;
+    week.spend.push({ cost, ms: Date.parse(record.ts) });
     const day = Math.min(6, Math.floor((Date.parse(record.ts) - start) / DAY_MS));
     week.days[day]! += cost;
     const project = projectOf(record);
@@ -124,6 +144,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     let percent: number | undefined;
     let percentEstimated = false;
     let source: WeekRow['source'] = 'reading';
+    let pressure: { at: string; percent: number } | undefined;
     const share = shares.find(s => Date.parse(s.resetsAt) === end);
     if (current && Date.parse(current.resetsAt) === end) {
       percent = current.estimatedNow ?? current.weekly;
@@ -134,11 +155,16 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     else if (share) {
       percent = convertPercent(share.percent, share.plan, plan);
       percentEstimated = share.estimated;
+      const reached = snapshots
+        .filter(s => Date.parse(s.weeklyResetsAt) === end && s.weekly >= PRESSURE_PERCENT)
+        .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))[0];
+      pressure = reached && { at: reached.ts, percent: convertPercent(reached.weekly, share.plan, plan) };
     }
     else if (calibrationK !== undefined && week.cost > 0) {
       percent = Math.min(100, calibrationK * week.cost);
       percentEstimated = true;
       source = 'estimated';
+      pressure = pressureByCost(week.spend, calibrationK);
     }
 
     const weekHits = hits.map(hit => hit.ts).filter(ts => Date.parse(ts) >= start && Date.parse(ts) < end);
@@ -155,6 +181,8 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       messages: week.messages,
       percent,
       percentEstimated: percentEstimated ? true : undefined,
+      pressureAt: pressure?.at,
+      pressurePercent: pressure?.percent,
       projectCount: projects.length,
       projects: projects.slice(0, TOP_PROJECTS),
       sessions: windows.length,

@@ -1,21 +1,27 @@
 import type { PlanFit, PlanFitInput } from '@/core/planFit';
 
 import { PLAN_LABELS } from '@/core/plans';
-import { formatDollars, formatPercent } from '@/dashboard/format';
-import { cardVerdict, FIT_KIND, valueText } from '@/dashboard/plansData';
+import { formatDollars } from '@/dashboard/format';
+import { cardVerdict, estimateText, FIT_KIND, valueText } from '@/dashboard/plansData';
 import { InfoTip } from '@/dashboard/Tip';
 import { VerdictBox } from '@/dashboard/VerdictBox';
 
-function Bar({ percent }: { percent: number }) {
+/** The bar of an estimate: hatched when it holds time the limit hid, with the minimum solid on top. */
+function Bar({ floor, percent }: { floor: number; percent: number }) {
+  const hidden = estimateText(percent, floor).minimum !== undefined;
+  const over = percent >= 100;
   return (
     <span className="plan-track">
-      <span className={percent >= 100 ? 'plan-bar over' : 'plan-bar'} style={{ width: `${Math.min(percent, 100)}%` }} />
+      <span className={over ? 'plan-bar over' : hidden ? 'plan-bar estimated' : 'plan-bar'} style={{ width: `${Math.min(percent, 100)}%` }} />
+      {hidden && <span className={over ? 'plan-bar plan-bar-floor over' : 'plan-bar plan-bar-floor'} style={{ width: `${Math.min(floor, 100)}%` }} />}
     </span>
   );
 }
 
 function PlanCard({ fit, input, isCurrent, timeZone }: { fit: PlanFit; input: PlanFitInput; isCurrent: boolean; timeZone: string }) {
   const verdict = cardVerdict(fit, input, timeZone);
+  const typical = estimateText(fit.typical, fit.typicalFloor);
+  const busiest = estimateText(fit.busiest, fit.busiestFloor);
   return (
     <article className="card fit-card">
       <div className="card-head">
@@ -26,15 +32,21 @@ function PlanCard({ fit, input, isCurrent, timeZone }: { fit: PlanFit; input: Pl
       </div>
       <div className="fit-stat">
         <span className="card-subtitle">Typical week</span>
-        <strong className="fit-number">{formatPercent(fit.typical)}</strong>
-        <Bar percent={fit.typical} />
+        <span className="fit-value">
+          <strong className="fit-number">{typical.main}</strong>
+          {typical.minimum && <span className="fit-minimum">{`(${typical.minimum})`}</span>}
+        </span>
+        <Bar floor={fit.typicalFloor} percent={fit.typical} />
       </div>
       <div className="fit-stat">
         <span className="fit-stat-row">
           <span className="card-subtitle">Busiest week</span>
-          <strong>{formatPercent(fit.busiest)}</strong>
+          <span className="fit-value">
+            <strong>{busiest.main}</strong>
+            {busiest.minimum && <span className="fit-minimum">{`(${busiest.minimum})`}</span>}
+          </span>
         </span>
-        <Bar percent={fit.busiest} />
+        <Bar floor={fit.busiestFloor} percent={fit.busiest} />
       </div>
       <dl className="fit-facts">
         <dt>Weeks over the limit</dt>
