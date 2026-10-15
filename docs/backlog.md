@@ -26,22 +26,11 @@ Improvements to something that exists.
 
 ### Forecast
 
-- Weekday-aware daily usage (weekends differ) for the forecast. Covered by stage 3 of `docs/plans/forecast-accuracy.md`.
-- The calibrated range applies the 25th/75th percentile day to every remaining day, which overstates the spread of a multi-day total; a bootstrap over days would be tighter. Also covered by stage 3 of the plan.
 - `[forecast]` Carry the uncertainty of `k` into the forecast range, so a weakly calibrated plan shows a wider band.
 - `[forecast]` Say which limit binds first (5-hour or weekly) and show a probability of hitting each, once the scheduled forecast exists.
-- `[forecast]` Fit `k` per model family instead of assuming limits scale with API price; needs enough readings per family.
-- `[forecast]` Pace by effort level and fast mode (`UsageRecord.effort`, `speed`), once the per-model pace shows how much the model alone explains.
-
-### Calibration
-
-- `[forensics]` Calibration cross-check from observed limit hits: the median cost of limit-hit windows is a capacity estimate, floored by the highest cost of a window that did not hit the limit; compare with the demand estimates of limit-hit weeks. Server overloads are stored (`events.jsonl`) but not shown anywhere.
-
-- `[forensics]` Test the credit scheme cached in `~/.claude.json` (`tengu_amber_tally`: 5-hour credits 10000 / 50000 / 200000 for Pro / Max 5× / Max 20×, and credits per million tokens per model) against the readings: replay the usage under it with the backtest and compare its error with the API-price model. Unverified: units, which token types count, whether the flag is live. Opus 5.5 : Sonnet 5.5 : Haiku 4.5 is 1833 : 1250 : 833 there, against 4 : 2 : 1 by API output price.
 
 ### Plans and what-if
 
-- Convert between plans with the measured multipliers (Plans tab, "How far to trust the conversions") when both plans have enough weeks, instead of the advertised ones.
 - The what-if only moves Opus work to Sonnet; other shifts (Sonnet to Haiku, a lower effort) would reuse the same linear `shift` per week and session.
 - An upper bound for capped weeks: fill the hidden time at the week's own pace before the cutoff, next to the typical-pace estimate (`src/core/planFit.ts`).
 - The current week's pace without the limit on the Overview, next to the forecast (which predicts the real, capped % at reset). Deferred from `docs/plans/uncapped-weeks.md`.
@@ -53,12 +42,34 @@ Improvements to something that exists.
 
 ## Waiting for data
 
-Blocked until more history exists, so the result can be judged.
+Blocked until more history exists, so the result can be judged. Sub-sections are
+ordered by how many completed weeks of data the item needs; the week counts are
+estimates of when the result becomes judgeable, not limits in the code.
 
-- Forecast stage 3 (expected active hours from a weekday × hour profile) is paused: the data dir holds about one week of readings, so the backtest cannot tell whether it beats the flat pace. Resume when several completed weeks exist. Plan: `docs/plans/forecast-accuracy.md`.
-- The Plans tab appears only with at least 3 weeks of data. The Plans and what-if enhancements wait for it, since they cannot be tried or evaluated before.
-- Uncapped demand on real data: cut uncapped weeks at 90% after the fact and check how close the typical-pace estimate gets to their real final %. Needs several weeks that never reached the pressure point.
+### 4 weeks
+
+- Uncapped demand on real data: cut uncapped weeks at 90% after the fact and check how close the typical-pace estimate gets to their real final %. Needs at least 3 weeks that never reached the pressure point, so 4 weeks if one of them was capped.
+
+### 6 weeks
+
+- Forecast stage 3 (expected active hours from a weekday × hour profile) is paused: the backtest cannot tell whether it beats the flat pace on so little history. The profile needs 3 weeks to exist (`docs/plans/forecast-accuracy.md`) and the backtest needs about 3 more weeks to score it against the flat pace. Plan: `docs/plans/forecast-accuracy.md`.
+- Weekday-aware daily usage (weekends differ) for the forecast. Covered by stage 3 of `docs/plans/forecast-accuracy.md`.
+- The calibrated range applies the 25th/75th percentile day to every remaining day, which overstates the spread of a multi-day total; a bootstrap over days would be tighter. Also covered by stage 3 of the plan.
+- `[forensics]` Calibration cross-check from observed limit hits: the median cost of limit-hit windows is a capacity estimate, floored by the highest cost of a window that did not hit the limit; compare with the demand estimates of limit-hit weeks. Server overloads are stored (`events.jsonl`) but not shown anywhere.
+- `[forensics]` Test the credit scheme cached in `~/.claude.json` (`tengu_amber_tally`: 5-hour credits 10000 / 50000 / 200000 for Pro / Max 5× / Max 20×, and credits per million tokens per model) against the readings: replay the usage under it with the backtest and compare its error with the API-price model. Unverified: units, which token types count, whether the flag is live. Opus 5.5 : Sonnet 5.5 : Haiku 4.5 is 1833 : 1250 : 833 there, against 4 : 2 : 1 by API output price.
+
+### 12 weeks
+
 - A model of how pace slows as a week nears its limit, to replace the fixed 90% pressure point. Needs many weeks to tell slowing down from a quiet week.
+- `[forecast]` Fit `k` per model family instead of assuming limits scale with API price; needs enough readings per family.
+- `[forecast]` Pace by effort level and fast mode (`UsageRecord.effort`, `speed`), once the per-model pace shows how much the model alone explains.
+
+### Needs a second plan
+
+- Convert between plans with the measured multipliers (Plans tab, "How far to trust the conversions") when both plans have enough weeks, instead of the advertised ones.
+
+### No week count (waits for an event)
+
 - `[forensics]` Verify against a real transcript that a compaction writes `isCompactSummary` or a `compact_boundary` system entry (none in the local transcripts; `src/core/events.ts` assumes both), and the weekly `quotaLimits.rateLimitType` name (only `five_hour` seen; `hitScope` takes `seven_day`/`week`). Until then the no-gap flush leans on the rewritten-share rule.
 - Price the 4.5-generation models (Opus 4.5, Sonnet 4.5) and long-context premiums if they show up in transcripts; they are flagged as unknown today.
 - Treat a `seven_day.resets_at` of null (if the endpoint ever returns it) as "no usage yet" rather than `bad-shape`.
