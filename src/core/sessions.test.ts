@@ -259,3 +259,42 @@ describe('observed limit hits', () => {
     expect(stats.blocked).toBe(0);
   });
 });
+
+describe('over a range', () => {
+  const range = { from: Date.parse('2026-09-13T22:00:00Z'), to: Date.parse('2026-09-16T22:00:00Z') };
+
+  it('lists the local days of the range, newest first, and the windows overlapping it', () => {
+    const { days, stats, windows } = sessions([
+      rec('2026-09-12T10:00:00Z'), // before the range
+      rec('2026-09-14T10:00:00Z'),
+      rec('2026-09-15T20:00:00Z'),
+      rec('2026-09-17T10:00:00Z'), // after it
+    ], [], { range });
+    expect(days).toEqual(['2026-09-16', '2026-09-15', '2026-09-14']);
+    expect(windows.map(w => w.start)).toEqual(['2026-09-15T20:00:00.000Z', '2026-09-14T10:00:00.000Z']);
+    expect(stats.count).toBe(2);
+  });
+
+  it('keeps a window that begins before the range and ends in it', () => {
+    const { windows } = sessions([rec('2026-09-13T20:00:00Z')], [], { range });
+    expect(windows.map(w => w.start)).toEqual(['2026-09-13T20:00:00.000Z']);
+  });
+
+  it('stops the days at today for a range running into the future', () => {
+    const { days } = sessions([], [], { range: { from: Date.parse('2026-10-01T22:00:00Z'), to: Date.parse('2026-10-09T22:00:00Z') } });
+    expect(days).toEqual(['2026-10-03', '2026-10-02']);
+  });
+
+  it('matches the default window when given the last 7 local days', () => {
+    const records = [rec('2026-09-26T10:00:00Z'), rec('2026-09-28T10:00:00Z'), rec('2026-10-02T21:00:00Z')];
+    const week = { from: Date.parse('2026-09-26T22:00:00Z'), to: Date.parse('2026-10-03T22:00:00Z') };
+    expect(sessions(records, [], { range: week })).toEqual(sessions(records));
+  });
+
+  it('is empty before the first message', () => {
+    const { days, stats, windows } = sessions([rec('2026-09-28T10:00:00Z')], [], { range: { from: Date.parse('2026-01-01T00:00:00Z'), to: Date.parse('2026-01-03T00:00:00Z') } });
+    expect(days).toHaveLength(3);
+    expect(windows).toEqual([]);
+    expect(stats.count).toBe(0);
+  });
+});

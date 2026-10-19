@@ -185,11 +185,11 @@ function addTo(split: CostSplit, model: string, cost: number): void {
 const byCost = <T extends { cost: number }>(a: T, b: T) => b.cost - a.cost;
 
 /**
- * Usage of the records at or after `from`, by project, conversation, agent,
- * effort and surface. A conversation counts under the directory it started
- * in, even when it started before `from`.
+ * Usage of the records from `from` (inclusive) to `to` (exclusive), by
+ * project, conversation, agent, effort and surface. A conversation counts
+ * under the directory it started in, even when it started before `from`.
  */
-export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly<Record<string, SessionInfo>>, from = -Infinity): Breakdown {
+export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly<Record<string, SessionInfo>>, from = -Infinity, to = Infinity): Breakdown {
   const projectFor = sessionProjects(records);
   const skillFor = sessionSkills(records);
 
@@ -210,7 +210,7 @@ export function buildBreakdown(records: readonly UsageRecord[], titles: Readonly
 
   for (const record of records) {
     const ms = Date.parse(record.ts);
-    if (ms < from)
+    if (ms < from || ms >= to)
       continue;
     const { cost } = messageCost(record);
     const project = projectFor(record);

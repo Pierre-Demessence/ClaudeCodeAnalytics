@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import type { Family } from '@/core/family';
-import type { Summary } from '@/dashboard/api';
+import type { HistoryView } from '@/dashboard/history';
 import type { Bucket, Metric, Period } from '@/dashboard/usageData';
 
 import { familyOf } from '@/core/family';
 import { formatTokens, formatUsd, formatUsdShort } from '@/dashboard/format';
+import { rangeText } from '@/dashboard/history';
 import { SERIES } from '@/dashboard/models';
 import { Legend, Swatch } from '@/dashboard/Patterns';
 import { Toggle } from '@/dashboard/Toggle';
@@ -47,11 +48,14 @@ function UpgradeLabel({ version, viewBox }: { version: string; viewBox?: { x?: n
   return <text className="upgrade-label" dominantBaseline="hanging" x={x + 4} y={y + 2}>{version}</text>;
 }
 
-export function UsageChart({ summary }: { summary: Summary }) {
-  const [period, setPeriod] = useState<Period>('day');
+export function UsageChart({ view }: { view: HistoryView }) {
+  const { activity, usage } = view.history;
+  const [chosen, setChosen] = useState<Period>('day');
   const [metric, setMetric] = useState<Metric>('cost');
-  const rows = period === 'day' ? summary.daily : summary.weekly;
-  const data = toBuckets(rows, metric, period, summary.activity.upgrades);
+  // A range too long for a bar per day leaves only the weekly windows.
+  const period = usage.day ? chosen : 'week';
+  const rows = (period === 'day' ? usage.day : usage.week) ?? [];
+  const data = toBuckets(rows, metric, period, activity.upgrades);
   const families = new Set<Family>(rows.map(row => familyOf(row.model)));
   const series = SERIES.filter(s => families.has(s.family));
   const format = metric === 'cost' ? formatUsd : formatTokens;
@@ -62,16 +66,16 @@ export function UsageChart({ summary }: { summary: Summary }) {
       <div className="card-head">
         <h2>{period === 'day' ? 'Daily usage by model' : 'Weekly usage by model'}</h2>
         <span className="card-subtitle">
-          {period === 'day' ? `last 35 days, ${unit}` : `per weekly window, ${unit}`}
+          {period === 'day' ? `${rangeText(view, 'last 35 days')}, ${unit}` : `${view.range ? `${rangeText(view, '')}, ` : ''}per weekly window, ${unit}`}
         </span>
         <span className="card-head-spacer" />
         <div className="controls">
           <Toggle label="Unit" onChange={setMetric} options={[['cost', 'Dollars'], ['tokens', 'Tokens']]} value={metric} />
-          <Toggle label="Bucket" onChange={setPeriod} options={[['day', 'Day'], ['week', 'Week']]} value={period} />
+          <Toggle label="Bucket" onChange={setChosen} options={usage.day ? [['day', 'Day'], ['week', 'Week']] : [['week', 'Week']]} value={period} />
         </div>
       </div>
       {data.length === 0
-        ? <p className="empty">No usage imported yet.</p>
+        ? <p className="empty">{view.range ? 'No usage in this range.' : 'No usage imported yet.'}</p>
         : (
             <>
               <div className="chart" role="img" aria-label={`Usage ${period === 'day' ? 'per day' : 'per week'} by model family`}>

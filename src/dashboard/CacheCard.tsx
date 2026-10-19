@@ -21,10 +21,14 @@ function flushText({ extra, idleGap, noGap }: DayFlushes): string {
   return `${parts.join(', ')} · ${formatUsd(extra)} extra`;
 }
 
-/** Cache use this week, and the daily cache-read share. */
-export function CacheCard({ cache }: { cache: Activity['cache'] }) {
-  const { daily, week } = cache;
+/** Cache use over the range, or this week, and the cache-read share per day (per weekly window for a long range). */
+export function CacheCard({ cache, range }: { cache: Activity['cache']; range?: string }) {
+  const { bucket, daily, week } = cache;
   const tip = useTip();
+  const scope = range ? 'in this range' : 'this week';
+  const span = range ?? 'last 14 days';
+  const unit = bucket === 'week' ? 'weekly window' : 'day';
+  const bucketText = (day: string) => (bucket === 'week' ? `Week from ${formatDay(day)}` : formatDay(day));
   const hasDaily = daily.some(d => d.readShare !== undefined);
   const flushTotals = daily.reduce((sum, d) => ({ count: sum.count + (d.flushes ? d.flushes.idleGap + d.flushes.noGap : 0), extra: sum.extra + (d.flushes?.extra ?? 0) }), { count: 0, extra: 0 });
 
@@ -41,8 +45,8 @@ export function CacheCard({ cache }: { cache: Activity['cache'] }) {
               <div>
                 <strong>{formatUsdShort(week.saved)}</strong>
                 <span>
-                  saved this week
-                  <InfoTip label="About saved">Cost of the cached input at the full input price, minus what cache reads cost, this week.</InfoTip>
+                  {`saved ${scope}`}
+                  <InfoTip label="About saved">{`Cost of the cached input at the full input price, minus what cache reads cost, ${scope}.`}</InfoTip>
                 </span>
               </div>
               <div>
@@ -54,10 +58,10 @@ export function CacheCard({ cache }: { cache: Activity['cache'] }) {
               </div>
             </div>
           )
-        : <p className="empty">No usage this week yet.</p>}
+        : <p className="empty">{range ? 'No usage in this range.' : 'No usage this week yet.'}</p>}
       {hasDaily && (
         <>
-          <div className="mini-bars cache-bars" role="img" aria-label="Daily share of input read from the cache, last 14 days">
+          <div className="mini-bars cache-bars" role="img" aria-label={`Share of input read from the cache per ${unit}, ${span}`}>
             <span className="cache-reference" style={{ bottom: `${REFERENCE_SHARE * 100}%` }}>
               <span>90%</span>
             </span>
@@ -66,15 +70,15 @@ export function CacheCard({ cache }: { cache: Activity['cache'] }) {
                 className={d.readShare !== undefined && d.readShare < POOR_SHARE ? 'mini-bar poor' : 'mini-bar'}
                 key={d.day}
                 style={{ height: `${(d.readShare ?? 0) * 100}%` }}
-                {...tip(d.readShare === undefined ? `${formatDay(d.day)}: no usage` : `${formatDay(d.day)}: ${formatPercent(d.readShare * 100)} of input from cache`)}
+                {...tip(d.readShare === undefined ? `${bucketText(d.day)}: no usage` : `${bucketText(d.day)}: ${formatPercent(d.readShare * 100)} of input from cache`)}
               />
             ))}
           </div>
           {daily.some(d => d.flushes) && (
-            <div aria-label="Cache flushes per day, last 14 days" className="flush-marks" role="group">
+            <div aria-label={`Cache flushes per ${unit}, ${span}`} className="flush-marks" role="group">
               {daily.map(d => (d.flushes
                 ? (
-                    <span className="flush-mark" key={d.day} {...tip(`${formatDay(d.day)}: ${flushText(d.flushes)}`)}>
+                    <span className="flush-mark" key={d.day} {...tip(`${bucketText(d.day)}: ${flushText(d.flushes)}`)}>
                       <DatabaseZap aria-hidden="true" size={14} />
                       {d.flushes.idleGap + d.flushes.noGap}
                     </span>
@@ -98,11 +102,14 @@ export function CacheCard({ cache }: { cache: Activity['cache'] }) {
             {flushTotals.count > 0 && (
               <li>
                 <DatabaseZap aria-hidden="true" className="icon-inline" size={14} />
-                {`cache flush: a turn that rewrote the cache instead of reading it, counted per day. ${flushTotals.count} in these 14 days, ${formatUsd(flushTotals.extra)} extra.`}
+                {`cache flush: a turn that rewrote the cache instead of reading it, counted per ${unit}. ${flushTotals.count} ${range ? 'in this range' : 'in these 14 days'}, ${formatUsd(flushTotals.extra)} extra.`}
               </li>
             )}
           </ul>
-          <p className="note">Daily cache-read share, last 14 days. Drops usually mean long pauses (the 5-minute cache expired) or resumed conversations.</p>
+          <p className="note">
+            {`${bucket === 'week' ? 'Weekly' : 'Daily'} cache-read share, ${span}. `}
+            Drops usually mean long pauses (the 5-minute cache expired) or resumed conversations.
+          </p>
         </>
       )}
     </section>

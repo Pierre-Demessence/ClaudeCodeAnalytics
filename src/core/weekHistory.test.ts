@@ -288,3 +288,28 @@ describe('shift', () => {
     expect(rows.find(w => w.start === iso(weekStart(1)))!.shift).toBeUndefined();
   });
 });
+
+describe('over a range', () => {
+  const snapshots = Array.from({ length: 15 }, (_, i) => snap(i));
+
+  it('lists the windows starting in the range, without the cap of 12', () => {
+    const { weeks: rows } = weeks({ range: { from: weekStart(14), to: START + WEEK_MS }, snapshots });
+    expect(rows).toHaveLength(15);
+    expect(rows.at(-1)!.start).toBe(iso(weekStart(14)));
+  });
+
+  it('leaves out windows starting before or after the range', () => {
+    const { weeks: rows } = weeks({ range: { from: weekStart(4), to: weekStart(1) }, snapshots });
+    expect(rows.map(w => w.start)).toEqual([iso(weekStart(2)), iso(weekStart(3)), iso(weekStart(4))]);
+  });
+
+  it('takes the stats from the listed windows only', () => {
+    const records = [rec(weekStart(2) + DAY_MS), rec(weekStart(6) + DAY_MS, { output: 3_000_000 })];
+    const { stats } = weeks({ range: { from: weekStart(3), to: weekStart(1) }, records, snapshots });
+    expect(stats.medianCost).toBe(20);
+  });
+
+  it('is empty for a range with no window', () => {
+    expect(weeks({ range: { from: weekStart(30), to: weekStart(20) }, snapshots }).weeks).toEqual([]);
+  });
+});

@@ -143,8 +143,8 @@ describe('api routes', () => {
     const record = { cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, input: 0, key: 'm1|r1', model: 'claude-opus-5-5', output: 1000, project: 'p', sessionId: 's1', ts };
     await store.saveRecords(new Map([[record.key, record]]), [ts.slice(0, 7)]);
     await store.saveSessions({ s1: { title: 'Plan the Breakdown tab' } });
-    const summary = await (await fetch(`${base}/summary`)).json() as { breakdown: { week: { conversations: { title?: string }[] } } };
-    expect(summary.breakdown.week.conversations[0]?.title).toBe('Plan the Breakdown tab');
+    const summary = await (await fetch(`${base}/summary`)).json() as { breakdown: { conversations: { title?: string }[] } };
+    expect(summary.breakdown.conversations[0]?.title).toBe('Plan the Breakdown tab');
   });
 
   it('marks the 5-hour window of a stored rate-limit hit', async () => {
@@ -154,5 +154,38 @@ describe('api routes', () => {
     const summary = await (await fetch(`${base}/summary`)).json() as { sessions: { stats: { blocked: number }; windows: { limitHits?: string[] }[] } };
     expect(summary.sessions.windows[0]?.limitHits).toEqual([ts]);
     expect(summary.sessions.stats.blocked).toBe(1);
+  });
+
+  describe('range', () => {
+    const day = 86_400_000;
+    const range = (from: number, to: number, extra = '') => fetch(`${base}/range?from=${from}&to=${to}${extra}`);
+
+    it('serves the numbers of the history tabs over a range, from the stored data', async () => {
+      const now = Date.now();
+      const response = await range(now - day, now + day, '&tz=Europe/Paris');
+      expect(response.status).toBe(200);
+      const view = await response.json() as { breakdown: { total: { messages: number } }; range: unknown; usage: { week: unknown[] } };
+      expect(view.range).toEqual({ from: now - day, to: now + day });
+      expect(view.breakdown.total.messages).toBe(1);
+      expect(view.usage.week).toHaveLength(1);
+    });
+
+    it('answers an empty range with empty views', async () => {
+      const view = await (await range(0, day)).json() as { breakdown: { total: unknown }; sessions: { windows: unknown[] } };
+      expect(view.breakdown.total).toEqual({ cost: 0, messages: 0 });
+      expect(view.sessions.windows).toEqual([]);
+    });
+
+    it('answers 400 for missing, non-numeric, fractional or reversed bounds', async () => {
+      for (const query of ['', '?from=1', '?to=1', '?from=a&to=2', '?from=1&to=', '?from=1.5&to=3', '?from=5&to=5', '?from=9&to=2', '?from=0&to=99999999999999'])
+        expect((await fetch(`${base}/range${query}`)).status, query).toBe(400);
+    });
+
+    it('does not run the collector', async () => {
+      const statusFile = join(process.env.CCA_DATA_DIR!, 'status.json');
+      await rm(statusFile, { force: true });
+      expect((await range(0, day)).status).toBe(200);
+      await expect(readFile(statusFile)).rejects.toThrow();
+    });
   });
 });

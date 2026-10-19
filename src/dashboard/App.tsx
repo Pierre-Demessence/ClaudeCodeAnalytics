@@ -8,11 +8,12 @@ import { addReading, deleteReading, loadStoredSummary, loadSummary, refreshNow, 
 import { Breakdown } from '@/dashboard/Breakdown';
 import { Calibration } from '@/dashboard/Calibration';
 import { Header } from '@/dashboard/Header';
+import { useHistoryView } from '@/dashboard/history';
 import { Overview } from '@/dashboard/Overview';
 import { PatternDefs } from '@/dashboard/Patterns';
 import { Plans } from '@/dashboard/Plans';
 import { Sessions } from '@/dashboard/Sessions';
-import { useTab } from '@/dashboard/tabs';
+import { hasRange, useTab } from '@/dashboard/tabs';
 import { useTheme } from '@/dashboard/theme';
 import { TipProvider } from '@/dashboard/Tip';
 import { Usage } from '@/dashboard/Usage';
@@ -29,6 +30,7 @@ export function App() {
   const { theme, toggle: toggleTheme } = useTheme();
   const { anonymous, toggle: toggleAnonymous } = useAnonymize();
   const shown = useMemo(() => summary && (anonymous ? anonymizeSummary(summary) : summary), [anonymous, summary]);
+  const view = useHistoryView(shown, anonymous, hasRange(tab));
 
   // Overlapping requests (auto-reload during a save) may finish out of order: only the latest one counts.
   const latestRequestRef = useRef(0);
@@ -86,6 +88,7 @@ export function App() {
         onRefresh={() => void run(refreshNow)}
         onToggleAnonymous={toggleAnonymous}
         onToggleTheme={toggleTheme}
+        range={view?.choice}
         summary={shown}
         tab={tab}
         theme={theme}
@@ -97,14 +100,14 @@ export function App() {
             {error}
           </p>
         )}
-        {shown
+        {shown && view
           ? (
               <>
                 {tab === 'overview' && <Overview summary={shown} />}
-                {tab === 'usage' && <Usage summary={shown} />}
-                {tab === 'breakdown' && <Breakdown summary={shown} />}
-                {tab === 'sessions' && <Sessions summary={shown} />}
-                {tab === 'weeks' && <Weeks summary={shown} />}
+                {tab === 'usage' && <Usage summary={shown} view={view} />}
+                {tab === 'breakdown' && <Breakdown summary={shown} view={view} />}
+                {tab === 'sessions' && <Sessions summary={shown} view={view} />}
+                {tab === 'weeks' && <Weeks summary={shown} view={view} />}
                 {tab === 'plans' && <Plans summary={shown} />}
                 {tab === 'calibration' && (
                   <Calibration

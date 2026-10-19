@@ -10,7 +10,7 @@ const DAY_MS = 86_400_000;
 const hour = (h: number) => `${String(h % 24).padStart(2, '0')}:00`;
 
 /** Average cost per weekday and hour, in one hue so it reads without color vision. */
-export function Heatmap({ heatmap }: { heatmap: Activity['heatmap'] }) {
+export function Heatmap({ heatmap, range }: { heatmap: Activity['heatmap']; range?: string }) {
   const { cells, from, to } = heatmap;
   const tip = useTip();
   let max = 0;
@@ -28,7 +28,7 @@ export function Heatmap({ heatmap }: { heatmap: Activity['heatmap'] }) {
     <section className="card">
       <div className="card-head">
         <h2>When you work</h2>
-        <span className="card-subtitle">{`average cost per weekday and hour, ${days >= 28 ? 'last 4 weeks' : `last ${days} days`}`}</span>
+        <span className="card-subtitle">{`average cost per weekday and hour, ${range ?? (days >= 28 ? 'last 4 weeks' : `last ${days} days`)}`}</span>
         <span className="card-head-spacer" />
         {busiestText && (
           <span className="heatmap-busiest">
@@ -38,7 +38,7 @@ export function Heatmap({ heatmap }: { heatmap: Activity['heatmap'] }) {
         )}
       </div>
       {!busiest
-        ? <p className="empty">No usage in the last 4 weeks.</p>
+        ? <p className="empty">{range ? 'No usage in this range.' : 'No usage in the last 4 weeks.'}</p>
         : (
             <>
               <div className="heatmap" role="img" aria-label={`Average cost per weekday and hour; busiest ${busiestText}`}>

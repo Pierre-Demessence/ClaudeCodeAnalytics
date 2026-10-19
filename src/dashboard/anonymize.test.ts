@@ -4,30 +4,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UsageRecord } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
 
+import { buildRanged } from '@/core/ranged';
 import { buildSummary } from '@/core/summary';
-import { anonymizeSummary, useAnonymize } from '@/dashboard/anonymize';
+import { anonymizeRanged, anonymizeSummary, useAnonymize } from '@/dashboard/anonymize';
 
 function rec(ts: string, extra: Partial<UsageRecord> = {}): UsageRecord {
   return { cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, cwd: 'S:\\Dev\\secret-app', gitBranch: 'feat/secret-branch', input: 0, key: ts + JSON.stringify(extra), model: 'claude-opus-5-5', output: 1_000_000, project: 'S--Dev-secret-app', sessionId: 's1', ts, ...extra };
 }
 
+const input = {
+  endpointEnabled: false,
+  now: Date.parse('2026-10-02T12:00:00Z'),
+  planHistory: [],
+  snapshots: [],
+  timeZone: 'UTC',
+  titles: { s1: { title: 'Fix the secret parser' }, s2: { title: 'Rename the payroll module' } },
+  records: [
+    rec('2026-10-01T10:00:00Z'),
+    rec('2026-10-01T11:00:00Z', { cwd: 'S:\\Dev\\other-repo', gitBranch: 'main', project: 'S--Dev-other-repo', sessionId: 's2' }),
+  ],
+};
+
 function realSummary(): Summary {
-  const now = Date.parse('2026-10-02T12:00:00Z');
-  return {
-    ...buildSummary({
-      endpointEnabled: false,
-      now,
-      planHistory: [],
-      snapshots: [],
-      timeZone: 'UTC',
-      titles: { s1: { title: 'Fix the secret parser' }, s2: { title: 'Rename the payroll module' } },
-      records: [
-        rec('2026-10-01T10:00:00Z'),
-        rec('2026-10-01T11:00:00Z', { cwd: 'S:\\Dev\\other-repo', gitBranch: 'main', project: 'S--Dev-other-repo', sessionId: 's2' }),
-      ],
-    }),
-    status: {},
-  };
+  return { ...buildSummary(input), status: {} };
 }
 
 describe('anonymizeSummary', () => {
@@ -41,7 +40,7 @@ describe('anonymizeSummary', () => {
     const summary = realSummary();
     const masked = anonymizeSummary(summary);
     const labels = (names: { name: string }[]) => names.map(p => p.name);
-    const fromBreakdown = masked.breakdown.week.projects;
+    const fromBreakdown = masked.breakdown.projects;
     expect(labels(fromBreakdown)).toHaveLength(2);
     expect(new Set(labels(fromBreakdown)).size).toBe(2);
     for (const label of masked.weekHistory.weeks.flatMap(w => labels(w.projects)).concat(masked.sessions.windows.flatMap(w => labels(w.projects))))
@@ -50,11 +49,11 @@ describe('anonymizeSummary', () => {
 
   it('keeps the numbers and a missing title missing', () => {
     const summary = realSummary();
-    summary.breakdown.week.conversations[0]!.title = undefined;
+    summary.breakdown.conversations[0]!.title = undefined;
     const masked = anonymizeSummary(summary);
-    expect(masked.breakdown.week.conversations[0]!.title).toBeUndefined();
-    expect(masked.breakdown.week.total).toEqual(summary.breakdown.week.total);
-    expect(masked.breakdown.week.projects.map(p => p.cost)).toEqual(summary.breakdown.week.projects.map(p => p.cost));
+    expect(masked.breakdown.conversations[0]!.title).toBeUndefined();
+    expect(masked.breakdown.total).toEqual(summary.breakdown.total);
+    expect(masked.breakdown.projects.map(p => p.cost)).toEqual(summary.breakdown.projects.map(p => p.cost));
   });
 
   it('drops the last collector error, which can hold file paths', () => {
@@ -70,6 +69,32 @@ describe('anonymizeSummary', () => {
     const before = JSON.stringify(summary);
     anonymizeSummary(summary);
     expect(JSON.stringify(summary)).toBe(before);
+  });
+});
+
+describe('anonymizeRanged', () => {
+  const ranged = () => buildRanged(input, { from: Date.parse('2026-09-01T00:00:00Z'), to: Date.parse('2026-10-03T00:00:00Z') });
+
+  it('leaves no project, path, branch or title in the ranged views', () => {
+    const json = JSON.stringify(anonymizeRanged(ranged()));
+    for (const secret of ['secret-app', 'other-repo', 'secret-branch', 'secret parser', 'payroll', 'Dev'])
+      expect(json).not.toContain(secret);
+  });
+
+  it('keeps the numbers, the range and the projects apart', () => {
+    const real = ranged();
+    const masked = anonymizeRanged(real);
+    expect(masked.range).toEqual(real.range);
+    expect(masked.breakdown.total).toEqual(real.breakdown.total);
+    expect(new Set(masked.breakdown.projects.map(p => p.name)).size).toBe(2);
+    expect(masked.breakdown.conversations.map(c => c.title)).toEqual(expect.arrayContaining(['Conversation 1', 'Conversation 2']));
+  });
+
+  it('does not change the original', () => {
+    const real = ranged();
+    const before = JSON.stringify(real);
+    anonymizeRanged(real);
+    expect(JSON.stringify(real)).toBe(before);
   });
 });
 

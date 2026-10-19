@@ -8,6 +8,7 @@ import type { Bucket } from '@/dashboard/usageData';
 import { DAY_MS, HOUR_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
 import { formatUsd } from '@/dashboard/format';
+import { viewOver } from '@/dashboard/rangeTesting';
 import { TipProvider } from '@/dashboard/Tip';
 import { Usage } from '@/dashboard/Usage';
 import { UsageTooltip } from '@/dashboard/UsageChart';
@@ -158,5 +159,40 @@ describe('usage tooltip', () => {
     render(<UsageTooltip active format={formatUsd} payload={payload} />);
     expect(screen.getAllByRole('listitem').map(li => li.textContent)).toEqual(['Opus$3.00', 'Sonnet$2.00', 'Haiku$1.00', 'Total$6.00']);
     expect(screen.getByText('Claude Code 2.1.287')).toBeTruthy();
+  });
+});
+
+describe('usage tab over a range', () => {
+  afterEach(cleanup);
+
+  const input = (records: UsageRecord[]) => ({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots: [], timeZone: 'UTC' });
+  const renderOver = (records: UsageRecord[], choice: Parameters<typeof viewOver>[1]) => {
+    // Cache figures need input tokens.
+    const { summary: data, view } = viewOver(input(records.map(r => ({ ...r, cacheRead: 900, input: 100 }))), choice);
+    return render(<TipProvider><Usage summary={data} view={view} /></TipProvider>);
+  };
+
+  it('keeps a bar per day for a short range, and names the range in each card', () => {
+    renderOver([rec(5 * DAY_MS), rec(40 * DAY_MS)], { back: 0, kind: 'preset', preset: '4weeks' });
+    expect(screen.getByRole('heading', { name: 'Daily usage by model' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Day' })).toBeTruthy();
+    expect(card('Daily usage by model').querySelector('.card-subtitle')!.textContent).toMatch(/^\d+ \w+ – \d+ \w+ \d{4}, API-equivalent dollars$/);
+    expect(card('Cost per message').textContent).toContain('Outliers in this range');
+    expect(card('Cache efficiency').textContent).toContain('saved in this range');
+  });
+
+  it('offers only weekly windows beyond 62 days', () => {
+    renderOver([rec(5 * DAY_MS), rec(100 * DAY_MS)], { back: 0, kind: 'preset', preset: '12months' });
+    expect(screen.getByRole('heading', { name: 'Weekly usage by model' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Day' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Week' }).getAttribute('aria-pressed')).toBe('true');
+    expect(card('Cache efficiency').querySelector('[aria-label^="Share of input read from the cache per weekly window"]')).toBeTruthy();
+  });
+
+  it('says so for a range without usage', () => {
+    renderOver([rec(5 * DAY_MS)], { from: '2025-01-01', kind: 'custom', to: '2025-01-31' });
+    expect(within(card('Daily usage by model')).getByText('No usage in this range.')).toBeTruthy();
+    expect(within(card('When you work')).getByText('No usage in this range.')).toBeTruthy();
+    expect(within(card('Cost per message')).getByText('No usage in this range.')).toBeTruthy();
   });
 });

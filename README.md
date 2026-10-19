@@ -32,7 +32,7 @@ Everything stays on your machine. Data comes from two places:
   of input from cache, dollars saved, daily share, and the days the cache was
   flushed and rewritten with their extra cost), and the cost per message with
   this week's outliers and their cause (e.g. a cache rewrite after a pause).
-- Where the usage goes, this week, the last 4 weeks or all time: by project
+- Where the usage goes over the range picked: by project
   (with the model mix and cache share), main agent vs subagents (with the subagents' types), effort level,
   thinking share and surface, and the most expensive conversations.
 - Past 5-hour sessions of the last 7 days, on a day × hour timeline and in a
@@ -44,6 +44,9 @@ Everything stays on your machine. Data comes from two places:
   (estimated from transcripts when no reading ends the week), cost per 24 h
   block, sessions, messages, projects, the weeks that hit the limit (from a
   configurable threshold, 98% by default) and the weeks a rate limit blocked.
+- A range picker shared by the Usage, Breakdown, Sessions and Weeks tabs: presets
+  (this week, last 4 weeks, last 3 months, last 12 months, all time), previous and
+  next stepping, or custom days, kept in the URL; long lists and charts page.
 - Plan setting with history; the plan is also detected from Claude Code's login.
 - Tabs: Overview (limits and pacing), Usage (subscription vs API prices, charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents), Sessions (past 5-hour windows),

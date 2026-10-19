@@ -9,23 +9,24 @@ const BIN_LABELS = ['<1¢', '1–3¢', '3–10¢', '10–30¢', '30¢–$1', '$1
 /** Bar height on a log scale, so single outliers stay visible next to thousands of cheap messages. */
 const logHeight = (count: number, max: number) => (count > 0 ? Math.max(2, Math.log10(count + 1) / Math.log10(max + 1) * 100) : 0);
 
-/** This week's message costs and the most expensive messages. */
-export function MessageCostCard({ messageCost }: { messageCost: Activity['messageCost'] }) {
+/** The range's (by default this week's) message costs and the most expensive messages. */
+export function MessageCostCard({ messageCost, range }: { messageCost: Activity['messageCost']; range?: string }) {
   const { bins, outlierCount, outliers } = messageCost;
   const max = Math.max(...bins);
   const tip = useTip();
+  const scope = range ? 'in this range' : 'this week';
 
   return (
     <section className="card">
       <div className="card-head">
         <h2>Cost per message</h2>
-        <span className="card-subtitle">this week, bar heights on a log scale</span>
+        <span className="card-subtitle">{`${range ?? 'this week'}, bar heights on a log scale`}</span>
       </div>
       {max === 0
-        ? <p className="empty">No usage this week yet.</p>
+        ? <p className="empty">{range ? 'No usage in this range.' : 'No usage this week yet.'}</p>
         : (
             <>
-              <div className="cost-bins" role="img" aria-label={`Messages per cost range this week: ${bins.map((n, i) => `${BIN_LABELS[i]} ${n}`).join(', ')}`}>
+              <div className="cost-bins" role="img" aria-label={`Messages per cost range ${scope}: ${bins.map((n, i) => `${BIN_LABELS[i]} ${n}`).join(', ')}`}>
                 {bins.map((count, i) => (
                   <div className="cost-bin" key={BIN_LABELS[i]} {...tip(`${count} messages costing ${BIN_LABELS[i]}`)}>
                     <span>{count}</span>
@@ -36,9 +37,9 @@ export function MessageCostCard({ messageCost }: { messageCost: Activity['messag
               <div className="cost-bin-labels" aria-hidden="true">
                 {BIN_LABELS.map(label => <span key={label}>{label}</span>)}
               </div>
-              <h3>Outliers this week</h3>
+              <h3>{`Outliers ${scope}`}</h3>
               {outliers.length === 0
-                ? <p className="note">No message reached $1 this week.</p>
+                ? <p className="note">{`No message reached $1 ${scope}.`}</p>
                 : (
                     <>
                       {outlierCount > outliers.length && <p className="note">{`The ${outliers.length} costliest of ${outlierCount} messages over $1.`}</p>}

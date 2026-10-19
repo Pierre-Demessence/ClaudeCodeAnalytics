@@ -1,3 +1,4 @@
+import type { Range } from './range.ts';
 import type { FiveHourWindow } from './sessions.ts';
 import type { WeekShare } from './share.ts';
 import type { ApiEvent, Plan, Snapshot, UsageRecord } from './types.ts';
@@ -56,7 +57,7 @@ export interface WeekRow {
 export interface WeekHistory {
   /** Medians leave out the window in progress; the cost median also leaves out windows without Claude Code messages. */
   stats: { blocked: number; hit: number; medianCost?: number; medianPercent?: number };
-  /** The last 12 windows, newest first. */
+  /** The windows starting in the range, or the last 12 without one; newest first. */
   weeks: WeekRow[];
 }
 
@@ -70,6 +71,8 @@ export interface WeekHistoryInput {
   now: number;
   /** The plan the percents are shown on. */
   plan: Plan;
+  /** Lists the windows that start in it, without a cap; without one, the last 12. */
+  range?: Range;
   records: readonly UsageRecord[];
   /** Every 5-hour window, as `fiveHourWindows` builds them. */
   sessionWindows: readonly FiveHourWindow[];
@@ -103,9 +106,9 @@ function pressureByCost(spend: readonly { cost: number; ms: number }[], k: numbe
   return undefined;
 }
 
-/** The last 12 weekly windows: final %, cost per day, sessions and projects. */
+/** The weekly windows starting in a range, or the last 12: final %, cost per day, sessions and projects. */
 export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
-  const { calibrationK, current, hits = [], now, plan, records, sessionWindows, shares, snapshots, weekLimitThreshold, weekStartOf } = input;
+  const { calibrationK, current, hits = [], now, plan, range, records, sessionWindows, shares, snapshots, weekLimitThreshold, weekStartOf } = input;
 
   const starts = new Set<number>(snapshots.map(s => Date.parse(s.weeklyResetsAt) - WEEK_MS));
   if (current)
@@ -113,7 +116,8 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
   const recordStarts = records.map(record => ({ record, start: weekStartOf(Date.parse(record.ts)) }));
   for (const { start } of recordStarts)
     starts.add(start);
-  const shown = [...starts].sort((a, b) => b - a).slice(0, HISTORY_WEEKS);
+  const ordered = [...starts].sort((a, b) => b - a);
+  const shown = range ? ordered.filter(start => start >= range.from && start < range.to) : ordered.slice(0, HISTORY_WEEKS);
 
   const building = new Map<number, Building>(shown.map(start => [start, { cost: 0, days: Array.from<number>({ length: 7 }).fill(0), messages: 0, projects: new Map(), saving: 0, spend: [] }]));
   const projectOf = sessionProjects(records);

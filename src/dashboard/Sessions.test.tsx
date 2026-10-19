@@ -6,6 +6,7 @@ import type { Summary } from '@/dashboard/api';
 
 import { HOUR_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
+import { viewOver } from '@/dashboard/rangeTesting';
 import { Sessions } from '@/dashboard/Sessions';
 import { TipProvider } from '@/dashboard/Tip';
 
@@ -152,5 +153,64 @@ describe('sessions tab', () => {
       renderTab(summary([rec(2 * HOUR_MS)], [reading(HOUR_MS, 40, 2 * HOUR_MS)]));
       expect(document.querySelectorAll('.session-block .icon-blocked, .session-peak-blocked')).toHaveLength(0);
     });
+  });
+});
+
+describe('sessions tab over a range', () => {
+  afterEach(cleanup);
+
+  // One session a day at 10:00 from 1 Sep to 2 Oct, UTC.
+  const days = Array.from({ length: 32 }, (_, i) => new Date(Date.parse('2026-09-01T10:00:00Z') + i * 86_400_000).toISOString());
+  const input = { endpointEnabled: true, now: NOW, planHistory: [], records: days.map(ts => rec(NOW - Date.parse(ts), { sessionId: ts })), snapshots: [], timeZone: 'UTC' };
+  const september = { from: '2026-09-01', kind: 'custom', to: '2026-09-30' } as const;
+  const renderOver = () => {
+    const { summary: data, view } = viewOver(input, september);
+    return render(<TipProvider><Sessions summary={data} view={view} /></TipProvider>);
+  };
+
+  it('names the range and counts its sessions', () => {
+    renderOver();
+    expect(screen.getByRole('heading', { name: '5-hour sessions, 1 Sept – 30 Sept 2026' })).toBeTruthy();
+    expect(stat('sessions, 1 Sept – 30 Sept 2026').previousElementSibling!.textContent).toBe('30');
+  });
+
+  it('pages the session list by 25, newest first', () => {
+    renderOver();
+    const list = card('Session list');
+    expect(within(list).getAllByRole('row')).toHaveLength(26);
+    expect(within(list).getAllByRole('row')[1]!.textContent).toContain('Wed 30 Sept');
+    expect(within(list).getByRole('navigation', { name: 'Session list pages' }).textContent).toBe('Page 1 of 2');
+    expect((within(list).getByRole('button', { name: 'Previous page' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(list).getByRole('button', { name: 'Next page' }));
+    expect(within(list).getAllByRole('row')).toHaveLength(6);
+    expect(within(list).getByRole('navigation', { name: 'Session list pages' }).textContent).toBe('Page 2 of 2');
+    expect((within(list).getByRole('button', { name: 'Next page' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('pages the block chart by 7 days, going back in time with the left button', () => {
+    renderOver();
+    const chart = card('5-hour sessions, 1 Sept – 30 Sept 2026');
+    const rows = () => [...chart.querySelectorAll('.session-day')].map(day => day.textContent);
+    expect(rows()).toHaveLength(7);
+    expect(rows()[0]).toBe('Wed 30 Sept');
+    const pager = within(chart).getByRole('navigation', { name: 'Chart days' });
+    expect(pager.textContent).toBe('Thu 24 Sept – Wed 30 Sept');
+    expect((within(pager).getByRole('button', { name: 'Next page' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(pager).getByRole('button', { name: 'Previous page' }));
+    expect(rows()[0]).toBe('Wed 23 Sept');
+    expect(within(chart).getByRole('navigation', { name: 'Chart days' }).textContent).toBe('Thu 17 Sept – Wed 23 Sept');
+  });
+
+  it('shows no pager for a range that fits in one page', () => {
+    const { summary: data, view } = viewOver(input, { from: '2026-09-01', kind: 'custom', to: '2026-09-05' });
+    render(<TipProvider><Sessions summary={data} view={view} /></TipProvider>);
+    expect(screen.queryByRole('navigation', { name: 'Session list pages' })).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Chart days' })).toBeNull();
+  });
+
+  it('says so when the range holds no session', () => {
+    const { summary: data, view } = viewOver(input, { from: '2025-01-01', kind: 'custom', to: '2025-01-31' });
+    render(<TipProvider><Sessions summary={data} view={view} /></TipProvider>);
+    expect(within(card('Session list')).getByText('No 5-hour session in this range.')).toBeTruthy();
   });
 });

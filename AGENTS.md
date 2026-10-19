@@ -29,10 +29,13 @@ Run lint, test and build before considering work done.
 - `src/core/` — pure logic, no Node or DOM APIs: transcript parsing, events
   (rate-limit hits, overloads, compactions), output split by tool, context added per tool, pricing,
   aggregation, calibration, forecast, active pace, weekly share, week history,
-  cache anomalies, plans, plan fit, value for money, multipliers, breakdown, `buildSummary`.
+  cache anomalies, plans, plan fit, value for money, multipliers, breakdown, `buildSummary`,
+  history ranges (`range.ts` resolves the picker's choice, `ranged.ts` builds the history
+  tabs' views over one; both go through `prepareSummary` like `buildSummary`).
 - `src/collector/` — Node: transcript scan, usage endpoint client, data-dir
   store, lock, hook installer; entry `cli.ts` (also run by the Claude Code hook).
-- `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview.
+- `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview (`/api/range` is the
+  history tabs' view of a range, from the stored data only).
 - `src/dashboard/` — React app (`main.tsx` entry).
 - `widget/` — the taskbar widget, one native Rust process (no webview): `widget.svg`
   is its look, `src/` the logic (`view` texts and flags, `template` fills the SVG,
@@ -61,7 +64,11 @@ Run lint, test and build before considering work done.
 - `import-x/no-unresolved` checks every import, including the `@/` alias.
 - Console output and top-level `await` are only allowed in `cli.ts` files.
 - Tabs are `#/<id>` hash links (`dashboard/tabs.ts`); a new tab is one entry
-  in `TABS` plus its branch in `App.tsx`.
+  in `TABS` plus its branch in `App.tsx`. Usage, Breakdown, Sessions and Weeks share a
+  history range kept in the hash's query (`?range=<preset>[&back=<n>]` or
+  `?from=YYYY-MM-DD&to=YYYY-MM-DD`; none = each view's default window). They read
+  `HistoryView` (`dashboard/history.ts`), wrap their content in `RangeFrame`, and page
+  long lists with `Pager`/`usePage`.
 - Theme: `data-theme` on `<html>`. Dark variables exist twice in `styles.css`
   (OS media query and `[data-theme='dark']`): change both. The storage key
   `cca-theme` is also read by the inline script in `index.html`.
@@ -81,7 +88,8 @@ Run lint, test and build before considering work done.
 - Anonymize mode (header eye button) masks project names, paths, branches and
   conversation titles in one place, `anonymizeSummary` (`dashboard/anonymize.ts`),
   applied to the summary in `App.tsx`. A new field showing one of those must be
-  added there, and views must read it from the summary, never from another source.
+  added there (ranged data goes through `anonymizeRanged`, applied in `useHistoryView`),
+  and views must read it from the summary or the history view, never from another source.
 - Claude Design: one canvas for the project, "Claude Code Analytics redesign"
   (<https://claude.ai/artifact/Fw9e29WbgMikfa9CK5WyfV>). A new design is a page in
   it (board files named by feature), never a new artifact.
@@ -122,6 +130,8 @@ Run lint, test and build before considering work done.
   Traefik (bound to `127.0.0.1:80`) reaches it, and `*.localhost` passes the
   default `allowedHosts`. Other containers on the `proxy` network can still
   call it by IP (Vite always allows IP hosts). Never publish a port.
+- `GET /api/range` reads the stored data only: it never runs the collector or calls the
+  endpoint, so any number of tabs can ask for ranges without touching the rate limit.
 - The container loads `vite.config.ts` with `--configLoader native` (its root
   filesystem is read-only), so the config and everything it imports must run
   under Node's type stripping, like the collector.

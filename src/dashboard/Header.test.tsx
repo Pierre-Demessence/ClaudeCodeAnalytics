@@ -32,6 +32,14 @@ describe('header', () => {
     expect(screen.getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBeNull();
   });
 
+  it('carries the range on the links of the tabs that read it', () => {
+    renderHeader({ range: { back: 2, kind: 'preset', preset: 'week' } });
+    expect(screen.getByRole('link', { name: 'Usage' }).getAttribute('href')).toBe('#/usage?range=week&back=2');
+    expect(screen.getByRole('link', { name: 'Sessions' }).getAttribute('href')).toBe('#/sessions?range=week&back=2');
+    expect(screen.getByRole('link', { name: 'Overview' }).getAttribute('href')).toBe('#/overview');
+    expect(screen.getByRole('link', { name: 'Calibration' }).getAttribute('href')).toBe('#/calibration');
+  });
+
   it('disables Refresh while busy', () => {
     renderHeader({ busy: true });
     expect((screen.getByRole('button', { name: 'Refresh' }) as HTMLButtonElement).disabled).toBe(true);

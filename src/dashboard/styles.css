@@ -1019,14 +1019,79 @@ details .table {
   color: var(--critical-text);
 }
 
-/* Breakdown: every bar carries a $ or % label; model parts use the family patterns. */
-.breakdown-controls {
+/* History range: the picker above the Usage, Breakdown, Sessions and Weeks content. */
+.range-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 12px 24px;
 }
 
+.range-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.range-picker .toggle {
+  flex-wrap: wrap;
+}
+
+.range-step,
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-label {
+  min-width: 11ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.range-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.range-dates label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.range-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The content stays readable while the range's data is on its way; the picker names the wait. */
+.range-content {
+  display: grid;
+  gap: 20px;
+  transition: opacity 0.15s;
+}
+
+.range-content.loading {
+  opacity: 0.5;
+}
+
+.pager {
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.card-head .pager {
+  margin-top: 0;
+}
+
+/* Breakdown: every bar carries a $ or % label; model parts use the family patterns. */
 .breakdown-total {
   color: var(--text-secondary);
   font-size: 0.9rem;

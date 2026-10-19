@@ -3,12 +3,15 @@ import type { Plugin } from 'vite';
 
 import { Buffer } from 'node:buffer';
 
+import type { SummaryInput } from '../core/summary.ts';
 import type { Plan, PlanPeriod, Settings, Snapshot } from '../core/types.ts';
 
 import { collect } from '../collector/collect.ts';
 import { waitForLock } from '../collector/lock.ts';
 import { claudeDir, dataDir, Store } from '../collector/store.ts';
 import { PLANS } from '../core/plans.ts';
+import { MAX_RANGE_MS } from '../core/range.ts';
+import { buildRanged } from '../core/ranged.ts';
 import { buildSummary } from '../core/summary.ts';
 import { widgetView } from '../core/widget.ts';
 
@@ -160,7 +163,7 @@ async function underLock(store: Store, waitMs: number, write: () => Promise<void
   }
 }
 
-async function summary(store: Store, timeZone: string) {
+async function loadInput(store: Store, timeZone: string) {
   const [records, events, snapshots, settings, status, titles] = await Promise.all([
     store.loadRecords(),
     store.loadEvents(),
@@ -169,23 +172,45 @@ async function summary(store: Store, timeZone: string) {
     store.loadStatus(),
     store.loadSessions(),
   ]);
-  return {
-    ...buildSummary({
-      endpointEnabled: settings.endpointEnabled,
-      events: [...events.values()],
-      limitThreshold: settings.limitThreshold,
-      now: Date.now(),
-      planHistory: settings.planHistory,
-      records: [...records.values()],
-      snapshots,
-      subscriptionStart: status.subscriptionStartedAt ? Date.parse(status.subscriptionStartedAt) : undefined,
-      throttleMinutes: settings.throttleMinutes,
-      timeZone,
-      titles,
-      weekLimitThreshold: settings.weekLimitThreshold,
-    }),
-    status,
+  const input: SummaryInput = {
+    endpointEnabled: settings.endpointEnabled,
+    events: [...events.values()],
+    limitThreshold: settings.limitThreshold,
+    now: Date.now(),
+    planHistory: settings.planHistory,
+    records: [...records.values()],
+    snapshots,
+    subscriptionStart: status.subscriptionStartedAt ? Date.parse(status.subscriptionStartedAt) : undefined,
+    throttleMinutes: settings.throttleMinutes,
+    timeZone,
+    titles,
+    weekLimitThreshold: settings.weekLimitThreshold,
   };
+  return { input, status };
+}
+
+async function summary(store: Store, timeZone: string) {
+  const { input, status } = await loadInput(store, timeZone);
+  return { ...buildSummary(input), status };
+}
+
+/** A whole number of milliseconds from the query string; anything else is a client error. */
+function boundOf(value: string | null, name: string): number {
+  const bound = value === null || value.trim() === '' ? Number.NaN : Number(value);
+  if (!Number.isSafeInteger(bound))
+    throw new HttpError(400, `${name} must be a whole number of milliseconds`);
+  return bound;
+}
+
+/** The history tabs' numbers over `from`–`to` (ms, `to` excluded), from the stored data only. */
+async function ranged(store: Store, timeZone: string, query: URLSearchParams) {
+  const from = boundOf(query.get('from'), 'from');
+  const to = boundOf(query.get('to'), 'to');
+  if (from >= to)
+    throw new HttpError(400, 'from must be before to');
+  if (to - from > MAX_RANGE_MS)
+    throw new HttpError(400, 'The range is too long');
+  return buildRanged((await loadInput(store, timeZone)).input, { from, to });
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse, lockWaitMs: number): Promise<void> {
@@ -200,6 +225,10 @@ async function handle(req: IncomingMessage, res: ServerResponse, lockWaitMs: num
     if (url.searchParams.get('collect') !== '0')
       await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
     return send(res, 200, await summary(store, timeZone));
+  }
+  if (req.method === 'GET' && url.pathname === '/range') {
+    // Stored data only: the collector runs with `/summary`, which the dashboard reloads every few minutes.
+    return send(res, 200, await ranged(store, timeZone, url.searchParams));
   }
   if (req.method === 'GET' && url.pathname === '/widget') {
     // The taskbar widget polls this: it keeps the endpoint readings coming while the PC is idle.

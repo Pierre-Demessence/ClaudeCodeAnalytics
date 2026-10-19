@@ -2,18 +2,26 @@ import { TriangleAlert } from 'lucide-react';
 
 import type { WeekRow } from '@/core/weekHistory';
 import type { Summary } from '@/dashboard/api';
+import type { HistoryView } from '@/dashboard/history';
 
 import { dayKey } from '@/core/aggregate';
 import { BlockedIcon } from '@/dashboard/BlockedIcon';
 import { formatDollars, formatInteger, formatPercent, formatUsd } from '@/dashboard/format';
+import { defaultView, rangeText } from '@/dashboard/history';
+import { Pager } from '@/dashboard/Pager';
+import { RangeFrame } from '@/dashboard/RangePicker';
 import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
 import { InfoTip } from '@/dashboard/Tip';
+import { usePage } from '@/dashboard/usePage';
 import { useTip } from '@/dashboard/useTip';
 import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 const HitIcon = ({ size = 14 }: { size?: number }) => <TriangleAlert aria-hidden="true" className="icon-inline icon-critical" size={size} />;
 
-const EMPTY = 'No weekly window yet.';
+/** Rows per page of the week list. */
+const LIST_ROWS = 12;
+
+const emptyText = (view: HistoryView) => (view.range ? 'No weekly window in this range.' : 'No weekly window yet.');
 
 /** What the rate limits seen in the transcripts did to a week: blocked 5-hour sessions, weekly-limit hits and when. */
 function blockedTip({ blockedSessions, limitHits }: WeekRow, timeZone: string): string {
@@ -28,16 +36,18 @@ function weekTip(week: WeekRow, timeZone: string): string {
   return `${formatWeekRange(week, timeZone)}${week.inProgress ? ' (in progress)' : ''}\n${formatUsd(week.cost)} · ${week.messages} messages · ${week.sessions} sessions`;
 }
 
-function Stats({ summary }: { summary: Summary }) {
-  const { planFit, weekHistory: { stats, weeks }, weekLimitThreshold } = summary;
-  const uncapped = uncappedMedian(planFit, stats.medianPercent);
+function Stats({ summary, view }: { summary: Summary; view: HistoryView }) {
+  const { planFit, weekLimitThreshold } = summary;
+  const { stats, weeks } = view.history.weekHistory;
+  // The estimate is the Plans tab's typical week over its own weeks, so it only matches the default 12.
+  const uncapped = view.range ? undefined : uncappedMedian(planFit, stats.medianPercent);
   return (
     <section aria-label="Weeks summary" className="session-stats">
       <div className="card">
         <strong>{weeks.length}</strong>
         <span>
           weeks shown
-          <InfoTip label="About weeks shown">Weekly windows with a reading or a message, the one in progress included. At most the last 12.</InfoTip>
+          <InfoTip label="About weeks shown">{view.range ? 'Weekly windows with a reading or a message that start in the range, the one in progress included.' : 'Weekly windows with a reading or a message, the one in progress included. At most the last 12.'}</InfoTip>
         </span>
       </div>
       <div className="card">
@@ -78,8 +88,9 @@ function Stats({ summary }: { summary: Summary }) {
   );
 }
 
-function Timeline({ summary }: { summary: Summary }) {
-  const { planFit, timeZone, weekHistory: { stats, weeks }, weekLimitThreshold } = summary;
+function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
+  const { planFit, timeZone, weekLimitThreshold } = summary;
+  const { stats, weeks } = view.history.weekHistory;
   const tip = useTip();
   const bounds = heatBounds(weeks);
   const maxDay = Math.max(0, ...weeks.flatMap(w => w.days.map(cost => cost ?? 0)));
@@ -88,7 +99,7 @@ function Timeline({ summary }: { summary: Summary }) {
   return (
     <section className="card">
       <div className="card-head">
-        <h2>Weekly usage, last 12 weeks</h2>
+        <h2>{`Weekly usage, ${rangeText(view, 'last 12 weeks')}`}</h2>
         <InfoTip label="About the weekly timeline">
           {weeks[0]
             ? `Each cell is the cost of 24 h from the weekly reset (${resetText(weeks[0].start, timeZone)}). The bar is the week's peak %.`
@@ -96,7 +107,7 @@ function Timeline({ summary }: { summary: Summary }) {
         </InfoTip>
       </div>
       {weeks.length === 0
-        ? <p className="empty">{EMPTY}</p>
+        ? <p className="empty">{emptyText(view)}</p>
         : (
             <>
               <div className="wk-grid">
@@ -187,95 +198,109 @@ function Timeline({ summary }: { summary: Summary }) {
   );
 }
 
-function List({ summary }: { summary: Summary }) {
-  const { limitThreshold, planFit, timeZone, weekHistory: { weeks } } = summary;
+function List({ summary, view }: { summary: Summary; view: HistoryView }) {
+  const { limitThreshold, planFit, timeZone } = summary;
+  const { weeks } = view.history.weekHistory;
   const tip = useTip();
+  const { end, page, pages, setPage, start } = usePage(weeks.length, LIST_ROWS, view.range ? `${view.range.from}-${view.range.to}` : 'default');
   return (
     <section className="card">
       <h2>Week list</h2>
       {weeks.length === 0
-        ? <p className="empty">{EMPTY}</p>
+        ? <p className="empty">{emptyText(view)}</p>
         : (
-            <div className="table-scroll">
-              <table className="table week-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Week</th>
-                    <th scope="col">Projects</th>
-                    <th scope="col">
-                      Sessions
-                      <InfoTip label="About sessions">
-                        {'5-hour windows started in the week.\n'}
-                        <HitIcon size={13} />
-                        {` peak ≥ ${limitThreshold}%\n`}
-                        <BlockedIcon size={13} />
-                        {' blocked by a rate limit'}
-                      </InfoTip>
-                    </th>
-                    <th scope="col">Messages</th>
-                    <th scope="col">
-                      Cost
-                      <InfoTip label="About cost">API-equivalent cost of the week's Claude Code messages.</InfoTip>
-                    </th>
-                    <th scope="col">Peak %</th>
-                    <th scope="col">
-                      Without the limit
-                      <InfoTip label="About without the limit">The peak % plus the days a limit or a missing subscription hid, filled at your typical pace. The same estimate as the Plans tab, on your current plan.</InfoTip>
-                    </th>
-                    <th scope="col">
-                      Source
-                      <InfoTip label="About source">{'Reading: the peak % comes from a reading of the week.\nEstimated: no reading, so it comes from the transcripts and the calibration.'}</InfoTip>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {weeks.map((week) => {
-                    const uncapped = uncappedOf(planFit, week);
-                    return (
-                      <tr key={week.start}>
-                        <th scope="row">
-                          {formatWeekRange(week, timeZone)}
-                          {week.inProgress && <span className="session-now">in progress</span>}
-                        </th>
-                        <td {...(week.projects.length > 0 ? tip(week.projects.map(p => p.path).join('\n')) : {})}>{projectsText(week)}</td>
-                        <td className="wk-sessions-cell">
-                          {week.sessions}
-                          {week.cappedSessions > 0 && (
-                            <span className="wk-capped">
-                              <HitIcon size={13} />
-                              {week.cappedSessions}
-                            </span>
-                          )}
-                          {week.blockedSessions > 0 && (
-                            <span className="wk-blocked-sessions">
-                              <BlockedIcon size={13} />
-                              {week.blockedSessions}
-                            </span>
-                          )}
-                        </td>
-                        <td>{formatInteger(week.messages)}</td>
-                        <td><strong>{formatUsd(week.cost)}</strong></td>
-                        <td><strong>{percentText(week)}</strong></td>
-                        <td {...(uncapped ? tip(uncappedTip(week, uncapped, timeZone)) : {})}>{uncapped ? uncappedText(uncapped.demand) : ''}</td>
-                        <td className="secondary">{week.source}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="table-scroll">
+                <table className="table week-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Week</th>
+                      <th scope="col">Projects</th>
+                      <th scope="col">
+                        Sessions
+                        <InfoTip label="About sessions">
+                          {'5-hour windows started in the week.\n'}
+                          <HitIcon size={13} />
+                          {` peak ≥ ${limitThreshold}%\n`}
+                          <BlockedIcon size={13} />
+                          {' blocked by a rate limit'}
+                        </InfoTip>
+                      </th>
+                      <th scope="col">Messages</th>
+                      <th scope="col">
+                        Cost
+                        <InfoTip label="About cost">API-equivalent cost of the week's Claude Code messages.</InfoTip>
+                      </th>
+                      <th scope="col">Peak %</th>
+                      <th scope="col">
+                        Without the limit
+                        <InfoTip label="About without the limit">The peak % plus the days a limit or a missing subscription hid, filled at your typical pace. The same estimate as the Plans tab, on your current plan.</InfoTip>
+                      </th>
+                      <th scope="col">
+                        Source
+                        <InfoTip label="About source">{'Reading: the peak % comes from a reading of the week.\nEstimated: no reading, so it comes from the transcripts and the calibration.'}</InfoTip>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weeks.slice(start, end).map((week) => {
+                      const uncapped = uncappedOf(planFit, week);
+                      return (
+                        <tr key={week.start}>
+                          <th scope="row">
+                            {formatWeekRange(week, timeZone)}
+                            {week.inProgress && <span className="session-now">in progress</span>}
+                          </th>
+                          <td {...(week.projects.length > 0 ? tip(week.projects.map(p => p.path).join('\n')) : {})}>{projectsText(week)}</td>
+                          <td className="wk-sessions-cell">
+                            {week.sessions}
+                            {week.cappedSessions > 0 && (
+                              <span className="wk-capped">
+                                <HitIcon size={13} />
+                                {week.cappedSessions}
+                              </span>
+                            )}
+                            {week.blockedSessions > 0 && (
+                              <span className="wk-blocked-sessions">
+                                <BlockedIcon size={13} />
+                                {week.blockedSessions}
+                              </span>
+                            )}
+                          </td>
+                          <td>{formatInteger(week.messages)}</td>
+                          <td><strong>{formatUsd(week.cost)}</strong></td>
+                          <td><strong>{percentText(week)}</strong></td>
+                          <td {...(uncapped ? tip(uncappedTip(week, uncapped, timeZone)) : {})}>{uncapped ? uncappedText(uncapped.demand) : ''}</td>
+                          <td className="secondary">{week.source}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {pages > 1 && (
+                <Pager
+                  canNext={page < pages - 1}
+                  canPrevious={page > 0}
+                  label="Week list pages"
+                  onNext={() => setPage(page + 1)}
+                  onPrevious={() => setPage(page - 1)}
+                  text={`Page ${page + 1} of ${pages}`}
+                />
+              )}
+            </>
           )}
     </section>
   );
 }
 
 /** Past weekly windows: summary numbers, a week × day timeline and the list. */
-export function Weeks({ summary }: { summary: Summary }) {
+export function Weeks({ summary, view = defaultView(summary) }: { summary: Summary; view?: HistoryView }) {
   return (
-    <>
-      <Stats summary={summary} />
-      <Timeline summary={summary} />
-      <List summary={summary} />
-    </>
+    <RangeFrame view={view}>
+      <Stats summary={summary} view={view} />
+      <Timeline summary={summary} view={view} />
+      <List summary={summary} view={view} />
+    </RangeFrame>
   );
 }

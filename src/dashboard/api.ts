@@ -1,3 +1,5 @@
+import type { Range } from '@/core/range';
+import type { RangedSummary } from '@/core/ranged';
 import type { DashboardSummary } from '@/core/summary';
 import type { PlanPeriod, Status } from '@/core/types';
 
@@ -13,21 +15,24 @@ export interface ManualReading {
 
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-async function request(path: string, body?: unknown, params: Record<string, string> = {}): Promise<Summary> {
+async function request<T = Summary>(path: string, body?: unknown, params: Record<string, string> = {}, signal?: AbortSignal): Promise<T> {
   const query = new URLSearchParams({ tz: timeZone, ...params });
   const response = await fetch(`/api${path}?${query}`, body === undefined
-    ? undefined
-    : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' }, method: 'POST' });
-  const json = await response.json() as Summary | { error?: string };
+    ? { signal }
+    : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' }, method: 'POST', signal });
+  const json = await response.json() as T | { error?: string };
   if (!response.ok)
-    throw new Error(('error' in json && json.error) || response.statusText);
-  return json as Summary;
+    throw new Error((json && typeof json === 'object' && 'error' in json && json.error) || response.statusText);
+  return json as T;
 }
 
 export const loadSummary = () => request('/summary');
 
 /** The summary of the data already stored, without importing transcripts first: fast, possibly a little behind. */
 export const loadStoredSummary = () => request('/summary', undefined, { collect: '0' });
+
+/** The history views over `range`, from the data already stored; `signal` abandons the request. */
+export const loadRange = (range: Range, signal?: AbortSignal) => request<RangedSummary>('/range', undefined, { from: String(range.from), to: String(range.to) }, signal);
 
 /** Imports transcripts and calls the endpoint now, ignoring the throttle. */
 export const refreshNow = () => request('/collect', {});

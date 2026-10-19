@@ -10,7 +10,7 @@ import type { ModelRatio } from './modelRatio.ts';
 import type { MultiplierCheck } from './multipliers.ts';
 import type { WeekPacing } from './pacing.ts';
 import type { PlanFitInput } from './planFit.ts';
-import type { Sessions } from './sessions.ts';
+import type { FiveHourWindow, Sessions } from './sessions.ts';
 import type { WeekShare } from './share.ts';
 import type { ApiEvent, Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
 import type { ValueForMoney } from './valueForMoney.ts';
@@ -19,7 +19,7 @@ import type { WeekHistory } from './weekHistory.ts';
 import { activeHourlyPace, activeLeftByFamily, activeTimeLeft } from './activePace.ts';
 import { familyPaces } from './activeTime.ts';
 import { buildActivity } from './activity.ts';
-import { aggregate, createCostIndex, dailyCostSeries, dayKey, startOfDay } from './aggregate.ts';
+import { aggregate, createCostIndex, dailyCostSeries, dayKey } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
 import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { dedupeHits, hitScope } from './events.ts';
@@ -36,6 +36,7 @@ import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces }
 import { typicalWeek, weeklyShares } from './share.ts';
 import { valueForMoney } from './valueForMoney.ts';
 import { buildWeekHistory, DEFAULT_WEEK_LIMIT_THRESHOLD } from './weekHistory.ts';
+import { weekBucketer, weekStarter, windowStartOf } from './weekWindows.ts';
 
 /** Days of daily cost and 5-hour sessions used as "typical" for forecasts. */
 const TYPICAL_DAYS = 28;
@@ -64,8 +65,6 @@ export interface SummaryInput {
   /** Weekly % from which a week counts as having hit the limit; 98 by default. */
   weekLimitThreshold?: number;
 }
-
-export type BreakdownPeriod = 'week' | 'fourWeeks' | 'all';
 
 /** The 5-hour window of the latest reading, while that reading is still valid. */
 export interface FiveHourSession {
@@ -107,8 +106,8 @@ export interface CurrentWeek {
 export interface DashboardSummary {
   /** Heatmap, cache use, message costs (this weekly window) and Claude Code upgrades. */
   activity: Activity;
-  /** Where the usage went: this weekly window, it and the 3 before, all time. */
-  breakdown: Record<BreakdownPeriod, Breakdown>;
+  /** Where the usage went in the current weekly window. */
+  breakdown: Breakdown;
   calibration?: Calibration;
   /** The current weekly window, from its reading or, without one yet, from the last known reset. */
   current?: CurrentWeek;
@@ -140,6 +139,8 @@ export interface DashboardSummary {
   planHistory: readonly PlanPeriod[];
   /** How the active plan period was set; absent without history. */
   planSource?: PlanPeriod['source'];
+  /** What the history ranges resolve against: the weekly reset times and the first stored message. */
+  rangeBasis: { firstMessage?: number; resets: number[] };
   /** Past 5-hour windows of the last 7 days. */
   sessions: Sessions;
   /** Minutes between endpoint calls. */
@@ -166,32 +167,37 @@ function fiveHourStillValid(snapshot: Snapshot, now: number): boolean {
   return now - Date.parse(snapshot.ts) < FIVE_HOURS_MS;
 }
 
-/** Window start containing `ms`, for windows anchored on `anchor` (a reset time). */
-function windowStartOf(ms: number, anchor: number): number {
-  return anchor + Math.floor((ms - anchor) / WEEK_MS) * WEEK_MS;
-}
-
 /**
- * Start of the weekly window holding `ms`, given the reset times seen in
- * readings (sorted). Uses the first reset after `ms`, so usage lands in the
- * same window as the readings grouped by that reset, even if Anthropic moves
- * the reset time; past the last reset, windows continue from it.
+ * What the summary and the ranged views share, whatever the range: readings
+ * sorted, calibrations, the 5-hour windows, the current week. Computed once by
+ * `prepareSummary`, so the two can never disagree.
  */
-export function weekStartFor(ms: number, resets: readonly number[]): number {
-  const anchor = resets.find(reset => reset > ms) ?? resets.at(-1)!;
-  return windowStartOf(ms, anchor);
+export interface PreparedSummary {
+  calibration?: Calibration;
+  current?: CurrentWeek;
+  costBetween: (from: number, to: number) => number;
+  /** Time of the first stored message, or `now` without any. */
+  first: number;
+  fiveHourCalibration?: Calibration;
+  fiveHourSession?: FiveHourSession;
+  limitThreshold: number;
+  plan: Plan;
+  /** Weekly reset times seen in readings, sorted. */
+  resets: number[];
+  sessionHits: ApiEvent[];
+  sessionWindows: FiveHourWindow[];
+  /** Readings oldest first. */
+  snapshots: Snapshot[];
+  weekHits: ApiEvent[];
+  weekLimitThreshold: number;
+  /** Start of the weekly window holding a time. */
+  weekStartOf: (ms: number) => number;
+  /** Final % of every completed window with readings. */
+  weeks: WeekShare[];
 }
 
-/** Monday 00:00 local, as a fallback week start before any reading exists. */
-function isoWeekStart(ms: number, timeZone: string): string {
-  const day = dayKey(ms, timeZone);
-  const date = new Date(`${day}T12:00:00Z`);
-  const offset = (date.getUTCDay() + 6) % 7;
-  return dayKey(date.getTime() - offset * DAY_MS, 'UTC');
-}
-
-/** Everything the dashboard shows, computed from collector data. */
-export function buildSummary(input: SummaryInput): DashboardSummary {
+/** The part of the summary that does not depend on a range. */
+export function prepareSummary(input: SummaryInput): PreparedSummary {
   const { now, planHistory, records, timeZone } = input;
   const snapshots = [...input.snapshots].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
   const nowIso = new Date(now).toISOString();
@@ -223,12 +229,6 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
   const activePace = activeHourlyPace(records, now - TYPICAL_DAYS * DAY_MS, now);
   const paceByFamily = familyPaces(records, now - TYPICAL_DAYS * DAY_MS, now);
-  // A loop, not Math.max(...): spreading a year of records overflows the call stack.
-  let latestRecord: UsageRecord | undefined;
-  for (const record of records) {
-    if (!latestRecord || Date.parse(record.ts) > Date.parse(latestRecord.ts))
-      latestRecord = record;
-  }
 
   const weeks = weeklyShares(snapshots, costBetween, calibration && { k: calibration.k, plan }, planHistory, now);
   const typicalBase = typicalWeek(weeks, plan);
@@ -323,20 +323,47 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     }
   }
 
+  const resets = [...new Set(snapshots.map(s => Date.parse(s.weeklyResetsAt)))].sort((a, b) => a - b);
+  return {
+    calibration,
+    costBetween,
+    current,
+    first,
+    fiveHourCalibration,
+    fiveHourSession,
+    limitThreshold,
+    plan,
+    resets,
+    sessionHits,
+    sessionWindows,
+    snapshots,
+    weekHits,
+    weekLimitThreshold,
+    weeks,
+    weekStartOf: weekStarter(resets, timeZone),
+  };
+}
+
+/** Everything the dashboard shows, computed from collector data. */
+export function buildSummary(input: SummaryInput): DashboardSummary {
+  const { now, planHistory, records, timeZone } = input;
+  const nowIso = new Date(now).toISOString();
+  const prepared = prepareSummary(input);
+  const { calibration, costBetween, current, first, fiveHourCalibration, fiveHourSession, limitThreshold, plan, resets, sessionHits, sessionWindows, snapshots, weekHits, weekLimitThreshold, weeks, weekStartOf } = prepared;
+  const latest = snapshots.at(-1);
+  // A loop, not Math.max(...): spreading a year of records overflows the call stack.
+  let latestRecord: UsageRecord | undefined;
+  for (const record of records) {
+    if (!latestRecord || Date.parse(record.ts) > Date.parse(latestRecord.ts))
+      latestRecord = record;
+  }
+
   const chartFrom = dayKey(now - (DAILY_CHART_DAYS - 1) * DAY_MS, timeZone);
   const daily = aggregate(records.filter(r => dayKey(Date.parse(r.ts), timeZone) >= chartFrom), ms => dayKey(ms, timeZone));
-  const resets = [...new Set(snapshots.map(s => Date.parse(s.weeklyResetsAt)))].sort((a, b) => a - b);
-  const weekly = aggregate(records, ms => (resets.length === 0
-    ? isoWeekStart(ms, timeZone)
-    : new Date(weekStartFor(ms, resets)).toISOString()));
+  const weekly = aggregate(records, weekBucketer(resets, timeZone));
 
-  const weekStart = resets.length === 0 ? startOfDay(isoWeekStart(now, timeZone), timeZone) : weekStartFor(now, resets);
-  const titles = input.titles ?? {};
-  const breakdown = {
-    all: buildBreakdown(records, titles),
-    fourWeeks: buildBreakdown(records, titles, weekStart - 3 * WEEK_MS),
-    week: buildBreakdown(records, titles, weekStart),
-  };
+  const weekStart = weekStartOf(now);
+  const breakdown = buildBreakdown(records, input.titles ?? {}, weekStart);
 
   const detected = latest && planFromSubscription(latest.subscriptionType, latest.rateLimitTier);
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();
@@ -354,7 +381,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     shares: weeks,
     snapshots,
     weekLimitThreshold,
-    weekStartOf: ms => (resets.length === 0 ? startOfDay(isoWeekStart(ms, timeZone), timeZone) : weekStartFor(ms, resets)),
+    weekStartOf,
   });
 
   const limitsInput = { costBetween, dataStart: first, now, plan, planHistory, snapshots };
@@ -380,6 +407,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     planFit: buildPlanFitInput({ calibrationK: calibration?.k, plan, planHistory, sessionWindows, subscriptionStart: input.subscriptionStart, weekHistory }),
     planHistory,
     planSource: (planHistory.findLast(period => Date.parse(period.from) <= now) ?? planHistory[0])?.source,
+    rangeBasis: { firstMessage: records.length > 0 ? first : undefined, resets },
     sessions,
     throttleMinutes: input.throttleMinutes ?? 15,
     timeZone,

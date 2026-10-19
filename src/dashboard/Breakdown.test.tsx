@@ -1,12 +1,14 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { SummaryInput } from '@/core/summary';
 import type { UsageRecord } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
 
 import { DAY_MS, HOUR_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
 import { Breakdown } from '@/dashboard/Breakdown';
+import { viewOver } from '@/dashboard/rangeTesting';
 import { TipProvider } from '@/dashboard/Tip';
 
 const NOW = Date.now();
@@ -25,21 +27,20 @@ function rec(ago: number, extra: Partial<UsageRecord> = {}): UsageRecord {
   return { cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, cwd: 'S:\\Dev\\app', input: 0, key: ts + JSON.stringify(extra), model: 'claude-opus-5-5', output: 1_000_000, project: 'p', sessionId: 's1', ts, ...extra };
 }
 
-function summary(records: UsageRecord[]): Summary {
+function inputOf(records: UsageRecord[]): SummaryInput {
   const resetsAt = new Date(NOW + 3 * DAY_MS).toISOString();
   return {
-    ...buildSummary({
-      endpointEnabled: true,
-      now: NOW,
-      planHistory: [],
-      records,
-      snapshots: [{ source: 'endpoint', ts: new Date(NOW - 10 * 60_000).toISOString(), weekly: 42, weeklyResetsAt: resetsAt }],
-      timeZone: 'UTC',
-      titles: { s1: { title: 'Build the tab' } },
-    }),
-    status: {},
+    endpointEnabled: true,
+    now: NOW,
+    planHistory: [],
+    records,
+    snapshots: [{ source: 'endpoint', ts: new Date(NOW - 10 * 60_000).toISOString(), weekly: 42, weeklyResetsAt: resetsAt }],
+    timeZone: 'UTC',
+    titles: { s1: { title: 'Build the tab' } },
   };
 }
+
+const summary = (records: UsageRecord[]): Summary => ({ ...buildSummary(inputOf(records)), status: {} });
 
 const card = (name: string) => screen.getByRole('heading', { name }).closest('section')!;
 
@@ -55,18 +56,28 @@ describe('breakdown', () => {
 
   it('shows this week by default, with its share of the weekly limit', () => {
     render(<Breakdown summary={summary(records)} />, { wrapper: TipProvider });
-    expect(screen.getByRole('button', { name: 'This week' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Default' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByText(/^Total/).textContent).toBe('Total $45 · 42% of the weekly limit');
     const projects = within(card('By project')).getAllByRole('row').slice(1);
     expect(projects.map(row => row.querySelector('th')!.textContent)).toEqual(['app', 'other']);
     expect(tipOf(projects[0]!.querySelector('th')!)).toBe('s:\\Dev\\app');
   });
 
-  it('switches period without the weekly limit', () => {
-    render(<Breakdown summary={summary(records)} />);
-    fireEvent.click(screen.getByRole('button', { name: 'All time' }));
+  it('follows the range picked, without the weekly limit beyond the current week', () => {
+    const onChoose = vi.fn();
+    const { summary: data, view } = viewOver(inputOf(records), { back: 0, kind: 'preset', preset: 'all' }, onChoose);
+    render(<Breakdown summary={data} view={view} />);
+    expect(screen.getByRole('button', { name: 'All time' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByText(/^Total/).textContent).toBe('Total $65');
     expect(within(card('By project')).getByText('old')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Last 4 weeks' }));
+    expect(onChoose).toHaveBeenCalledWith({ back: 0, kind: 'preset', preset: '4weeks' });
+  });
+
+  it('keeps the weekly limit for the current week picked as a preset', () => {
+    const { summary: data, view } = viewOver(inputOf(records), { back: 0, kind: 'preset', preset: 'week' });
+    render(<Breakdown summary={data} view={view} />);
+    expect(screen.getByText(/^Total/).textContent).toBe('Total $45 · 42% of the weekly limit');
   });
 
   it('splits agents, effort and surfaces with labels', () => {

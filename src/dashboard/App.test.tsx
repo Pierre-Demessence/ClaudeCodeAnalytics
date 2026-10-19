@@ -1,16 +1,18 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { SummaryInput } from '@/core/summary';
 import type { Summary } from '@/dashboard/api';
 
 import { DAY_MS } from '@/core/calibration';
+import { buildRanged } from '@/core/ranged';
 import { buildSummary } from '@/core/summary';
 import { App } from '@/dashboard/App';
 
 const NOW = Date.now();
 const RESET = new Date(NOW + 3 * DAY_MS).toISOString();
 
-function summary(): Summary {
+function input(): SummaryInput {
   const records = Array.from({ length: 10 }, (_, i) => ({
     cacheRead: 0,
     cacheWrite1h: 0,
@@ -23,14 +25,18 @@ function summary(): Summary {
     ts: new Date(NOW - (i + 1) * DAY_MS).toISOString(),
   }));
   return {
-    ...buildSummary({
-      endpointEnabled: true,
-      now: NOW,
-      planHistory: [{ from: new Date(NOW - 30 * DAY_MS).toISOString(), plan: 'pro', source: 'detected' }],
-      records,
-      snapshots: [{ source: 'endpoint', ts: new Date(NOW - 3_600_000).toISOString(), weekly: 95, weeklyResetsAt: RESET }],
-      timeZone: 'UTC',
-    }),
+    endpointEnabled: true,
+    now: NOW,
+    planHistory: [{ from: new Date(NOW - 30 * DAY_MS).toISOString(), plan: 'pro', source: 'detected' }],
+    records,
+    snapshots: [{ source: 'endpoint', ts: new Date(NOW - 3_600_000).toISOString(), weekly: 95, weeklyResetsAt: RESET }],
+    timeZone: 'UTC',
+  };
+}
+
+function summary(): Summary {
+  return {
+    ...buildSummary(input()),
     status: { endpointResult: 'ok', lastRunAt: new Date(NOW).toISOString(), messages: 10 },
   };
 }
@@ -81,6 +87,41 @@ describe('app', () => {
     });
     expect(screen.getByRole('heading', { name: 'Limit drift' })).toBeTruthy();
     expect((screen.getByLabelText('Plan', { selector: '#plan-select' }) as HTMLSelectElement).value).toBe('pro');
+  });
+
+  it('opens a tab on the range in the hash, and carries it to the other history tabs', async () => {
+    location.hash = '#/breakdown?range=3months';
+    const fetch = vi.fn(async (url: string) => {
+      if (!url.startsWith('/api/range'))
+        return Response.json(summary());
+      const params = new URL(url, 'http://localhost').searchParams;
+      return Response.json(buildRanged(input(), { from: Number(params.get('from')), to: Number(params.get('to')) }));
+    });
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    await screen.findByRole('button', { name: 'Last 3 months' });
+    expect(screen.getByRole('button', { name: 'Last 3 months' }).getAttribute('aria-pressed')).toBe('true');
+    await waitFor(() => expect(screen.getByText(/^Total/).textContent).toBe('Total $13'));
+    expect(fetch.mock.calls.filter(([url]) => url.startsWith('/api/range'))).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Weeks' }).getAttribute('href')).toBe('#/weeks?range=3months');
+    expect(screen.getByRole('link', { name: 'Plans' }).getAttribute('href')).toBe('#/plans');
+
+    act(() => {
+      location.hash = '#/weeks?range=3months';
+      dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(screen.getByRole('button', { name: 'Last 3 months' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('heading', { name: /^Weekly usage, \d/ })).toBeTruthy();
+  });
+
+  it('shows the default windows without a range, and fetches no range', async () => {
+    location.hash = '#/sessions';
+    const fetch = vi.fn(async (_url: string) => Response.json(summary()));
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: '5-hour sessions, last 7 days' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Default' }).getAttribute('aria-pressed')).toBe('true');
+    expect(fetch.mock.calls.some(([url]) => url.startsWith('/api/range'))).toBe(false);
   });
 
   it('toggles the theme from the header', async () => {

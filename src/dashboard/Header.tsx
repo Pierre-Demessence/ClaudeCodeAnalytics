@@ -1,5 +1,6 @@
 import { Eye, EyeOff, Moon, Sun } from 'lucide-react';
 
+import type { RangeChoice } from '@/core/range';
 import type { Summary } from '@/dashboard/api';
 import type { TabId } from '@/dashboard/tabs';
 import type { Theme } from '@/dashboard/theme';
@@ -13,6 +14,8 @@ import { useTip } from '@/dashboard/useTip';
 interface Props {
   anonymous: boolean;
   busy: boolean;
+  /** The history range, carried by the links of the tabs that read it. */
+  range?: RangeChoice;
   summary?: Summary;
   tab: TabId;
   theme: Theme;
@@ -21,7 +24,7 @@ interface Props {
   onToggleTheme: () => void;
 }
 
-export function Header({ anonymous, busy, onRefresh, onToggleAnonymous, onToggleTheme, summary, tab, theme }: Props) {
+export function Header({ anonymous, busy, onRefresh, onToggleAnonymous, onToggleTheme, range, summary, tab, theme }: Props) {
   const now = useNow();
   const tip = useTip();
   const readAt = summary?.current?.readAt;
@@ -61,7 +64,7 @@ export function Header({ anonymous, busy, onRefresh, onToggleAnonymous, onToggle
         </div>
         <nav aria-label="Sections" className="tabs">
           {TABS.map(({ id, label }) => (
-            <a aria-current={id === tab ? 'page' : undefined} href={tabHref(id)} key={id}>{label}</a>
+            <a aria-current={id === tab ? 'page' : undefined} href={tabHref(id, range)} key={id}>{label}</a>
           ))}
         </nav>
       </div>

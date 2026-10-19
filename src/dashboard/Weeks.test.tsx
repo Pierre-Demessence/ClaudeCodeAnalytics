@@ -1,10 +1,12 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import type { RangeChoice } from '@/core/range';
 import type { ApiEvent, Snapshot, UsageRecord } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
 
 import { buildSummary } from '@/core/summary';
+import { viewOver } from '@/dashboard/rangeTesting';
 import { TipProvider } from '@/dashboard/Tip';
 import { Weeks } from '@/dashboard/Weeks';
 
@@ -204,5 +206,46 @@ describe('weeks tab', () => {
       expect(rows[0]!.querySelector('.wk-blocked-sessions .icon-blocked')).toBeTruthy();
       expect(rows[2]!.querySelector('.wk-blocked-sessions')).toBeNull();
     });
+  });
+});
+
+describe('weeks tab over a range', () => {
+  afterEach(cleanup);
+
+  // One message a week, Thursdays 10:00 from 4 Jun to 1 Oct, UTC: 18 weekly windows.
+  const thursdays = Array.from({ length: 18 }, (_, i) => new Date(Date.parse('2026-06-04T10:00:00Z') + i * 7 * 86_400_000).toISOString());
+  const input = { endpointEnabled: true, now: NOW, planHistory: [], records: thursdays.map(ts => rec(ts)), snapshots: [], timeZone: 'UTC' };
+  const renderOver = (choice: RangeChoice = { from: '2026-06-01', kind: 'custom', to: '2026-10-02' }) => {
+    const { summary: data, view } = viewOver(input, choice);
+    return render(<TipProvider><Weeks summary={data} view={view} /></TipProvider>);
+  };
+
+  it('names the range and shows every window that starts in it', () => {
+    renderOver();
+    const chart = card('Weekly usage, 1 Jun – 2 Oct 2026');
+    expect(chart.querySelectorAll('.wk-row:not(.wk-head)')).toHaveLength(18);
+    const stats = screen.getByRole('region', { name: 'Weeks summary' });
+    expect(within(stats).getByText('weeks shown').closest('.card')!.querySelector('strong')!.textContent).toBe('18');
+  });
+
+  it('pages the week list by 12', () => {
+    renderOver();
+    const list = card('Week list');
+    expect(within(list).getAllByRole('row')).toHaveLength(13);
+    expect(within(list).getByRole('navigation', { name: 'Week list pages' }).textContent).toBe('Page 1 of 2');
+    fireEvent.click(within(list).getByRole('button', { name: 'Next page' }));
+    expect(within(list).getAllByRole('row')).toHaveLength(7);
+    expect(within(list).getByRole('navigation', { name: 'Week list pages' }).textContent).toBe('Page 2 of 2');
+  });
+
+  it('shows no pager and no estimate without the limit for a short range', () => {
+    renderOver({ from: '2026-09-01', kind: 'custom', to: '2026-10-02' });
+    expect(screen.queryByRole('navigation', { name: 'Week list pages' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Weeks summary' }).querySelector('.wk-uncapped')).toBeNull();
+  });
+
+  it('says so when the range holds no window', () => {
+    renderOver({ from: '2025-01-01', kind: 'custom', to: '2025-01-31' });
+    expect(within(card('Week list')).getByText('No weekly window in this range.')).toBeTruthy();
   });
 });

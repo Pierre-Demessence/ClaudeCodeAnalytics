@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 
+import type { RangedSummary } from '@/core/ranged';
 import type { Summary } from '@/dashboard/api';
 
 const STORAGE_KEY = 'cca-anonymize';
@@ -17,12 +18,8 @@ function labeler(prefix: string) {
   };
 }
 
-/**
- * A copy of `summary` without project names, directories, branches or
- * conversation titles. The same project reads the same in every view. Display
- * only: the API and the data dir keep the real values.
- */
-export function anonymizeSummary(summary: Summary): Summary {
+/** The masking of each kind of section, sharing one set of labels so the same project reads the same everywhere. */
+function masker() {
   const project = labeler('Project');
   const conversation = labeler('Conversation');
   const branch = labeler('branch');
@@ -34,14 +31,11 @@ export function anonymizeSummary(summary: Summary): Summary {
   const maskAll = <T extends { name: string; path: string }>(items: T[]): T[] => items.map(mask);
 
   return {
-    ...summary,
-    // Node file errors quote absolute paths (user name, project folders).
-    status: { ...summary.status, lastError: undefined },
-    activity: {
-      ...summary.activity,
-      messageCost: { ...summary.activity.messageCost, outliers: maskAll(summary.activity.messageCost.outliers) },
-    },
-    breakdown: Object.fromEntries(Object.entries(summary.breakdown).map(([period, breakdown]) => [period, {
+    activity: (activity: Summary['activity']): Summary['activity'] => ({
+      ...activity,
+      messageCost: { ...activity.messageCost, outliers: maskAll(activity.messageCost.outliers) },
+    }),
+    breakdown: (breakdown: Summary['breakdown']): Summary['breakdown'] => ({
       ...breakdown,
       projects: maskAll(breakdown.projects),
       conversations: breakdown.conversations.map(c => ({
@@ -49,15 +43,49 @@ export function anonymizeSummary(summary: Summary): Summary {
         branch: c.branch === undefined ? undefined : branch(c.branch),
         title: c.title === undefined ? undefined : conversation(c.sessionId),
       })),
-    }])) as Summary['breakdown'],
-    sessions: {
-      ...summary.sessions,
-      windows: summary.sessions.windows.map(w => ({ ...w, projects: maskAll(w.projects) })),
-    },
-    weekHistory: {
-      ...summary.weekHistory,
-      weeks: summary.weekHistory.weeks.map(w => ({ ...w, projects: maskAll(w.projects) })),
-    },
+    }),
+    sessions: (sessions: Summary['sessions']): Summary['sessions'] => ({
+      ...sessions,
+      windows: sessions.windows.map(w => ({ ...w, projects: maskAll(w.projects) })),
+    }),
+    weekHistory: (weekHistory: Summary['weekHistory']): Summary['weekHistory'] => ({
+      ...weekHistory,
+      weeks: weekHistory.weeks.map(w => ({ ...w, projects: maskAll(w.projects) })),
+    }),
+  };
+}
+
+/**
+ * A copy of `summary` without project names, directories, branches or
+ * conversation titles. The same project reads the same in every view. Display
+ * only: the API and the data dir keep the real values.
+ */
+export function anonymizeSummary(summary: Summary): Summary {
+  const masks = masker();
+  return {
+    ...summary,
+    // Node file errors quote absolute paths (user name, project folders).
+    activity: masks.activity(summary.activity),
+    breakdown: masks.breakdown(summary.breakdown),
+    sessions: masks.sessions(summary.sessions),
+    status: { ...summary.status, lastError: undefined },
+    weekHistory: masks.weekHistory(summary.weekHistory),
+  };
+}
+
+/**
+ * The same masking for the views of a range. Labels are handed out by first
+ * appearance within what is masked, so a project can read differently here and
+ * in the summary's own views.
+ */
+export function anonymizeRanged(ranged: RangedSummary): RangedSummary {
+  const masks = masker();
+  return {
+    ...ranged,
+    activity: masks.activity(ranged.activity),
+    breakdown: masks.breakdown(ranged.breakdown),
+    sessions: masks.sessions(ranged.sessions),
+    weekHistory: masks.weekHistory(ranged.weekHistory),
   };
 }
 

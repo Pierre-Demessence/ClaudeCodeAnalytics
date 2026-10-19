@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
 
 import { DAY_MS, HOUR_MS } from './calibration.ts';
-import { buildSummary, weekStartFor } from './summary.ts';
+import { buildSummary } from './summary.ts';
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const RESET = '2026-10-21T20:00:00.000Z';
@@ -16,22 +16,6 @@ function rec(ts: number, model = 'claude-opus-5-5'): UsageRecord {
 function snap(ts: number, weekly: number, weeklyResetsAt: string, extra: Partial<Snapshot> = {}): Snapshot {
   return { source: 'endpoint', ts: new Date(ts).toISOString(), weekly, weeklyResetsAt, ...extra };
 }
-
-describe('weekStartFor', () => {
-  const h = 3_600_000;
-  // The reset moved from Wednesday 20:00 to Thursday 08:00 between two weeks.
-  const resets = [Date.parse('2026-10-07T20:00:00Z'), Date.parse('2026-10-15T08:00:00Z')];
-
-  it('uses the window of the next reset', () => {
-    expect(weekStartFor(Date.parse('2026-10-05T00:00:00Z'), resets)).toBe(resets[0]! - 7 * DAY_MS);
-    expect(weekStartFor(Date.parse('2026-10-10T00:00:00Z'), resets)).toBe(resets[1]! - 7 * DAY_MS);
-  });
-
-  it('steps back whole weeks before the first reading and forward after the last', () => {
-    expect(weekStartFor(Date.parse('2026-09-25T00:00:00Z'), resets)).toBe(resets[0]! - 14 * DAY_MS);
-    expect(weekStartFor(resets[1]! + h, resets)).toBe(resets[1]);
-  });
-});
 
 describe('buildSummary', () => {
   // One record per day at noon UTC for 3 weeks: $20/day.
@@ -319,7 +303,7 @@ describe('buildSummary', () => {
     expect(summary.fiveHourSession).toMatchObject({ percent: 30 });
   });
 
-  it('breaks usage down for this week, the last 4 weeks and all time', () => {
+  it('breaks usage down for this week', () => {
     const older = rec(NOW - 30 * DAY_MS);
     const summary = buildSummary({
       endpointEnabled: true,
@@ -331,11 +315,8 @@ describe('buildSummary', () => {
       titles: { s1: { title: 'Daily work' } },
     });
     // This week starts 14 Oct 20:00: records of 15–19 Oct.
-    expect(summary.breakdown.week.total).toEqual({ cost: 100, messages: 5 });
-    // Four windows back: from 23 Sep 20:00, which leaves out the 20 Sep record.
-    expect(summary.breakdown.fourWeeks.total).toEqual({ cost: 420, messages: 21 });
-    expect(summary.breakdown.all.total).toEqual({ cost: 440, messages: 22 });
-    expect(summary.breakdown.week.conversations[0]?.title).toBe('Daily work');
+    expect(summary.breakdown.total).toEqual({ cost: 100, messages: 5 });
+    expect(summary.breakdown.conversations[0]?.title).toBe('Daily work');
     // Message costs share the Breakdown's week: 5 messages of $20.
     expect(summary.activity.messageCost.bins.reduce((a, b) => a + b)).toBe(5);
     expect(summary.activity.messageCost.outlierCount).toBe(5);
@@ -345,9 +326,9 @@ describe('buildSummary', () => {
     const sunday = rec(Date.parse('2026-10-18T23:00:00Z'));
     const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [sunday], snapshots: [], timeZone: 'Europe/Paris' });
     // Sunday 23:00 UTC is Monday 01:00 in Paris.
-    expect(summary.breakdown.week.total.messages).toBe(1);
+    expect(summary.breakdown.total.messages).toBe(1);
     const utc = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [sunday], snapshots: [], timeZone: 'UTC' });
-    expect(utc.breakdown.week.total.messages).toBe(0);
+    expect(utc.breakdown.total.messages).toBe(0);
   });
 
   it('works without any data', () => {

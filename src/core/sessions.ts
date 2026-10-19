@@ -1,3 +1,4 @@
+import type { Range } from './range.ts';
 import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
 
 import { dayKey, startOfDay } from './aggregate.ts';
@@ -43,11 +44,11 @@ export interface FiveHourWindow {
 }
 
 export interface Sessions {
-  /** The local days shown, newest first: the last 7, plus tomorrow while the window in progress runs into it. */
+  /** The local days of the range, newest first (the last 7 without one), plus tomorrow while the window in progress runs into it. */
   days: string[];
   /** Medians leave out the window in progress; the cost median also leaves out windows without Claude Code messages. */
   stats: { blocked: number; capped: number; count: number; medianCost?: number; medianPeak?: number };
-  /** Windows overlapping `days`, newest first. */
+  /** Windows overlapping the range, newest first. */
   windows: FiveHourWindow[];
 }
 
@@ -58,6 +59,8 @@ export interface SessionsInput {
   k?: number;
   limitThreshold: number;
   now: number;
+  /** The span to list; the last 7 local days when absent. */
+  range?: Range;
   records: readonly UsageRecord[];
   snapshots: readonly Snapshot[];
   timeZone: string;
@@ -200,20 +203,23 @@ export function sessionPaces(windows: readonly FiveHourWindow[], from: number): 
     .map(w => w.cost / (FIVE_HOURS_MS / HOUR_MS));
 }
 
-/** The 5-hour windows of the last 7 local days. */
-export function buildSessions({ timeZone, ...input }: SessionsInput): Sessions {
+/** The 5-hour windows of a range, or of the last 7 local days. */
+export function buildSessions({ range, timeZone, ...input }: SessionsInput): Sessions {
   // Step through calendar days at UTC noon so DST never skips or repeats a day.
   const today = Date.parse(`${dayKey(input.now, timeZone)}T12:00:00Z`);
-  const days = Array.from({ length: SESSION_DAYS }, (_, i) => new Date(today - i * DAY_MS).toISOString().slice(0, 10));
-  const from = startOfDay(days.at(-1)!, timeZone);
+  const last = range ? Date.parse(`${dayKey(Math.min(range.to - 1, input.now), timeZone)}T12:00:00Z`) : today;
+  const first = range ? Date.parse(`${dayKey(range.from, timeZone)}T12:00:00Z`) : today - (SESSION_DAYS - 1) * DAY_MS;
+  const dayCount = Math.max(0, Math.round((last - first) / DAY_MS) + 1);
+  const days = Array.from({ length: dayCount }, (_, i) => new Date(last - i * DAY_MS).toISOString().slice(0, 10));
+  const from = range ? range.from : startOfDay(days.at(-1)!, timeZone);
   // Drop windows that are noise: no transcript message fell inside and the reading
   // shows little or no usage. A bigger reading without messages is claude.ai use.
   const shown = fiveHourWindows(input)
-    .filter(w => Date.parse(w.end) > from)
+    .filter(w => Date.parse(w.end) > from && (!range || Date.parse(w.start) < range.to))
     .filter(w => w.messages > 0 || (w.peak ?? 0) >= MIN_UNTRACKED_PEAK);
 
   const tomorrow = new Date(today + DAY_MS).toISOString().slice(0, 10);
-  const runsIntoTomorrow = shown.some(w => w.inProgress && Date.parse(w.end) > startOfDay(tomorrow, timeZone));
+  const runsIntoTomorrow = last === today && shown.some(w => w.inProgress && Date.parse(w.end) > startOfDay(tomorrow, timeZone));
   const done = shown.filter(w => !w.inProgress);
   return {
     days: runsIntoTomorrow ? [tomorrow, ...days] : days,

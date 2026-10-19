@@ -207,15 +207,13 @@ Claude Code moves into subfolders mid-conversation (seen: `node_modules\…`,
 junk rows. The transcript folder name was rejected: it is lossy (spaces and
 dots become `-`) and only serves as a fallback for records without a directory.
 
-## Breakdown precomputed for its three periods
+## Breakdown fetched on demand through `/api/range`
 
-`buildSummary` returns the Breakdown for this week, the last 4 weeks and all
-time, so the period toggle is instant; it adds a few dozen rows to the summary.
-A `/api/breakdown?period=` route was rejected: one more route and a loading
-state per click for no gain at this size. "Last 4 weeks" is this weekly window
-and the 3 before it, so "This week" is a subset of it. A conversation that
-straddles a period start is ranked and measured by its messages inside the
-period only.
+The summary carries the Breakdown for the default window only. Any other range
+is computed by `/api/range` from the stored data: measuring all time on every
+poll for a view opened rarely was wasted work, and a range is picked by the
+user, so a loading state per pick is acceptable. A conversation that straddles
+the range start is ranked and measured by its messages inside the range only.
 
 ## Usage tab: upgrades by highest version, outliers from $1
 

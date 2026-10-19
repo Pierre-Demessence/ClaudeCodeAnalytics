@@ -269,3 +269,26 @@ describe('buildBreakdown', () => {
     });
   });
 });
+
+describe('buildBreakdown over a range', () => {
+  it('stops before `to`, so two ranges that meet count each message once', () => {
+    const records = [
+      rec('2026-09-30T23:59:59Z'),
+      rec('2026-10-01T00:00:00Z'),
+      rec('2026-10-02T10:00:00Z'),
+    ];
+    const first = buildBreakdown(records, {}, Date.parse('2026-09-01T00:00:00Z'), Date.parse('2026-10-01T00:00:00Z'));
+    const second = buildBreakdown(records, {}, Date.parse('2026-10-01T00:00:00Z'), Date.parse('2026-11-01T00:00:00Z'));
+    expect(first.total.messages).toBe(1);
+    expect(second.total.messages).toBe(2);
+  });
+
+  it('keeps a conversation under the directory it started in before the range', () => {
+    const records = [
+      rec('2026-08-01T10:00:00Z', { cwd: 'S:\Dev\app' }),
+      rec('2026-10-01T10:00:00Z', { cwd: 'S:\Dev\app\docs' }),
+    ];
+    const { projects } = buildBreakdown(records, {}, Date.parse('2026-09-01T00:00:00Z'), Date.parse('2026-11-01T00:00:00Z'));
+    expect(projects.map(p => p.path)).toEqual(['s:\Dev\app']);
+  });
+});

@@ -1,12 +1,16 @@
 import type { Flush } from './cacheAnomalies.ts';
+import type { Range } from './range.ts';
 import type { ApiEvent, UsageRecord } from './types.ts';
 
+import { startOfDay } from './aggregate.ts';
 import { sessionProjects } from './breakdown.ts';
 import { detectFlushes } from './cacheAnomalies.ts';
+import { DAY_MS, WEEK_MS } from './calibration.ts';
 import { costParts, messageCost, priceFor } from './pricing.ts';
+import { addDays, DAILY_RANGE_MAX_DAYS, rangeDays } from './range.ts';
 import { compareVersions } from './versions.ts';
+import { weekStarter } from './weekWindows.ts';
 
-const DAY_MS = 86_400_000;
 /** Days averaged in the weekday × hour heatmap. */
 const HEATMAP_DAYS = 28;
 /** Days in the daily cache-share chart. */
@@ -43,6 +47,7 @@ export interface DayFlushes {
   noGap: number;
 }
 
+/** Cache use over the `messages` range. */
 export interface CacheWeek {
   /** Share of input tokens read from the cache, 0–1. */
   readShare: number;
@@ -55,14 +60,16 @@ export interface CacheWeek {
 /** When and how the usage happens. Costs are API-equivalent USD. */
 export interface Activity {
   cache: {
-    /** The last 14 local days; `readShare` is absent on a day without usage, `flushes` on a day without any. */
+    /** Whether `daily` holds local days or, for a range over 62 days, weekly windows. */
+    bucket: 'day' | 'week';
+    /** The last 14 local days, or the cache range's days or weekly windows; `day` is the local day a bucket starts. `readShare` is absent without usage, `flushes` without any. */
     daily: { day: string; flushes?: DayFlushes; readShare?: number }[];
-    /** The current weekly window; absent without usage. */
+    /** The `messages` range (the current weekly window by default); absent without usage. */
     week?: CacheWeek;
   };
   /** Average cost per day for each weekday (Monday first) and local hour, over `from`–`to` (local days). */
   heatmap: { cells: number[][]; from: string; to: string };
-  /** Costs of the current weekly window's messages. */
+  /** Costs of the `messages` range's messages (the current weekly window by default). */
   messageCost: {
     /** Message counts per bin of `COST_BIN_EDGES`. */
     bins: number[];
@@ -70,20 +77,30 @@ export interface Activity {
     /** The most expensive outliers, costliest first. */
     outliers: Outlier[];
   };
-  /** Local days, within the daily chart, on which the highest Claude Code version seen rose. */
+  /** Local days, within the usage chart, on which the highest Claude Code version seen rose. */
   upgrades: { day: string; version: string }[];
 }
 
 export interface ActivityInput {
-  /** First local day of the daily chart. */
+  /** Span of the cache-share chart; the last 14 local days by default. */
+  cache?: Range;
+  /** First local day of the usage chart. */
   chartFrom: string;
+  /** Last local day of the usage chart; open by default. */
+  chartTo?: string;
   /** Compactions excuse a cache read drop; other events are ignored. */
   events?: readonly ApiEvent[];
+  /** Days averaged in the weekday × hour heatmap; the last 28 local days by default. */
+  heatmap?: Range;
+  /** Messages behind the cache stats and the cost bins; those from `weekStart` on by default. */
+  messages?: Range;
   now: number;
   records: readonly UsageRecord[];
   timeZone: string;
-  /** Start of the current weekly window. */
-  weekStart: number;
+  /** Start of the current weekly window: where the default `messages` begins. */
+  weekStart?: number;
+  /** Start of the weekly window holding a time, for the cache chart of a long range; local Mondays by default. */
+  weekStartOf?: (ms: number) => number;
 }
 
 /** Local day, weekday (Monday = 0) and hour of an instant, memoized per 15-minute slot. */
@@ -116,24 +133,23 @@ function daysBetween(from: string, to: string): string[] {
   }
 }
 
-/** The local day `offset` calendar days from `day`, whatever the DST changes between. */
-function addDays(day: string, offset: number): string {
-  return new Date(Date.parse(`${day}T12:00:00Z`) + offset * DAY_MS).toISOString().slice(0, 10);
+/** Records more than a day outside `range` are skipped before the costlier local-time lookup; the day is the time zone margin. */
+function isNear(record: Pick<UsageRecord, 'ts'>, range: Range): boolean {
+  const ms = Date.parse(record.ts);
+  return ms >= range.from - DAY_MS && ms < range.to + DAY_MS;
 }
-
-/** Records older than `days` local days before `now` (plus a day of time zone margin) are skipped before the costlier local-time lookup. */
-const isRecent = (record: Pick<UsageRecord, 'ts'>, now: number, days: number) => Date.parse(record.ts) >= now - (days + 1) * DAY_MS;
 
 const inputTokens = (r: UsageRecord) => r.input + r.cacheRead + r.cacheWrite5m + r.cacheWrite1h;
 
-function heatmapOf(records: readonly UsageRecord[], localTime: ReturnType<typeof localTimeOf>, now: number): Activity['heatmap'] {
-  const to = localTime(now).day;
+function heatmapOf(records: readonly UsageRecord[], localTime: ReturnType<typeof localTimeOf>, range: Range, now: number): Activity['heatmap'] {
+  // Days after today have no usage yet and must not dilute the averages.
+  const to = localTime(Math.min(range.to - 1, now)).day;
   // A loop, not Math.min(...): spreading a year of records overflows the call stack.
   let first = now;
   for (const record of records)
     first = Math.min(first, Date.parse(record.ts));
   const firstDay = localTime(first).day;
-  const earliest = addDays(to, -(HEATMAP_DAYS - 1));
+  const earliest = localTime(range.from).day;
   const from = firstDay > earliest ? firstDay : earliest;
 
   const dayCounts = Array.from<number>({ length: 7 }).fill(0);
@@ -142,7 +158,7 @@ function heatmapOf(records: readonly UsageRecord[], localTime: ReturnType<typeof
 
   const cells = Array.from({ length: 7 }, () => Array.from<number>({ length: 24 }).fill(0));
   for (const record of records) {
-    if (!isRecent(record, now, HEATMAP_DAYS))
+    if (!isNear(record, range))
       continue;
     const local = localTime(Date.parse(record.ts));
     if (local.day >= from && local.day <= to)
@@ -151,7 +167,7 @@ function heatmapOf(records: readonly UsageRecord[], localTime: ReturnType<typeof
   return { cells: cells.map((row, weekday) => row.map(total => (dayCounts[weekday] ? total / dayCounts[weekday] : 0))), from, to };
 }
 
-function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], flushes: readonly Flush[], localTime: ReturnType<typeof localTimeOf>, now: number): Activity['cache'] {
+function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], flushes: readonly Flush[], localTime: ReturnType<typeof localTimeOf>, range: Range, now: number, weekStartOf: (ms: number) => number): Activity['cache'] {
   let read = 0;
   let input = 0;
   let saved = 0;
@@ -169,38 +185,53 @@ function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], 
     cost += parts.input + parts.output + parts.cacheWrite5m + parts.cacheWrite1h + parts.cacheRead;
   }
 
-  const today = localTime(now).day;
-  const days = daysBetween(addDays(today, -(CACHE_DAYS - 1)), today);
-  const perDay = new Map<string, { input: number; read: number }>();
-  for (const record of records) {
-    if (!isRecent(record, now, CACHE_DAYS))
-      continue;
-    const day = localTime(Date.parse(record.ts)).day;
-    if (day < days[0]!)
-      continue;
-    const totals = perDay.get(day) ?? { input: 0, read: 0 };
-    totals.read += record.cacheRead;
-    totals.input += inputTokens(record);
-    perDay.set(day, totals);
+  // Nothing happened after now.
+  const shown = { from: range.from, to: Math.min(range.to, now + 1) };
+  const bucket = rangeDays(range) > DAILY_RANGE_MAX_DAYS ? 'week' : 'day';
+  const bucketOf = (ms: number) => localTime(bucket === 'day' ? ms : weekStartOf(ms)).day;
+  const buckets: string[] = [];
+  if (bucket === 'day') {
+    buckets.push(...daysBetween(localTime(shown.from).day, localTime(shown.to - 1).day));
+  }
+  else {
+    for (let start = weekStartOf(shown.from); start < shown.to;) {
+      buckets.push(localTime(start).day);
+      const next = weekStartOf(start + WEEK_MS);
+      start = next > start ? next : start + WEEK_MS;
+    }
   }
 
-  const flushesPerDay = new Map<string, DayFlushes>();
-  for (const flush of flushes) {
-    if (!isRecent(flush, now, CACHE_DAYS))
+  const perBucket = new Map<string, { input: number; read: number }>();
+  for (const record of records) {
+    const ms = Date.parse(record.ts);
+    if (ms < shown.from || ms >= shown.to)
       continue;
-    const day = localTime(Date.parse(flush.ts)).day;
-    const totals = flushesPerDay.get(day) ?? { extra: 0, idleGap: 0, noGap: 0 };
+    const key = bucketOf(ms);
+    const totals = perBucket.get(key) ?? { input: 0, read: 0 };
+    totals.read += record.cacheRead;
+    totals.input += inputTokens(record);
+    perBucket.set(key, totals);
+  }
+
+  const flushesPerBucket = new Map<string, DayFlushes>();
+  for (const flush of flushes) {
+    const ms = Date.parse(flush.ts);
+    if (ms < shown.from || ms >= shown.to)
+      continue;
+    const key = bucketOf(ms);
+    const totals = flushesPerBucket.get(key) ?? { extra: 0, idleGap: 0, noGap: 0 };
     totals[flush.kind]++;
     totals.extra += flush.extra;
-    flushesPerDay.set(day, totals);
+    flushesPerBucket.set(key, totals);
   }
 
   return {
+    bucket,
     week: input > 0 ? { readShare: read / input, saved, writeCostShare: cost > 0 ? writeCost / cost : 0 } : undefined,
-    daily: days.map((day) => {
-      const totals = perDay.get(day);
-      const dayFlushes = flushesPerDay.get(day);
-      return { day, ...totals?.input ? { readShare: totals.read / totals.input } : {}, ...dayFlushes && { flushes: dayFlushes } };
+    daily: buckets.map((day) => {
+      const totals = perBucket.get(day);
+      const bucketFlushes = flushesPerBucket.get(day);
+      return { day, ...totals?.input ? { readShare: totals.read / totals.input } : {}, ...bucketFlushes && { flushes: bucketFlushes } };
     }),
   };
 }
@@ -239,7 +270,7 @@ function messageCostOf(week: readonly UsageRecord[], records: readonly UsageReco
   return { bins, outlierCount: expensive.length, outliers };
 }
 
-function upgradesOf(records: readonly UsageRecord[], localTime: ReturnType<typeof localTimeOf>, chartFrom: string): Activity['upgrades'] {
+function upgradesOf(records: readonly UsageRecord[], localTime: ReturnType<typeof localTimeOf>, chartFrom: string, chartTo: string): Activity['upgrades'] {
   const versioned = records.filter(r => r.version).sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
   const byDay = new Map<string, string>();
   let highest: string | undefined;
@@ -249,17 +280,25 @@ function upgradesOf(records: readonly UsageRecord[], localTime: ReturnType<typeo
     if (!highest || compareVersions(record.version!, highest) > 0)
       highest = record.version;
   }
-  return [...byDay].filter(([day]) => day >= chartFrom).map(([day, version]) => ({ day, version }));
+  return [...byDay].filter(([day]) => day >= chartFrom && day <= chartTo).map(([day, version]) => ({ day, version }));
 }
 
 /** Heatmap, cache use, message costs and Claude Code upgrades. */
-export function buildActivity({ chartFrom, events = [], now, records, timeZone, weekStart }: ActivityInput): Activity {
+export function buildActivity({ cache, chartFrom, chartTo = '9999-12-31', events = [], heatmap, messages, now, records, timeZone, weekStart = -Infinity, weekStartOf }: ActivityInput): Activity {
   const localTime = localTimeOf(timeZone);
-  const week = records.filter(r => Date.parse(r.ts) >= weekStart);
+  const today = localTime(now).day;
+  const endOfToday = startOfDay(addDays(today, 1), timeZone);
+  const heatmapRange = heatmap ?? { from: startOfDay(addDays(today, -(HEATMAP_DAYS - 1)), timeZone), to: endOfToday };
+  const cacheRange = cache ?? { from: startOfDay(addDays(today, -(CACHE_DAYS - 1)), timeZone), to: endOfToday };
+  const messagesRange = messages ?? { from: weekStart, to: Infinity };
+  const week = records.filter((record) => {
+    const ms = Date.parse(record.ts);
+    return ms >= messagesRange.from && ms < messagesRange.to;
+  });
   return {
-    cache: cacheOf(week, records, detectFlushes(records, events), localTime, now),
-    heatmap: heatmapOf(records, localTime, now),
+    cache: cacheOf(week, records, detectFlushes(records, events), localTime, cacheRange, now, weekStartOf ?? weekStarter([], timeZone)),
+    heatmap: heatmapOf(records, localTime, heatmapRange, now),
     messageCost: messageCostOf(week, records),
-    upgrades: upgradesOf(records, localTime, chartFrom),
+    upgrades: upgradesOf(records, localTime, chartFrom, chartTo),
   };
 }

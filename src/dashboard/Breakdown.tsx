@@ -1,22 +1,19 @@
-import { useState } from 'react';
-
-import type { BreakdownPeriod } from '@/core/summary';
 import type { Summary } from '@/dashboard/api';
+import type { HistoryView } from '@/dashboard/history';
 import type { Series } from '@/dashboard/models';
 
 import { familyOf } from '@/core/family';
 import { CardGrid, Cell } from '@/dashboard/CardGrid';
 import { ContextCard } from '@/dashboard/ContextCard';
 import { formatDateTime, formatDollars, formatDuration, formatPercent } from '@/dashboard/format';
+import { defaultView, rangeText } from '@/dashboard/history';
 import { ModelRatiosCard } from '@/dashboard/ModelRatios';
 import { SERIES } from '@/dashboard/models';
 import { OutputCard, SkillCard } from '@/dashboard/OutputCards';
 import { Legend, Swatch } from '@/dashboard/Patterns';
+import { RangeFrame } from '@/dashboard/RangePicker';
 import { InfoTip } from '@/dashboard/Tip';
-import { Toggle } from '@/dashboard/Toggle';
 import { useTip } from '@/dashboard/useTip';
-
-const PERIODS: [BreakdownPeriod, string][] = [['week', 'This week'], ['fourWeeks', 'Last 4 weeks'], ['all', 'All time']];
 
 const SURFACES: Record<string, string> = {
   'claude-desktop': 'Desktop',
@@ -81,27 +78,29 @@ function ShareBars({ rows, total }: { rows: { cost: number; label: string; title
   );
 }
 
-export function Breakdown({ summary }: { summary: Summary }) {
-  const [period, setPeriod] = useState<BreakdownPeriod>('week');
-  const breakdown = summary.breakdown[period];
+/** Whether the range is the current weekly window, the one the weekly limit's % belongs to. */
+const isCurrentWeek = ({ choice }: HistoryView) => !choice || (choice.kind === 'preset' && choice.preset === 'week' && choice.back === 0);
+
+export function Breakdown({ summary, view = defaultView(summary) }: { summary: Summary; view?: HistoryView }) {
+  const breakdown = view.history.breakdown;
   const { agents, conversations, effort, projects, subagentTypes, surfaces, total } = breakdown;
   const current = summary.current;
-  const weeklyPercent = period === 'week' && current ? current.estimatedNow ?? current.weekly : undefined;
+  const weeklyPercent = isCurrentWeek(view) && current ? current.estimatedNow ?? current.weekly : undefined;
   const effortTotal = effort.reduce((sum, e) => sum + e.cost, 0);
   const largestProject = projects[0]?.cost ?? 0;
   const tip = useTip();
   const families = new Set(projects.flatMap(p => familySplit(p.byModel).map(part => part.series.family)));
 
+  const totalText = (
+    <span className="breakdown-total">
+      {'Total '}
+      <strong>{formatDollars(total.cost)}</strong>
+      {weeklyPercent !== undefined && ` · ${current?.estimatedNow !== undefined ? '≈ ' : ''}${formatPercent(weeklyPercent)} of the weekly limit`}
+    </span>
+  );
+
   return (
-    <>
-      <div className="breakdown-controls">
-        <Toggle label="Period" onChange={setPeriod} options={PERIODS} value={period} />
-        <span className="breakdown-total">
-          {'Total '}
-          <strong>{formatDollars(total.cost)}</strong>
-          {weeklyPercent !== undefined && ` · ${current?.estimatedNow !== undefined ? '≈ ' : ''}${formatPercent(weeklyPercent)} of the weekly limit`}
-        </span>
-      </div>
+    <RangeFrame aside={totalText} view={view}>
 
       {total.messages === 0
         ? <p className="empty">No usage in this period.</p>
@@ -208,7 +207,7 @@ export function Breakdown({ summary }: { summary: Summary }) {
               <section className="card">
                 <div className="card-head">
                   <h2>Most expensive conversations</h2>
-                  <span className="card-subtitle">{PERIODS.find(([id]) => id === period)![1].toLowerCase()}</span>
+                  <span className="card-subtitle">{rangeText(view, 'this week')}</span>
                 </div>
                 <div className="table-scroll">
                   <table className="table conversation-table">
@@ -250,6 +249,6 @@ export function Breakdown({ summary }: { summary: Summary }) {
               </section>
             </>
           )}
-    </>
+    </RangeFrame>
   );
 }

@@ -161,3 +161,57 @@ describe('upgrades', () => {
     ]);
   });
 });
+
+describe('over a past range', () => {
+  const september = { from: Date.parse('2026-08-31T22:00:00Z'), to: Date.parse('2026-09-30T22:00:00Z') };
+
+  it('averages the heatmap over the days of the range only', () => {
+    const { heatmap } = activity([
+      rec('2026-09-01T10:00:00Z', { output: 0 }), // the first imported day
+      rec('2026-09-10T10:00:00Z', { output: 1_000_000 }), // Thu 10 Sep 12:00
+      rec('2026-10-01T10:00:00Z', { output: 1_000_000 }), // after
+    ], { heatmap: september });
+    expect(heatmap.from).toBe('2026-09-01');
+    expect(heatmap.to).toBe('2026-09-30');
+    // Thursdays in September 2026: 3, 10, 17, 24.
+    expect(heatmap.cells[3]![12]).toBeCloseTo(5);
+  });
+
+  it('measures the cache stats and cost bins over the messages range', () => {
+    const records = [
+      rec('2026-09-10T10:00:00Z', { cacheRead: 900_000, input: 100_000 }),
+      rec('2026-10-01T10:00:00Z', { output: 1_000_000 }),
+    ];
+    const { cache, messageCost } = activity(records, { messages: september });
+    expect(cache.week!.readShare).toBeCloseTo(0.9);
+    expect(messageCost.bins.reduce((a, b) => a + b)).toBe(1);
+  });
+
+  it('gives one cache bucket per local day for a range of 62 days or fewer', () => {
+    const { cache } = activity([rec('2026-09-10T10:00:00Z', { cacheRead: 300, input: 100 })], { cache: september });
+    expect(cache.bucket).toBe('day');
+    expect(cache.daily).toHaveLength(30);
+    expect(cache.daily.find(d => d.day === '2026-09-10')!.readShare).toBeCloseTo(0.75);
+  });
+
+  it('gives one bucket per weekly window beyond 62 days, named by the day it starts', () => {
+    const range = { from: Date.parse('2026-07-01T22:00:00Z'), to: Date.parse('2026-09-30T22:00:00Z') };
+    const { cache } = activity([
+      rec('2026-09-10T10:00:00Z', { cacheRead: 300, input: 100 }),
+      rec('2026-09-11T10:00:00Z', { cacheRead: 100, input: 100 }),
+    ], { cache: range });
+    expect(cache.bucket).toBe('week');
+    // Local Mondays by default: 7 Sep.
+    expect(cache.daily.find(d => d.day === '2026-09-07')!.readShare).toBeCloseTo(400 / 600);
+    expect(cache.daily.length).toBeGreaterThan(12);
+  });
+
+  it('keeps the upgrades within the chart days', () => {
+    const { upgrades } = activity([
+      rec('2026-08-20T10:00:00Z', { version: '2.0.1' }),
+      rec('2026-09-10T10:00:00Z', { version: '2.0.2' }),
+      rec('2026-10-01T10:00:00Z', { version: '2.0.3' }),
+    ], { chartFrom: '2026-09-01', chartTo: '2026-09-30' });
+    expect(upgrades).toEqual([{ day: '2026-09-10', version: '2.0.2' }]);
+  });
+});
