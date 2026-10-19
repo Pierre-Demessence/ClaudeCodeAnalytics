@@ -58,6 +58,8 @@ estimates of when the result becomes judgeable, not limits in the code.
 - `[forensics]` Calibration cross-check from observed limit hits: the median cost of limit-hit windows is a capacity estimate, floored by the highest cost of a window that did not hit the limit; compare with the demand estimates of limit-hit weeks. Server overloads are stored (`events.jsonl`) but not shown anywhere.
 - `[forensics]` Test the credit scheme cached in `~/.claude.json` (`tengu_amber_tally`: 5-hour credits 10000 / 50000 / 200000 for Pro / Max 5× / Max 20×, and credits per million tokens per model) against the readings: replay the usage under it with the backtest and compare its error with the API-price model. Unverified: units, which token types count, whether the flag is live. Opus 5.5 : Sonnet 5.5 : Haiku 4.5 is 1833 : 1250 : 833 there, against 4 : 2 : 1 by API output price.
 
+- `[forecast]` Fit the limit per token kind (output, cache read, cache write) instead of one `k` on the total API price; effort, model and subagents act on the limit through this mix. Seen on 2026-10-19: the first High-effort week (from 2026-10-14) used 40.7% of the weekly limit per $100 against 35.2 and 33.5 on Medium. 5-hour windows agree (median 325 vs 285 % per $100, 5 vs 19 windows). A least-squares fit on 25 windows gave cache writes about twice the weight of cache reads per API dollar, output in between. All High windows come after the Medium ones, so a limit change on 2026-10-14 cannot be ruled out; needs weeks that mix both efforts.
+
 ### 12 weeks
 
 - A model of how pace slows as a week nears its limit, to replace the fixed 90% pressure point. Needs many weeks to tell slowing down from a quiet week.
@@ -76,6 +78,8 @@ estimates of when the result becomes judgeable, not limits in the code.
 - Per-model weekly limits (`seven_day_opus` / `seven_day_sonnet` in the endpoint response) if a plan ever reports them.
 
 ## Technical debt
+
+- `writeAtomic` (`src/collector/store.ts:77`) leaves its temp file behind when `rename` throws: the data dir holds `messages-2026-10.jsonl.41372.<uuid>.tmp` from 2026-10-12 (3.6 MB). The cause is probably a Windows `EPERM`/`EBUSY` while another process reads the target (not confirmed). Remove the temp file on failure, and check whether that write was retried.
 
 - The server has no timer: the collector runs only when a client asks (Claude Code hook, the widget's 60 s poll, a dashboard tab, Refresh), so readings resume after a boot only while the widget or a tab is open. A server-side loop in `src/server/api.ts` (`configureServer`/`configurePreviewServer`, about every 60 s, same throttle) would make the dashboard work alone; then drop the 30 s retry in `App.tsx` (`RETRY_MS`). Cost: a permanent background transcript scan.
 - `[forensics]` "By skill or command" lists `${name}` and `…` as skills on the local data (seen in the Breakdown tab, last 4 weeks). Probably a `Skill` call or slash command whose name was never substituted; find the source line and decide whether `parseSkillSignal` should ignore such names (`src/core/transcript.ts`). Unchecked.
