@@ -105,6 +105,9 @@ Run lint, test and build before considering work done.
   "Claude Code Analytics redesign" (<https://claude.ai/artifact/Fw9e29WbgMikfa9CK5WyfV>).
   A new design is a page in it (board files named by feature), never a new artifact.
   Contributors skip it and show UI changes with screenshots in the pull request.
+- One version for the whole project: `package.json` (and `package-lock.json`) and
+  `widget/Cargo.toml` (and `Cargo.lock`) match the latest release tag `vX.Y.Z`, and
+  are bumped together in the commit that the next tag points to.
 
 ## Docs
 
