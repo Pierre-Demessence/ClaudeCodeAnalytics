@@ -2896,3 +2896,12 @@ button.info-tip:hover {
 .mult-text small {
   display: block;
 }
+
+.row-buttons {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.plan-note {
+  margin-top: 12px;
+}
