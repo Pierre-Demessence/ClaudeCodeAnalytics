@@ -208,6 +208,16 @@ describe('calibration tab', () => {
       expect(onSaveSettings).toHaveBeenCalledWith({ endpointEnabled: false });
     });
 
+    it('has nothing to save when only the hidden check interval was edited', () => {
+      renderTab({ ...summary(), endpointEnabled: false });
+      const endpoint = screen.getByRole('switch', { name: 'Usage endpoint' });
+      fireEvent.click(endpoint);
+      fireEvent.change(screen.getByLabelText('Check every'), { target: { value: '30' } });
+      fireEvent.click(endpoint);
+      expect(screen.queryByText('Unsaved changes')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    });
+
     it('opens the advanced section to show a wrong threshold', () => {
       const { onSaveSettings } = renderTab();
       const details = screen.getByText('Advanced', { selector: 'summary' }).closest('details')!;

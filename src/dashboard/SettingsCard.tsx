@@ -63,7 +63,8 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
     weekLimitThreshold: String(summary.weekLimitThreshold),
   };
   const current = { ...saved, ...draft };
-  const changed = (key: keyof Draft) => current[key] !== saved[key];
+  // The interval is hidden and left unsent while the endpoint is off, so its edit is no change then.
+  const changed = (key: keyof Draft) => current[key] !== saved[key] && (key !== 'throttleMinutes' || current.endpointEnabled);
   const dirty = (Object.keys(saved) as (keyof Draft)[]).some(changed);
   const edit = (change: Draft) => {
     setDraft(d => ({ ...d, ...change }));
@@ -110,7 +111,7 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
     }
     if (changed('endpointEnabled'))
       update.endpointEnabled = current.endpointEnabled;
-    if (changed('throttleMinutes') && current.endpointEnabled)
+    if (changed('throttleMinutes'))
       update.throttleMinutes = Number(current.throttleMinutes);
     if (changed('limitThreshold'))
       update.limitThreshold = Number(current.limitThreshold);
