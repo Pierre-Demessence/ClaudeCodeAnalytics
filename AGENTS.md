@@ -41,7 +41,9 @@ Run lint, test and build before considering work done.
   is its look, `src/` the logic (`view` texts and flags, `template` fills the SVG,
   `render` draws it with resvg, `fetch`, `dock`, `window` with the click and menu
   handling, `theme`, `autostart`); `core/widget.ts` builds the API's answer.
-- `docs/` — `backlog.md`, `decisions.md`, `plans/`.
+- `docs/` — `backlog.md`, `decisions.md`, `plans/`; `screenshots/` holds the README's
+  images: each tab in light and dark, anonymize mode on, 1280 px wide at 2× scale, cut
+  below the last whole card.
 - `Dockerfile`, `docker-compose.yml` — the always-on dashboard behind Traefik.
 
 ## Conventions
@@ -99,7 +101,7 @@ Run lint, test and build before considering work done.
 - **The OAuth token** (`~/.claude/.credentials.json`) is read in memory only,
   sent only to `api.anthropic.com`, never logged, stored or refreshed. It is read
   only while `endpointEnabled` is on, which defaults to off: keep it opt-in, and
-  keep the README's "What it reads" table in sync with what the collector reads.
+  keep the table in the README's "Privacy" section in sync with what the collector reads.
 - The usage endpoint needs a `claude-code/<version>` User-Agent; keep the
   throttle (default 15 min) and never add a retry loop: it shares a tight rate
   limit with Claude Code's own `/usage`.
