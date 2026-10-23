@@ -403,11 +403,24 @@ turn in the context is the carrying-cost model left in the backlog.
 ## Subscription cost from the billing date, not prorated
 
 The Usage card sets what was charged against the usage of the same cycle: the
-list price on each billing date, the day of the month the subscription started
-(`oauthAccount.subscriptionCreatedAt` in `~/.claude.json`), at the plan active
-then. Rejected: prorating the price over the days with data, which reads $6 for a
-$20 Pro plan ten days into a cycle; it remains the fallback without the date.
-Assumes monthly billing and list prices, in dollars before VAT.
+list price on each billing date, the day of the month the subscription started,
+at the plan active then. Rejected: prorating the price over the days with data,
+which reads $6 for a $20 Pro plan ten days into a cycle; it remains the fallback
+without the date. Assumes monthly billing and list prices, in dollars before VAT.
+
+The start is the first plan period's when it was set by hand, else
+`oauthAccount.subscriptionCreatedAt` in `~/.claude.json`, which can predate the
+first payment (a failed one sets it). A detected first period only marks when the
+collector first saw the plan. The plan history's starts are editable, so it is
+the one place to correct; a separate subscription-date setting was rejected as a
+second source for the same fact.
+
+An upgrade follows Anthropic's invoice: it starts a new cycle there and then, at
+the new plan's full price less a credit for the unused time of the plan paid for,
+and later billing dates count from it. Rejected: keeping the billing day and
+charging the price difference for the rest of the cycle, which an invoice
+disproved. A downgrade is assumed to wait for the next billing date and refund
+nothing (not checked against an invoice).
 
 ## The taskbar widget is a native Rust process drawing an SVG
 

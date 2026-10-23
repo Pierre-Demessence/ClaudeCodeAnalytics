@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { PlanPeriod } from './types.ts';
 
 import { DAY_MS } from './calibration.ts';
-import { MONTH_MS, valueForMoney } from './valueForMoney.ts';
+import { MONTH_MS, subscriptionStartOf, valueForMoney } from './valueForMoney.ts';
 
 const NOW = Date.parse('2026-10-08T12:00:00Z');
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -86,10 +86,57 @@ describe('valueForMoney', () => {
     });
 
     it('prices each charge at the plan active on its date', () => {
-      const history = [period(start - DAY_MS, 'pro'), period(Date.parse('2026-10-15T00:00:00Z'), 'max5')];
+      const history = [period(start - DAY_MS, 'max5'), period(Date.parse('2026-10-15T00:00:00Z'), 'pro')];
       const value = valueForMoney({ costBetween, dataStart: start, now: Date.parse('2026-11-30T00:00:00Z'), planHistory: history, subscriptionStart: start })!;
-      expect(value.allTime!.paid).toBe(20 + 100 + 100);
-      expect(value.recent!.paid).toBe(100);
+      expect(value.allTime!.paid).toBe(100 + 20 + 20);
+      expect(value.allTime!.credits).toBeUndefined();
+      expect(value.recent!.paid).toBe(20);
+    });
+
+    describe('an upgrade', () => {
+      const upgrade = Date.parse('2026-10-15T00:00:00Z');
+      const cycleEnd = Date.parse('2026-10-28T19:26:00Z');
+      const credit = 20 * (cycleEnd - upgrade) / (30 * DAY_MS);
+      const history = [period(start - DAY_MS, 'pro'), period(upgrade, 'max5')];
+
+      it('starts a new cycle at the full new price, less the unused time of the old plan', () => {
+        const at = Date.parse('2026-10-20T00:00:00Z');
+        const value = valueForMoney({ costBetween, dataStart: start, now: at, planHistory: history, subscriptionStart: start })!;
+        expect(value.recent!.paid).toBeCloseTo(100 - credit);
+        expect(value.recent!.credits).toEqual([{ amount: expect.closeTo(credit), plan: 'pro' }]);
+        expect(value.recent!.apiCost).toBeCloseTo((at - upgrade) / DAY_MS * 10);
+        expect(value.allTime!.paid).toBeCloseTo(20 + 100 - credit);
+        expect(value.allTime!.apiCost).toBeCloseTo((at - start) / DAY_MS * 10);
+      });
+
+      it('moves the billing day to the upgrade', () => {
+        const paid = (at: string) => valueForMoney({ costBetween, dataStart: start, now: Date.parse(at), planHistory: history, subscriptionStart: start })!.allTime!.paid;
+        expect(paid('2026-11-14T23:59:59Z')).toBeCloseTo(20 + 100 - credit);
+        expect(paid('2026-11-15T00:00:00Z')).toBeCloseTo(20 + 100 - credit + 100);
+      });
+
+      it('charges nothing for the plan already paid for after a downgrade in the same cycle', () => {
+        const back = [...history, period(Date.parse('2026-10-18T00:00:00Z'), 'pro'), period(Date.parse('2026-10-20T00:00:00Z'), 'max5')];
+        const value = valueForMoney({ costBetween, dataStart: start, now: Date.parse('2026-10-25T00:00:00Z'), planHistory: back, subscriptionStart: start })!;
+        expect(value.allTime!.paid).toBeCloseTo(20 + 100 - credit);
+        expect(value.recent!.credits).toHaveLength(1);
+      });
+
+      it('credits only the dearest plan paid for when upgrading twice', () => {
+        const twice = [...history, period(Date.parse('2026-10-25T00:00:00Z'), 'max20')];
+        const value = valueForMoney({ costBetween, dataStart: start, now: Date.parse('2026-10-26T00:00:00Z'), planHistory: twice, subscriptionStart: start })!;
+        const second = 100 * (Date.parse('2026-11-15T00:00:00Z') - Date.parse('2026-10-25T00:00:00Z')) / (31 * DAY_MS);
+        expect(value.recent!.paid).toBeCloseTo(200 - second);
+        expect(value.recent!.credits).toEqual([{ amount: expect.closeTo(second), plan: 'max5' }]);
+        expect(value.allTime!.credits).toHaveLength(2);
+      });
+
+      it('is a plain charge at the new plan on a billing date', () => {
+        const onDate = [period(start - DAY_MS, 'pro'), period(cycleEnd, 'max5')];
+        const value = valueForMoney({ costBetween, dataStart: start, now: cycleEnd + DAY_MS, planHistory: onDate, subscriptionStart: start })!;
+        expect(value.allTime!.paid).toBe(120);
+        expect(value.allTime!.credits).toBeUndefined();
+      });
     });
 
     it('cuts a billing day missing from a short month to its last day', () => {
@@ -112,5 +159,22 @@ describe('valueForMoney', () => {
     it('is absent without cost', () => {
       expect(valueForMoney({ dataStart: start, now, planHistory: pro, subscriptionStart: start, costBetween: () => 0 })).toBeUndefined();
     });
+  });
+});
+
+describe('subscriptionStartOf', () => {
+  const account = Date.parse('2026-05-10T11:03:00Z');
+  const july = Date.parse('2026-07-06T00:00:00Z');
+
+  it('takes the start of a manual first plan period over the account\'s date', () => {
+    expect(subscriptionStartOf([period(july, 'pro'), period(july + 100 * DAY_MS, 'max5')], account)).toBe(july);
+    expect(subscriptionStartOf([period(july, 'pro')], undefined)).toBe(july);
+  });
+
+  it('keeps the account\'s date after a detected first period, the epoch placeholder or no history', () => {
+    expect(subscriptionStartOf([{ ...period(july, 'pro'), source: 'detected' }, period(july + DAY_MS, 'max5')], account)).toBe(account);
+    expect(subscriptionStartOf([period(0, 'pro'), period(july, 'max5')], account)).toBe(account);
+    expect(subscriptionStartOf([], account)).toBe(account);
+    expect(subscriptionStartOf([], undefined)).toBeUndefined();
   });
 });
