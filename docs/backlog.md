@@ -6,6 +6,8 @@ orders the ones that are scheduled.
 
 ## Bugs
 
+- Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
+
 ## Features
 
 New capabilities.
