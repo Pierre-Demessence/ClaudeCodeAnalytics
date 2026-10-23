@@ -16,19 +16,14 @@ if (args.has('install-hook')) {
   }
 }
 else {
-  // Runs from a Claude Code hook: never fail or print noise into the session.
-  const quiet = args.has('--quiet');
   try {
     const result = await collect({ claudeDir: claudeDir(), dataDir: dataDir(), force: args.has('--force') });
-    if (!quiet) {
-      if (result.skipped)
-        console.log('Another collector run is in progress; skipped.');
-      else
-        console.log(JSON.stringify(result.status, null, 2));
-    }
+    if (result.skipped)
+      console.log('Another collector run is in progress; skipped.');
+    else
+      console.log(JSON.stringify(result.status, null, 2));
   }
   catch (error) {
-    if (!quiet)
-      console.error('Collector failed:', error instanceof Error ? error.message : error);
+    console.error('Collector failed:', error instanceof Error ? error.message : error);
   }
 }

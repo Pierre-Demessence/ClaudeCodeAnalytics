@@ -33,6 +33,14 @@ any OS and runs async. The endpoint call is throttled to every 15 minutes.
 Rejected: Windows Task Scheduler (platform-specific, runs when nothing changes);
 a status line (Pierre uses the dashboard, not the terminal).
 
+The hook is a `curl` POST to the Docker dashboard's `/api/hook`, not
+`node src/collector/cli.ts`: a hook running the working copy ran whatever branch
+was checked out, a contributor's included, as the user after every response.
+The container runs only the image built by `docker:up`, with a read-only root and
+two mounts. Rejected: running the local collector when the container is down
+(brings the risk back); a copy of the collector installed outside the clone
+(still runs with the user's full access).
+
 ## API-equivalent cost as the usage unit
 
 Plan limits drain faster on Opus than Sonnet, and cache reads cost far less than
@@ -131,7 +139,7 @@ it for a local tool. Updates go live only on `npm run docker:up`: mounting the
 working copy and rebuilding at start was rejected because a half-finished edit
 would go live at the next boot. The root filesystem is read-only, hence
 `--configLoader native` (the default loader bundles the config into
-`node_modules`). The collector hook stays on the host and shares the data dir.
+`node_modules`). The Claude Code hook asks the container for collector runs.
 
 ## Tabs as hash links, no router
 
@@ -324,8 +332,8 @@ every scanned transcript has an offset on a line end with no malformed lines.
 A checksum of the bytes before the offset would catch it; rejected as code for a
 case that does not occur.
 
-The data-dir lock (`wx` create) is shared by the host's hook and the Docker
-dashboard through Docker Desktop's file sharing, where exclusive create is not
+The data-dir lock (`wx` create) is shared by the host (`npm run dev`, `collect`)
+and the Docker dashboard through Docker Desktop's file sharing, where exclusive create is not
 strictly atomic, so two simultaneous runs could both take it. Accepted: runs
 last about a second, writes are atomic (temp file, then rename), and a lost
 write is imported again by the next scan because offsets only advance after a

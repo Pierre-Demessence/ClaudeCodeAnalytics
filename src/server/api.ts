@@ -235,6 +235,15 @@ async function handle(req: IncomingMessage, res: ServerResponse, lockWaitMs: num
     await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
     return send(res, 200, widgetView(await summary(store, timeZone), Date.now()));
   }
+  if (req.method === 'POST' && url.pathname === '/hook') {
+    // The Claude Code hook: a throttled run, so the host never runs the working copy's collector.
+    // A failed run is recorded in the status; the hook has nothing to show it in.
+    await readBody(req);
+    await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
   if (req.method === 'POST' && url.pathname === '/collect') {
     await readBody(req);
     const result = await collect({ claudeDir: claudeDir(), dataDir: store.dir, force: true });

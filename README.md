@@ -73,15 +73,17 @@ Requires Node ≥ 22.18.
 git clone https://github.com/Pierre-Demessence/ClaudeCodeAnalytics.git
 cd ClaudeCodeAnalytics
 npm install
-npm run hook:install -- --apply # adds the collector hook to ~/.claude/settings.json (with a backup)
+npm run hook:install -- --apply # adds the collector hook to ~/.claude/settings.json (with a backup); it calls the always-on dashboard
 npm run dashboard               # builds and opens the dashboard
 ```
 
 Run `npm run hook:install` without `--apply` to print the hook and add it yourself.
-The hook imports new transcripts in the background after every Claude Code
-response; opening the dashboard does too. Neither uses any of your usage: they
-read files Claude Code already writes and never call Claude, and the hook adds
-nothing to your conversation.
+After every Claude Code response, the hook asks the
+[always-on dashboard](#always-on-dashboard-docker) to import new transcripts, in
+the background; without it running, opening the dashboard imports them. The hook
+runs no code from this folder, so a branch checked out here never runs on its own.
+Neither uses any of your usage: they read files Claude Code already writes and
+never call Claude, and the hook adds nothing to your conversation.
 
 **Limit readings.** The % of your limits comes from one of two sources, set in
 the Calibration tab:
@@ -159,9 +161,10 @@ new `widget:install`.
 `npm run docker:up` builds the image and serves the dashboard at
 <http://analytics.claudecode.localhost>. Needs Docker Desktop and a running
 Traefik reverse proxy on an external `proxy` network. The container mounts
-`~/.claude` read-only and shares `~/.claude-code-analytics` with the hook, which
-keeps running on the host. It serves the version it was built from: run
-`npm run docker:up` again after updating.
+`~/.claude` read-only and `~/.claude-code-analytics`, and runs the collector when
+the hook asks. It runs the version it was built from: run `npm run docker:up`
+again after updating, and only on code you trust, since the collector can read
+your login token.
 
 ## Development
 

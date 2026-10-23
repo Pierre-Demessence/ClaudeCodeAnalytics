@@ -4,13 +4,27 @@ import { describe, expect, it } from 'vitest';
 import { STOP_HOOK, withCollectorHook } from './hook.ts';
 
 describe('withCollectorHook', () => {
-  it('adds an async Stop hook running the collector quietly, keeping other settings', () => {
+  it('adds an async Stop hook asking the dashboard for a run, keeping other settings', () => {
     const updated = withCollectorHook({ hooks: { Stop: [{ hooks: [{ command: 'other', type: 'command' }] }] }, model: 'opus' })!;
     expect(updated.model).toBe('opus');
     expect(updated.hooks!.Stop).toHaveLength(2);
     expect(updated.hooks!.Stop![1]!.hooks[0]).toBe(STOP_HOOK);
     expect(STOP_HOOK.async).toBe(true);
-    expect(STOP_HOOK.command).toMatch(/^node ".*\/src\/collector\/cli\.ts" --quiet$/);
+    expect(STOP_HOOK.command).toMatch(/^curl .* http:\/\/analytics\.claudecode\.localhost\/api\/hook$/);
+    expect(STOP_HOOK.command).not.toContain('node');
+  });
+
+  it('replaces a hook that runs the local collector, keeping the other hooks of its group', () => {
+    const local = { async: true, command: 'node "S:/Dev/ClaudeCodeAnalytics/src/collector/cli.ts" --quiet', type: 'command' as const };
+    const other = { command: 'other', type: 'command' as const };
+    const updated = withCollectorHook({ hooks: { Stop: [{ hooks: [local] }, { hooks: [local, other] }] } })!;
+    expect(updated.hooks!.Stop).toEqual([{ hooks: [other] }, { hooks: [STOP_HOOK] }]);
+  });
+
+  it('removes a local collector hook left next to the installed one', () => {
+    const local = { command: 'node "/x/src/collector/cli.ts"', type: 'command' as const };
+    const updated = withCollectorHook({ hooks: { Stop: [{ hooks: [STOP_HOOK, local] }] } })!;
+    expect(updated.hooks!.Stop).toEqual([{ hooks: [STOP_HOOK] }]);
   });
 
   it('tolerates hook entries of other shapes', () => {

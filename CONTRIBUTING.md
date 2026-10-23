@@ -27,10 +27,9 @@ npm run dev # dashboard with hot reload
 
 **Keep your own history safe.** The collector writes to
 `~/.claude-code-analytics/` by default. For manual tests, point it at a scratch
-folder with `CCA_DATA_DIR`. And if you installed the hook from this clone, it
-runs your working copy after every Claude Code response: a broken collector
-fails silently there (see "Last run failed" in the Calibration tab's Collection
-card).
+folder with `CCA_DATA_DIR`: `npm run dev` and `npm run collect` run your working
+copy's collector on that folder. The Claude Code hook never runs your working
+copy; it asks the Docker dashboard, which runs the version it was built from.
 
 ## Making a change
 

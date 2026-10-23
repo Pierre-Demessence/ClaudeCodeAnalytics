@@ -8,9 +8,9 @@ Before opening a pull request, read `CONTRIBUTING.md`: the docs a change must
 update and what the description holds.
 
 A few notes depend on a setup a contributor may not have: the Docker dashboard
-behind Traefik (which the taskbar widget polls), the Claude Design canvas (the
-maintainer's only), and a hook installed from this clone. Each says so; skip it
-when that setup isn't yours.
+behind Traefik (which the taskbar widget polls and the Claude Code hook calls),
+and the Claude Design canvas (the maintainer's only). Each says so; skip it when
+that setup isn't yours.
 
 ## Commands
 
@@ -42,7 +42,7 @@ Run lint, test and build before considering work done.
   history ranges (`range.ts` resolves the picker's choice, `ranged.ts` builds the history
   tabs' views over one; both go through `prepareSummary` like `buildSummary`).
 - `src/collector/` — Node: transcript scan, usage endpoint client, data-dir
-  store, lock, hook installer; entry `cli.ts` (also run by the Claude Code hook).
+  store, lock, hook installer; entry `cli.ts`.
 - `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview (`/api/range` is the
   history tabs' view of a range, from the stored data only).
 - `src/dashboard/` — React app (`main.tsx` entry).
@@ -140,10 +140,13 @@ Run lint, test and build before considering work done.
 - The usage endpoint needs a `claude-code/<version>` User-Agent; keep the
   throttle (default 15 min) and never add a retry loop: it shares a tight rate
   limit with Claude Code's own `/usage`.
-- A Claude Code hook installed from this clone runs `src/collector/cli.ts` from this
-  working copy, so uncommitted collector changes go live at the next response. Keep
-  the collector runnable; it fails silently in the hook (check `lastError` in
-  the status).
+- The Claude Code hook (`collector/hook.ts`) runs no code from this folder: it POSTs
+  to the container's `/api/hook`, so only the image built by `docker:up` collects
+  after each response. Never make it run the working copy (a `node …/cli.ts`
+  command, or a fallback when the container is down): checking out a contributor's
+  branch would run their code as the user, with the OAuth token in reach. Run
+  `docker:up` only on reviewed code. A failed run is recorded as `lastError` in the
+  status.
 - The data dir (`~/.claude-code-analytics/`, or `CCA_DATA_DIR`) holds the
   user's history: never wipe it. Tests and manual runs use a temp
   `CCA_DATA_DIR`. Stored messages hold token counts and session metadata
@@ -160,9 +163,9 @@ Run lint, test and build before considering work done.
   (`oauthAccount.subscriptionCreatedAt`): never the email or the ids.
 - Bump `SCAN_FORMAT` (`collector/store.ts`) only when records gain fields that
   old messages need: the next run re-reads every transcript once. Make the bump
-  the last edit, after the tests pass, since the hook runs it on the real data.
-  The dashboard runs the collector too: with the Docker setup, rebuild the container
-  (`docker:up`).
+  the last edit, after the tests pass, since `npm run dev` and `npm run collect`
+  run it on the real data. With the Docker setup, the hook's runs pick it up once
+  the container is rebuilt (`docker:up`).
 - The API is loopback-only: POST endpoints require `application/json` and a
   same-origin `Origin`; reads rely on Vite's default `allowedHosts`. Never set
   `server.host` or `allowedHosts: true` without adding a Host check. The Docker
@@ -176,7 +179,7 @@ Run lint, test and build before considering work done.
   filesystem is read-only), so the config and everything it imports must run
   under Node's type stripping, like the collector.
 - The container serves the image it was built from; it mounts `~/.claude`
-  read-only and shares the data dir with the host's hook.
+  read-only and the data dir read-write.
 - Keep the `@/*` alias in sync across `tsconfig.json`, `vite.config.ts` and
   `vitest.config.ts`.
 - The app name comes from `brand.json`; never hard-code it in `index.html`.

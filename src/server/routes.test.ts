@@ -70,6 +70,20 @@ describe('api routes', () => {
     expect(Object.keys(view).sort()).toEqual(['fiveHour', 'generatedAt', 'weekly']);
   });
 
+  it('runs the collector for the Claude Code hook, answering no content', async () => {
+    const statusFile = join(process.env.CCA_DATA_DIR!, 'status.json');
+    await rm(statusFile, { force: true });
+    const response = await post('/hook', {});
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe('');
+    await expect(readFile(statusFile, 'utf8')).resolves.toContain('lastRunAt');
+  });
+
+  it('rejects a hook call that is not JSON', async () => {
+    const response = await fetch(`${base}/hook`, { body: '{}', method: 'POST' });
+    expect(response.status).toBe(415);
+  });
+
   it('saves settings and manual readings', async () => {
     const settings = await post('/settings', { planHistory: [{ from: '2026-01-01T00:00:00Z', plan: 'max5', source: 'manual' }] });
     expect(await settings.json()).toMatchObject({ plan: 'max5' });

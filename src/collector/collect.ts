@@ -70,7 +70,7 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
     if (scan.claudeCodeVersion && (!status.claudeCodeVersion || compareVersions(scan.claudeCodeVersion, status.claudeCodeVersion) > 0))
       status.claudeCodeVersion = scan.claudeCodeVersion;
 
-    // Kept when unreadable: a container cannot see the live file the host's hook read.
+    // Kept when unreadable: the container cannot see the live file; host runs (`dev`, `collect`) read it.
     const subscriptionStartedAt = await readSubscriptionStart(options.claudeDir);
     if (subscriptionStartedAt)
       status.subscriptionStartedAt = subscriptionStartedAt;

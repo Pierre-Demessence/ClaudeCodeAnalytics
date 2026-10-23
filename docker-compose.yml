@@ -16,7 +16,7 @@ services:
     volumes:
       # Transcripts and the OAuth token: read-only, the token is only read.
       - ${USERPROFILE:?Run from Windows, where USERPROFILE is set}/.claude:/claude:ro
-      # The user's history, shared with the Claude Code hook running on the host.
+      # The user's history, also written by host runs (`npm run dev`, `collect`).
       - ${USERPROFILE}/.claude-code-analytics:/data
     read_only: true
     tmpfs:
