@@ -123,12 +123,13 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
       send(update);
   };
 
+  // Only Save and Discard wait for a running request: the fields edit the draft alone, and a
+  // disabled field would lose the focus at each auto-reload.
   const numberInput = (field: NumberField, id: string, unit: string) => (
     <span className="input-unit">
       <input
         aria-describedby={shown(field) ? `${id}-error` : undefined}
         aria-invalid={shown(field) ? true : undefined}
-        disabled={busy}
         id={id}
         inputMode="numeric"
         max={BOUNDS[field].max}
@@ -155,7 +156,7 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
               <label htmlFor="plan-select">Plan</label>
               <InfoTip label="About the plan">&quot;Detected&quot; follows Claude Code&apos;s login; another choice applies from when you save it.</InfoTip>
             </span>
-            <select disabled={busy} id="plan-select" onChange={e => edit({ plan: e.target.value })} value={current.plan}>
+            <select id="plan-select" onChange={e => edit({ plan: e.target.value })} value={current.plan}>
               {detected && <option value={DETECTED}>{`Detected: ${PLAN_LABELS[detected]}`}</option>}
               {PLANS.map(p => <option key={p} value={p}>{PLAN_LABELS[p]}</option>)}
             </select>
@@ -164,7 +165,7 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
             <p className="callout">
               <CircleAlert aria-hidden="true" className="icon-inline icon-warning" size={16} />
               <span>{`Claude Code reports ${PLAN_LABELS[detectedPlan]}, but your setting says ${PLAN_LABELS[plan]}.`}</span>
-              <button disabled={busy} onClick={() => edit({ plan: detectedPlan })} type="button">
+              <button onClick={() => edit({ plan: detectedPlan })} type="button">
                 {`Switch to ${PLAN_LABELS[detectedPlan]}`}
               </button>
             </p>
@@ -179,7 +180,6 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
             <input
               checked={current.endpointEnabled}
               className="switch"
-              disabled={busy}
               id="endpoint-switch"
               onChange={e => edit({ endpointEnabled: e.target.checked })}
               role="switch"

@@ -50,9 +50,9 @@ function driftSummary(weekly: (i: number) => number, weeks = 6): Summary {
   return { ...buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' }), status: {} };
 }
 
-function renderTab(data = summary()) {
+function renderTab(data = summary(), busy = false) {
   const props = {
-    busy: false,
+    busy,
     onAddReading: vi.fn(async (_reading: unknown) => {}),
     onDeleteReading: vi.fn(async (_ts: string) => {}),
     onSaveSettings: vi.fn(async (_settings: unknown) => true),
@@ -216,6 +216,15 @@ describe('calibration tab', () => {
       fireEvent.click(endpoint);
       expect(screen.queryByText('Unsaved changes')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    });
+
+    it('keeps the settings editable while a request runs, so the auto-reload does not take the focus away', () => {
+      renderTab(summary({ detectedPlan: 'max20' }), true);
+      fireEvent.change(screen.getByLabelText('5-hour window'), { target: { value: '90' } });
+      for (const control of [screen.getByLabelText('Plan', { selector: '#plan-select' }), screen.getByRole('switch', { name: 'Usage endpoint' }), screen.getByLabelText('Check every'), screen.getByLabelText('5-hour window'), screen.getByLabelText('Week'), screen.getByRole('button', { name: 'Switch to Max 20×' })])
+        expect((control as HTMLInputElement).disabled).toBe(false);
+      expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByRole('button', { name: 'Discard' }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it('opens the advanced section to show a wrong threshold', () => {
