@@ -10,9 +10,10 @@ import { SettingsCard } from '@/dashboard/SettingsCard';
 interface Props {
   busy: boolean;
   summary: Summary;
-  onAddReading: (reading: ManualReading) => Promise<void>;
-  onDeleteReading: (ts: string) => Promise<void>;
-  onSaveSettings: (settings: SettingsUpdate) => Promise<void>;
+  onAddReading: (reading: ManualReading) => Promise<unknown>;
+  onDeleteReading: (ts: string) => Promise<unknown>;
+  /** Resolves to whether the settings were saved. */
+  onSaveSettings: (settings: SettingsUpdate) => Promise<boolean>;
 }
 
 /** Limit drift and the fit, the readings beside the settings and collection status, then the plan history. */

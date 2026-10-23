@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { Summary } from '@/dashboard/api';
 
@@ -50,12 +50,12 @@ function driftSummary(weekly: (i: number) => number, weeks = 6): Summary {
   return { ...buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' }), status: {} };
 }
 
-function renderTab(data = summary()) {
+function renderTab(data = summary(), busy = false) {
   const props = {
-    busy: false,
+    busy,
     onAddReading: vi.fn(async (_reading: unknown) => {}),
     onDeleteReading: vi.fn(async (_ts: string) => {}),
-    onSaveSettings: vi.fn(async (_settings: unknown) => {}),
+    onSaveSettings: vi.fn(async (_settings: unknown) => true),
     summary: data,
   };
   render(<TipProvider><Calibration {...props} /></TipProvider>);
@@ -153,52 +153,159 @@ describe('calibration tab', () => {
   });
 
   describe('settings', () => {
-    it('saves the 5-hour limit threshold, prefilled with the saved one', () => {
-      const { onSaveSettings } = renderTab();
-      const input = screen.getByLabelText('5-hour limit hit from (%)') as HTMLInputElement;
-      expect(input.value).toBe('95');
-      fireEvent.change(input, { target: { value: '98' } });
-      fireEvent.click(within(input.closest('form')!).getByRole('button', { name: 'Save' }));
-      expect(onSaveSettings).toHaveBeenCalledWith({ limitThreshold: 98 });
-    });
+    const save = () => fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    it('saves the weekly limit threshold, prefilled with the saved one', () => {
+    it('saves nothing until Save, then sends only the changed settings together', () => {
       const { onSaveSettings } = renderTab();
-      const input = screen.getByLabelText('Weekly limit hit from (%)') as HTMLInputElement;
-      expect(input.value).toBe('98');
-      fireEvent.change(input, { target: { value: '99' } });
-      fireEvent.click(within(input.closest('form')!).getByRole('button', { name: 'Save' }));
-      expect(onSaveSettings).toHaveBeenCalledWith({ weekLimitThreshold: 99 });
-    });
-
-    it('saves the throttle, and refuses values outside 15 to 1440', () => {
-      const { onSaveSettings } = renderTab();
-      const input = screen.getByLabelText('Minutes between endpoint calls') as HTMLInputElement;
-      expect(input.value).toBe('15');
-      const save = within(input.closest('form')!).getByRole('button', { name: 'Save' });
-      fireEvent.change(input, { target: { value: '5' } });
-      fireEvent.click(save);
+      const fiveHour = screen.getByLabelText('5-hour window') as HTMLInputElement;
+      const week = screen.getByLabelText('Week') as HTMLInputElement;
+      expect(fiveHour.value).toBe('95');
+      expect(week.value).toBe('98');
+      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+      fireEvent.change(fiveHour, { target: { value: '98' } });
+      fireEvent.change(week, { target: { value: '99' } });
+      fireEvent.click(screen.getByRole('switch', { name: 'Usage endpoint' }));
       expect(onSaveSettings).not.toHaveBeenCalled();
+      expect(screen.getByText('Unsaved changes')).toBeTruthy();
+      save();
+      expect(onSaveSettings).toHaveBeenCalledTimes(1);
+      expect(onSaveSettings).toHaveBeenCalledWith({ endpointEnabled: false, limitThreshold: 98, weekLimitThreshold: 99 });
+    });
+
+    it('discards the edits back to the saved values', () => {
+      const { onSaveSettings } = renderTab();
+      const fiveHour = screen.getByLabelText('5-hour window') as HTMLInputElement;
+      fireEvent.change(fiveHour, { target: { value: '80' } });
+      fireEvent.change(screen.getByLabelText('Plan', { selector: '#plan-select' }), { target: { value: 'max5' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+      expect(fiveHour.value).toBe('95');
+      expect((screen.getByLabelText('Plan', { selector: '#plan-select' }) as HTMLSelectElement).value).toBe('pro');
+      expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+      expect(onSaveSettings).not.toHaveBeenCalled();
+    });
+
+    it('saves the check interval, and explains values outside 15 to 1440 next to the field', () => {
+      const { onSaveSettings } = renderTab();
+      const input = screen.getByLabelText('Check every') as HTMLInputElement;
+      expect(input.value).toBe('15');
+      fireEvent.change(input, { target: { value: '5' } });
+      save();
+      expect(onSaveSettings).not.toHaveBeenCalled();
+      expect(screen.getByText('A whole number of minutes from 15 to 1440')).toBeTruthy();
+      expect(input.getAttribute('aria-invalid')).toBe('true');
       fireEvent.change(input, { target: { value: '60' } });
-      fireEvent.click(save);
+      expect(screen.queryByText('A whole number of minutes from 15 to 1440')).toBeNull();
+      save();
       expect(onSaveSettings).toHaveBeenCalledWith({ throttleMinutes: 60 });
     });
 
-    it('explains the endpoint\'s token use without toggling it', () => {
+    it('hides the check interval while the endpoint is off, and leaves its edit unsent', () => {
       const { onSaveSettings } = renderTab();
-      const checkbox = screen.getByRole('checkbox', { name: 'Read limits from the undocumented usage endpoint' });
+      fireEvent.change(screen.getByLabelText('Check every'), { target: { value: '5' } });
+      fireEvent.click(screen.getByRole('switch', { name: 'Usage endpoint' }));
+      expect(screen.queryByLabelText('Check every')).toBeNull();
+      save();
+      expect(onSaveSettings).toHaveBeenCalledWith({ endpointEnabled: false });
+    });
+
+    it('has nothing to save when only the hidden check interval was edited', () => {
+      renderTab({ ...summary(), endpointEnabled: false });
+      const endpoint = screen.getByRole('switch', { name: 'Usage endpoint' });
+      fireEvent.click(endpoint);
+      fireEvent.change(screen.getByLabelText('Check every'), { target: { value: '30' } });
+      fireEvent.click(endpoint);
+      expect(screen.queryByText('Unsaved changes')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    });
+
+    it('keeps the settings editable while a request runs, so the auto-reload does not take the focus away', () => {
+      renderTab(summary({ detectedPlan: 'max20' }), true);
+      fireEvent.change(screen.getByLabelText('5-hour window'), { target: { value: '90' } });
+      for (const control of [screen.getByLabelText('Plan', { selector: '#plan-select' }), screen.getByRole('switch', { name: 'Usage endpoint' }), screen.getByLabelText('Check every'), screen.getByLabelText('5-hour window'), screen.getByLabelText('Week'), screen.getByRole('button', { name: 'Switch to Max 20×' })])
+        expect((control as HTMLInputElement).disabled).toBe(false);
+      expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByRole('button', { name: 'Discard' }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('opens the advanced section to show a wrong threshold', () => {
+      const { onSaveSettings } = renderTab();
+      const details = screen.getByText('Advanced', { selector: 'summary' }).closest('details')!;
+      expect(details.open).toBe(false);
+      fireEvent.change(screen.getByLabelText('Week'), { target: { value: '120' } });
+      save();
+      expect(onSaveSettings).not.toHaveBeenCalled();
+      expect(details.open).toBe(true);
+      expect(screen.getByText('A whole number from 50 to 100')).toBeTruthy();
+    });
+
+    it('keeps the edits when the save fails', async () => {
+      const props = renderTab();
+      props.onSaveSettings.mockResolvedValueOnce(false);
+      const input = screen.getByLabelText('5-hour window') as HTMLInputElement;
+      fireEvent.change(input, { target: { value: '90' } });
+      save();
+      expect(await screen.findByRole('alert')).toBeTruthy();
+      expect(screen.getByRole('alert').textContent).toBe('Not saved: your changes are kept.');
+      expect(input.value).toBe('90');
+    });
+
+    it('explains the endpoint\'s token use without toggling it', () => {
+      renderTab();
+      const checkbox = screen.getByRole('switch', { name: 'Usage endpoint' }) as HTMLInputElement;
       const info = screen.getByRole('button', { name: 'About the usage endpoint' });
       fireEvent.focus(info);
-      expect(screen.getByRole('tooltip').textContent).toContain('sent only to api.anthropic.com');
+      expect(screen.getByRole('tooltip').textContent).toContain('login token');
       fireEvent.click(info);
-      expect(onSaveSettings).not.toHaveBeenCalled();
-      fireEvent.click(checkbox);
-      expect(onSaveSettings).toHaveBeenCalledWith({ endpointEnabled: false });
+      expect(checkbox.checked).toBe(true);
+    });
+
+    describe('turning the endpoint on', () => {
+      // jsdom has no modal dialogs: opening one only sets its `open` attribute here.
+      beforeAll(() => {
+        HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+          this.setAttribute('open', '');
+        };
+        HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+          this.removeAttribute('open');
+        };
+      });
+
+      const turnOn = () => {
+        const props = renderTab({ ...summary(), endpointEnabled: false });
+        fireEvent.click(screen.getByRole('switch', { name: 'Usage endpoint' }));
+        save();
+        return props;
+      };
+
+      it('asks to confirm the token use before saving', () => {
+        const { onSaveSettings } = turnOn();
+        const dialog = screen.getByRole('dialog', { name: 'Turn on the usage endpoint?' });
+        expect(dialog.textContent).toContain('Sent only to api.anthropic.com');
+        expect(onSaveSettings).not.toHaveBeenCalled();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on and save' }));
+        expect(onSaveSettings).toHaveBeenCalledWith({ endpointEnabled: true });
+        expect(screen.queryByRole('dialog')).toBeNull();
+      });
+
+      it('sends nothing and keeps the edit when cancelled', () => {
+        const { onSaveSettings } = turnOn();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(onSaveSettings).not.toHaveBeenCalled();
+        expect((screen.getByRole('switch', { name: 'Usage endpoint' }) as HTMLInputElement).checked).toBe(true);
+      });
+
+      it('cancels on Escape', () => {
+        const { onSaveSettings } = turnOn();
+        fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(onSaveSettings).not.toHaveBeenCalled();
+      });
     });
 
     it('keeps a field empty while it is being retyped', () => {
       renderTab();
-      const input = screen.getByLabelText('Minutes between endpoint calls') as HTMLInputElement;
+      const input = screen.getByLabelText('Check every') as HTMLInputElement;
       fireEvent.change(input, { target: { value: '' } });
       expect(input.value).toBe('');
     });
@@ -214,6 +321,8 @@ describe('calibration tab', () => {
       expect(select.value).toBe('max5');
       expect(within(select).getByRole('option', { name: 'Detected: Max 5×' })).toBeTruthy();
       fireEvent.change(select, { target: { value: 'detected' } });
+      expect(onSaveSettings).not.toHaveBeenCalled();
+      save();
       const { planHistory } = onSaveSettings.mock.calls[0]![0] as { planHistory: { plan: string; source: string }[] };
       expect(planHistory.at(-1)).toMatchObject({ plan: 'max5', source: 'detected' });
     });
@@ -224,6 +333,7 @@ describe('calibration tab', () => {
       const select = screen.getByLabelText('Plan', { selector: '#plan-select' }) as HTMLSelectElement;
       expect(select.value).toBe('detected');
       fireEvent.change(select, { target: { value: 'pro' } });
+      save();
       const { planHistory } = onSaveSettings.mock.calls[0]![0] as { planHistory: { plan: string; source: string }[] };
       expect(planHistory.at(-1)).toMatchObject({ plan: 'pro', source: 'manual' });
     });
@@ -231,6 +341,7 @@ describe('calibration tab', () => {
     it('keeps the plan assumed so far when choosing the first plan period', () => {
       const { onSaveSettings } = renderTab();
       fireEvent.change(screen.getByLabelText('Plan', { selector: '#plan-select' }), { target: { value: 'max5' } });
+      save();
       const { planHistory } = onSaveSettings.mock.calls[0]![0] as { planHistory: { from: string; plan: string }[] };
       expect(planHistory.map(p => p.plan)).toEqual(['pro', 'max5']);
       expect(planHistory[0]!.from).toBe(new Date(0).toISOString());
@@ -243,6 +354,9 @@ describe('calibration tab', () => {
         planHistory: [{ from: '2026-01-01T00:00:00.000Z', plan: 'pro', source: 'manual' }],
       }));
       fireEvent.click(screen.getByRole('button', { name: 'Switch to Max 20×' }));
+      expect(onSaveSettings).not.toHaveBeenCalled();
+      expect((screen.getByLabelText('Plan', { selector: '#plan-select' }) as HTMLSelectElement).value).toBe('max20');
+      save();
       expect((onSaveSettings.mock.calls[0]![0] as { planHistory: { plan: string }[] }).planHistory.at(-1)?.plan).toBe('max20');
     });
   });
