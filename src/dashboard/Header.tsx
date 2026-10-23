@@ -50,7 +50,9 @@ export function Header({ anonymous, busy, onRefresh, onToggleAnonymous, onToggle
           <button
             disabled={busy}
             onClick={onRefresh}
-            {...tip('Imports transcripts and calls the usage endpoint now. The endpoint is rate-limited, so avoid repeated clicks.')}
+            {...tip(summary?.endpointEnabled
+              ? 'Imports transcripts and calls the usage endpoint now. The endpoint is rate-limited, so avoid repeated clicks.'
+              : 'Imports transcripts now.')}
             type="button"
           >
             Refresh

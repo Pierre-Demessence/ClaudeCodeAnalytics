@@ -169,7 +169,9 @@ export function Overview({ summary }: { summary: Summary }) {
                 <VerdictBox
                   detail={(
                     <>
-                      The first projection comes after a few readings: the collector takes one every 15 minutes once the hook is installed, or you can add one in
+                      {summary.endpointEnabled
+                        ? 'The first projection comes after a few readings: the collector takes one every 15 minutes once the hook is installed, or you can add one in'
+                        : 'The first projection comes after a few readings: turn on the usage endpoint, or add readings by hand, in'}
                       {' '}
                       {CALIBRATION_LINK}
                       .

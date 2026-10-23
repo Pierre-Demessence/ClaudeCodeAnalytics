@@ -85,12 +85,17 @@ export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
       <div className="cal-section">
         <label className="checkbox">
           <input
+            aria-labelledby="endpoint-label"
             checked={summary.endpointEnabled}
             disabled={busy}
             onChange={e => void onSaveSettings({ endpointEnabled: e.target.checked })}
             type="checkbox"
           />
-          Read limits from the undocumented usage endpoint
+          <span>
+            <span id="endpoint-label">Read limits from the undocumented usage endpoint</span>
+            {' '}
+            <InfoTip label="About the usage endpoint">Uses the login token Claude Code keeps in ~/.claude/.credentials.json: held in memory, sent only to api.anthropic.com, never logged or stored. It also detects your plan.</InfoTip>
+          </span>
         </label>
         <form className="inline-form" onSubmit={saveThrottle}>
           <div className="field">

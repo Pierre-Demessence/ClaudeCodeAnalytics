@@ -184,6 +184,18 @@ describe('calibration tab', () => {
       expect(onSaveSettings).toHaveBeenCalledWith({ throttleMinutes: 60 });
     });
 
+    it('explains the endpoint\'s token use without toggling it', () => {
+      const { onSaveSettings } = renderTab();
+      const checkbox = screen.getByRole('checkbox', { name: 'Read limits from the undocumented usage endpoint' });
+      const info = screen.getByRole('button', { name: 'About the usage endpoint' });
+      fireEvent.focus(info);
+      expect(screen.getByRole('tooltip').textContent).toContain('sent only to api.anthropic.com');
+      fireEvent.click(info);
+      expect(onSaveSettings).not.toHaveBeenCalled();
+      fireEvent.click(checkbox);
+      expect(onSaveSettings).toHaveBeenCalledWith({ endpointEnabled: false });
+    });
+
     it('keeps a field empty while it is being retyped', () => {
       renderTab();
       const input = screen.getByLabelText('Minutes between endpoint calls') as HTMLInputElement;

@@ -59,6 +59,9 @@ describe('collect', () => {
       '',
     ].join('\n'));
     await writeFile(join(claudeDir, 'projects', 'proj-a', 'session', 'subagents', 'agent.jsonl'), assistantLine('m2', 10, '2.1.300'));
+    // The endpoint is opt-in; most tests here exercise it.
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, 'settings.json'), JSON.stringify({ endpointEnabled: true }));
     fetchImpl.mockClear();
   });
 
@@ -181,6 +184,14 @@ describe('collect', () => {
     await store.saveSettings({ endpointEnabled: false, limitThreshold: 95, planHistory: [], throttleMinutes: 15, weekLimitThreshold: 98 });
     await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('leaves the credentials alone until the endpoint is turned on', async () => {
+    await rm(join(dataDir, 'settings.json'));
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect((await new Store(dataDir).loadStatus()).endpointResult).toBeUndefined();
+    expect((await new Store(dataDir).loadSettings()).endpointEnabled).toBe(false);
   });
 
   it('exits without writing while another run holds the lock', async () => {

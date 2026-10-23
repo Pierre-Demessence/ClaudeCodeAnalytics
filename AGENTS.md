@@ -97,7 +97,9 @@ Run lint, test and build before considering work done.
 ## Invariants
 
 - **The OAuth token** (`~/.claude/.credentials.json`) is read in memory only,
-  sent only to `api.anthropic.com`, never logged, stored or refreshed.
+  sent only to `api.anthropic.com`, never logged, stored or refreshed. It is read
+  only while `endpointEnabled` is on, which defaults to off: keep it opt-in, and
+  keep the README's "What it reads" table in sync with what the collector reads.
 - The usage endpoint needs a `claude-code/<version>` User-Agent; keep the
   throttle (default 15 min) and never add a retry loop: it shares a tight rate
   limit with Claude Code's own `/usage`.

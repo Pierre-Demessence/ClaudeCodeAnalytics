@@ -96,6 +96,12 @@ describe('overview', () => {
     expect(screen.queryByRole('heading', { name: 'Budget pacing this week' })).toBeNull();
   });
 
+  it('points to the endpoint setting when there is no history and the endpoint is off', () => {
+    render(<Overview summary={summary(null, { endpointEnabled: false })} />);
+    expect(weeklyCard().textContent).toContain('turn on the usage endpoint');
+    expect(weeklyCard().textContent).not.toContain('every 15 minutes');
+  });
+
   it('says no 5-hour session is in progress', () => {
     render(<Overview summary={summary()} />);
     expect(screen.getByText('No session in progress.')).toBeTruthy();

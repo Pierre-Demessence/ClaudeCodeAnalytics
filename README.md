@@ -11,10 +11,27 @@ Everything stays on your machine. Data comes from two places:
   per message, priced at public API rates as the usage unit, with the session,
   working directory, branch, effort and Claude Code version, and each
   conversation's AI-generated title. Message content is never stored.
-- **Plan limits**: Claude Code's undocumented usage endpoint (the numbers behind
-  `/usage`), read with the OAuth token Claude Code stores locally, and/or manual
-  readings you type in. The token is only ever sent to `api.anthropic.com`; it is
-  never logged or stored.
+- **Plan limits**: manual readings you type in (from `/usage`), and/or Claude
+  Code's undocumented usage endpoint (the numbers behind `/usage`), which is off
+  until you turn it on in Calibration. See [What it reads](#what-it-reads).
+
+## What it reads
+
+Everything runs locally; the only network call is the usage endpoint, and only
+once you turn it on.
+
+| Path | What is used | When |
+| --- | --- | --- |
+| `~/.claude/projects/**/*.jsonl` | Token counts, model, session, working directory, branch, tool names and sizes, skill and slash command names, conversation titles, and the times of rate-limit hits, overloads and compactions. Never message content or tool inputs. | Every collector run |
+| `~/.claude/projects/**/*.meta.json` | A subagent's type, never its description. | Every collector run |
+| `~/.claude.json` (or `~/.claude/.claude.json`) | `subscriptionCreatedAt` only (the billing day), never the email or account ids. | Every collector run |
+| `~/.claude/.credentials.json` | The OAuth access token, its expiry, the plan type and rate-limit tier. | Only with the usage endpoint on |
+| `~/.claude/settings.json` | Read and edited, with a backup, to add the hook. | Only when you run `hook:install -- --apply` |
+
+The token is held in memory, sent only to
+`https://api.anthropic.com/api/oauth/usage`, and never logged, stored or
+refreshed: Claude Code refreshes it. The whole client is
+[`src/collector/endpoint.ts`](src/collector/endpoint.ts).
 
 ## Features
 
@@ -47,7 +64,7 @@ Everything stays on your machine. Data comes from two places:
 - A range picker shared by the Usage, Breakdown, Sessions and Weeks tabs: presets
   (this week, last 4 weeks, last 3 months, last 12 months, all time), previous and
   next stepping, or custom days, kept in the URL; long lists and charts page.
-- Plan setting with history; the plan is also detected from Claude Code's login.
+- Plan setting with history; with the usage endpoint on, the plan is also detected from Claude Code's login.
 - Tabs: Overview (limits and pacing), Usage (subscription vs API prices, charts by model, heatmap, cache, message costs),
   Breakdown (projects, conversations, agents), Sessions (past 5-hour windows),
   Weeks (past weekly windows), Plans (which plan would have fit the last 12 weeks, with the demand a limit hid estimated at your typical pace, an Opus-to-Sonnet what-if, and how far the advertised plan multipliers match your own weeks) and Calibration (limit drift, the fit, readings with manual ones addable and deletable, plan and collection settings, plan history).
@@ -72,8 +89,8 @@ npm run dashboard               # builds and opens the dashboard
 ```
 
 The hook runs the collector in the background after every Claude Code
-response; it calls the usage endpoint at most every 15 minutes. Opening the
-dashboard also imports new transcripts.
+response; once the usage endpoint is turned on (Calibration tab), it calls it at
+most every 15 minutes. Opening the dashboard also imports new transcripts.
 
 Collected data lives in `~/.claude-code-analytics/` (override with
 `CCA_DATA_DIR`). Raise `cleanupPeriodDays` in `~/.claude/settings.json` if you

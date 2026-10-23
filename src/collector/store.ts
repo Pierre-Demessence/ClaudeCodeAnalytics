@@ -31,7 +31,8 @@ export interface StoredScanState {
   format: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { endpointEnabled: true, limitThreshold: DEFAULT_LIMIT_THRESHOLD, planHistory: [], throttleMinutes: 15, weekLimitThreshold: DEFAULT_WEEK_LIMIT_THRESHOLD };
+/** The endpoint is opt-in: nothing reads Claude Code's credentials until the user turns it on. */
+export const DEFAULT_SETTINGS: Settings = { endpointEnabled: false, limitThreshold: DEFAULT_LIMIT_THRESHOLD, planHistory: [], throttleMinutes: 15, weekLimitThreshold: DEFAULT_WEEK_LIMIT_THRESHOLD };
 
 export function dataDir(): string {
   return process.env.CCA_DATA_DIR ?? join(homedir(), '.claude-code-analytics');

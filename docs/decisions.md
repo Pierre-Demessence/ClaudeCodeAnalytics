@@ -10,6 +10,10 @@ the real weekly and 5-hour % (the numbers behind `/usage`). Anthropic does not
 publish limits in tokens, so this is the only ground truth. Manual readings use
 the same snapshot format, as a fallback if the endpoint breaks.
 
+The endpoint is opt-in (`endpointEnabled` defaults to off): a tool that reads
+`.credentials.json` without being asked looks like credential theft, whatever it
+does with the token. Rejected: on by default, even with the README explaining it.
+
 ## Send a `claude-code/<version>` User-Agent
 
 Probed 2026-10-02: an honest `claude-code-analytics` User-Agent got HTTP 429,
