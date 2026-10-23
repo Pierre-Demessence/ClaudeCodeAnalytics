@@ -2120,6 +2120,224 @@ button.info-tip:hover {
   border-top: 1px solid var(--grid);
 }
 
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--grid);
+}
+
+.settings-group:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+
+
+/* A checkbox drawn as a track with a sliding knob; role="switch" says it applies on its own. */
+input.switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--grid);
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+input.switch::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform 0.15s;
+}
+
+input.switch:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+input.switch:checked::before {
+  background: #fff;
+  transform: translateX(16px);
+}
+
+input.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input.switch:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input.switch,
+  input.switch::before {
+    transition: none;
+  }
+}
+
+
+/* One setting per row: its label on the left, its control on the right. */
+.setting-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-height: 32px;
+}
+
+.setting-label {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* A long plan name wraps the row instead of being cut. */
+.setting-row select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.setting-caption {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.field-error {
+  margin: -8px 0 0;
+  line-height: 1.35;
+}
+
+.field-error {
+  color: var(--critical-text);
+  font-size: 0.8rem;
+}
+
+.settings-actions .field-error {
+  margin: 0 auto 0 0;
+}
+
+details.settings-advanced {
+  margin-top: 0;
+}
+
+details.settings-advanced summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  list-style: none;
+}
+
+details.settings-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+details.settings-advanced summary:hover {
+  color: var(--text-primary);
+}
+
+.settings-chevron {
+  transition: transform 0.15s;
+}
+
+details.settings-advanced[open] .settings-chevron {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-chevron {
+    transition: none;
+  }
+}
+
+/* A details element does not lay its content out as flex, so the rows sit in a body of their own. */
+.settings-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.input-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.input-unit input[type='number'] {
+  width: 4em;
+  color: var(--text-primary);
+  text-align: right;
+  appearance: textfield;
+}
+
+.input-unit input[type='number']::-webkit-inner-spin-button,
+.input-unit input[type='number']::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+/* The units share a width so the inputs above each other line up. */
+.input-unit > span {
+  min-width: 1.8em;
+}
+
+.input-unit input:disabled,
+.input-unit input:disabled + span {
+  opacity: 0.55;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--grid);
+}
+
+.settings-actions .helper {
+  margin-right: auto;
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
 .cal-form {
   display: flex;
   flex-direction: column;
@@ -2904,4 +3122,71 @@ button.info-tip:hover {
 
 .plan-note {
   margin-top: 12px;
+}
+
+/* A modal question (ConfirmDialog.tsx); the native dialog centres it and draws the backdrop. */
+.confirm-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 24px 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 25%);
+  color: var(--text-primary);
+}
+
+.confirm-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+/* Doubled class: a dialog opened from a card must not take the card's heading margins. */
+.confirm-dialog .confirm-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-size: 1.15rem;
+}
+
+.confirm-dialog-title svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.confirm-dialog-body {
+  line-height: 1.5;
+}
+
+.confirm-dialog-body p {
+  margin: 0;
+}
+
+.confirm-dialog-body p + p,
+.confirm-dialog-body ul + p {
+  margin-top: 16px;
+}
+
+.confirm-dialog-body ul {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 0;
+  padding: 12px 16px 12px 32px;
+  border-radius: 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--grid);
+}
+
+.confirm-dialog-body .helper {
+  font-size: 0.85rem;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.confirm-dialog-actions button {
+  padding: 6px 16px;
 }

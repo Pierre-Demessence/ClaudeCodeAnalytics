@@ -35,7 +35,8 @@ export function App() {
   // Overlapping requests (auto-reload during a save) may finish out of order: only the latest one counts.
   const latestRequestRef = useRef(0);
 
-  const run = useCallback(async (action: () => Promise<Summary>) => {
+  /** Resolves to whether the action succeeded, even when a newer request supersedes its result. */
+  const run = useCallback(async (action: () => Promise<Summary>): Promise<boolean> => {
     const request = ++latestRequestRef.current;
     setBusy(true);
     try {
@@ -44,10 +45,12 @@ export function App() {
         setSummary(next);
         setError(undefined);
       }
+      return true;
     }
     catch (e) {
       if (request === latestRequestRef.current)
         setError(e instanceof Error ? e.message : String(e));
+      return false;
     }
     finally {
       if (request === latestRequestRef.current)

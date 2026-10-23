@@ -1,135 +1,259 @@
 import type { FormEvent } from 'react';
 
-import { CircleAlert } from 'lucide-react';
+import { ChevronRight, CircleAlert, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Plan } from '@/core/types';
 import type { SettingsUpdate, Summary } from '@/dashboard/api';
 
 import { PLAN_LABELS, PLANS } from '@/core/plans';
+import { ConfirmDialog } from '@/dashboard/ConfirmDialog';
 import { withPeriod } from '@/dashboard/planPeriods';
 import { InfoTip } from '@/dashboard/Tip';
 
 interface Props {
   busy: boolean;
   summary: Summary;
-  onSaveSettings: (settings: SettingsUpdate) => Promise<void>;
+  /** Resolves to whether the settings were saved. */
+  onSaveSettings: (settings: SettingsUpdate) => Promise<boolean>;
 }
 
 const DETECTED = 'detected';
 
+/** Edits made since the last save; an absent field follows the saved value. */
+interface Draft {
+  endpointEnabled?: boolean;
+  limitThreshold?: string;
+  /** `DETECTED` or a plan. */
+  plan?: string;
+  throttleMinutes?: string;
+  weekLimitThreshold?: string;
+}
+
+type NumberField = 'limitThreshold' | 'throttleMinutes' | 'weekLimitThreshold';
+
+/** The server's bounds, checked here so a wrong value is explained next to its field. */
+const BOUNDS: Record<NumberField, { max: number; message: string; min: number }> = {
+  limitThreshold: { max: 100, message: 'A whole number from 50 to 100', min: 50 },
+  throttleMinutes: { max: 1440, message: 'A whole number of minutes from 15 to 1440', min: 15 },
+  weekLimitThreshold: { max: 100, message: 'A whole number from 50 to 100', min: 50 },
+};
+
+function invalid(field: NumberField, value: string): string | undefined {
+  const { max, message, min } = BOUNDS[field];
+  const number = Number(value);
+  return value.trim() === '' || !Number.isInteger(number) || number < min || number > max ? message : undefined;
+}
+
+/** Every setting is a draft until Save sends the changed ones together; Discard drops them. */
 export function SettingsCard({ busy, onSaveSettings, summary }: Props) {
-  // Undefined until edited (an emptied field stays empty), so the fields follow the saved values.
-  const [editedThrottle, setEditedThrottle] = useState<string>();
-  const [editedThreshold, setEditedThreshold] = useState<string>();
-  const [editedWeekThreshold, setEditedWeekThreshold] = useState<string>();
-  const throttle = editedThrottle ?? String(summary.throttleMinutes);
-  const threshold = editedThreshold ?? String(summary.limitThreshold);
-  const weekThreshold = editedWeekThreshold ?? String(summary.weekLimitThreshold);
+  const [draft, setDraft] = useState<Draft>({});
+  // Errors show once Save was tried, then follow the edits.
+  const [tried, setTried] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // An update that turns the endpoint on, held until its token use is confirmed.
+  const [confirming, setConfirming] = useState<SettingsUpdate>();
   const { detected, detectedPlan, plan, planHistory, planSource } = summary;
-
-  const choosePlan = (value: string) => {
-    const from = new Date().toISOString();
-    const added = value === DETECTED
-      ? { from, plan: detected!, source: 'detected' as const }
-      : { from, plan: value as Plan, source: 'manual' as const };
-    void onSaveSettings({ planHistory: withPeriod(planHistory, plan, added) });
+  const saved = {
+    endpointEnabled: summary.endpointEnabled,
+    limitThreshold: String(summary.limitThreshold),
+    plan: planSource === 'detected' && detected ? DETECTED : plan,
+    throttleMinutes: String(summary.throttleMinutes),
+    weekLimitThreshold: String(summary.weekLimitThreshold),
+  };
+  const current = { ...saved, ...draft };
+  // The interval is hidden and left unsent while the endpoint is off, so its edit is no change then.
+  const changed = (key: keyof Draft) => current[key] !== saved[key] && (key !== 'throttleMinutes' || current.endpointEnabled);
+  const dirty = (Object.keys(saved) as (keyof Draft)[]).some(changed);
+  const edit = (change: Draft) => {
+    setDraft(d => ({ ...d, ...change }));
+    setFailed(false);
+  };
+  const reset = () => {
+    setDraft({});
+    setTried(false);
+    setFailed(false);
   };
 
-  const saveThrottle = (event: FormEvent) => {
+  // The interval is hidden and left unsent while the endpoint is off, so it is not checked then.
+  const errors = {
+    limitThreshold: invalid('limitThreshold', current.limitThreshold),
+    throttleMinutes: current.endpointEnabled ? invalid('throttleMinutes', current.throttleMinutes) : undefined,
+    weekLimitThreshold: invalid('weekLimitThreshold', current.weekLimitThreshold),
+  };
+  const shown = (field: NumberField) => (tried ? errors[field] : undefined);
+
+  // A failed save keeps the edits so they can be retried.
+  const send = (update: SettingsUpdate) => {
+    void onSaveSettings(update).then((ok) => {
+      if (ok)
+        reset();
+      else
+        setFailed(true);
+    });
+  };
+
+  const save = (event: FormEvent) => {
     event.preventDefault();
-    void onSaveSettings({ throttleMinutes: Number(throttle) }).then(() => setEditedThrottle(undefined));
+    setTried(true);
+    if (errors.limitThreshold || errors.weekLimitThreshold)
+      setAdvancedOpen(true);
+    if (Object.values(errors).some(Boolean))
+      return;
+    const update: SettingsUpdate = {};
+    if (changed('plan')) {
+      const from = new Date().toISOString();
+      const added = current.plan === DETECTED
+        ? { from, plan: detected!, source: 'detected' as const }
+        : { from, plan: current.plan as Plan, source: 'manual' as const };
+      update.planHistory = withPeriod(planHistory, plan, added);
+    }
+    if (changed('endpointEnabled'))
+      update.endpointEnabled = current.endpointEnabled;
+    if (changed('throttleMinutes'))
+      update.throttleMinutes = Number(current.throttleMinutes);
+    if (changed('limitThreshold'))
+      update.limitThreshold = Number(current.limitThreshold);
+    if (changed('weekLimitThreshold'))
+      update.weekLimitThreshold = Number(current.weekLimitThreshold);
+    if (update.endpointEnabled)
+      setConfirming(update);
+    else
+      send(update);
   };
 
-  const saveThreshold = (event: FormEvent) => {
-    event.preventDefault();
-    void onSaveSettings({ limitThreshold: Number(threshold) }).then(() => setEditedThreshold(undefined));
-  };
-
-  const saveWeekThreshold = (event: FormEvent) => {
-    event.preventDefault();
-    void onSaveSettings({ weekLimitThreshold: Number(weekThreshold) }).then(() => setEditedWeekThreshold(undefined));
-  };
+  // Only Save and Discard wait for a running request: the fields edit the draft alone, and a
+  // disabled field would lose the focus at each auto-reload.
+  const numberInput = (field: NumberField, id: string, unit: string) => (
+    <span className="input-unit">
+      <input
+        aria-describedby={shown(field) ? `${id}-error` : undefined}
+        aria-invalid={shown(field) ? true : undefined}
+        id={id}
+        inputMode="numeric"
+        max={BOUNDS[field].max}
+        min={BOUNDS[field].min}
+        onChange={e => edit({ [field]: e.target.value })}
+        step="1"
+        type="number"
+        value={current[field]}
+      />
+      <span aria-hidden="true">{unit}</span>
+    </span>
+  );
+  const fieldError = (field: NumberField, id: string) => shown(field) && (
+    <p className="field-error" id={`${id}-error`}>{shown(field)}</p>
+  );
 
   return (
     <section className="card cal-card">
       <h2>Settings</h2>
-      <div className="field">
-        <div className="field-label">
-          <label htmlFor="plan-select">Plan</label>
-          <InfoTip label="About the plan">&quot;Detected&quot; follows Claude Code&apos;s login; another choice applies from now.</InfoTip>
+      <form className="settings-form" noValidate onSubmit={save}>
+        <div className="settings-group">
+          <div className="setting-row">
+            <span className="setting-label">
+              <label htmlFor="plan-select">Plan</label>
+              <InfoTip label="About the plan">&quot;Detected&quot; follows Claude Code&apos;s login; another choice applies from when you save it.</InfoTip>
+            </span>
+            <select id="plan-select" onChange={e => edit({ plan: e.target.value })} value={current.plan}>
+              {detected && <option value={DETECTED}>{`Detected: ${PLAN_LABELS[detected]}`}</option>}
+              {PLANS.map(p => <option key={p} value={p}>{PLAN_LABELS[p]}</option>)}
+            </select>
+          </div>
+          {detectedPlan && current.plan === saved.plan && (
+            <p className="callout">
+              <CircleAlert aria-hidden="true" className="icon-inline icon-warning" size={16} />
+              <span>{`Claude Code reports ${PLAN_LABELS[detectedPlan]}, but your setting says ${PLAN_LABELS[plan]}.`}</span>
+              <button onClick={() => edit({ plan: detectedPlan })} type="button">
+                {`Switch to ${PLAN_LABELS[detectedPlan]}`}
+              </button>
+            </p>
+          )}
         </div>
-        <select
-          disabled={busy}
-          id="plan-select"
-          onChange={e => choosePlan(e.target.value)}
-          value={planSource === 'detected' && detected ? DETECTED : plan}
-        >
-          {detected && <option value={DETECTED}>{`Detected: ${PLAN_LABELS[detected]}`}</option>}
-          {PLANS.map(p => <option key={p} value={p}>{PLAN_LABELS[p]}</option>)}
-        </select>
-      </div>
-      {detectedPlan && (
-        <p className="callout">
-          <CircleAlert aria-hidden="true" className="icon-inline icon-warning" size={16} />
-          <span>{`Claude Code reports ${PLAN_LABELS[detectedPlan]}, but your setting says ${PLAN_LABELS[plan]}.`}</span>
-          <button
-            disabled={busy}
-            onClick={() => void onSaveSettings({ planHistory: [...planHistory, { from: new Date().toISOString(), plan: detectedPlan, source: 'manual' }] })}
-            type="button"
-          >
-            {`Switch to ${PLAN_LABELS[detectedPlan]}`}
-          </button>
+        <div className="settings-group">
+          <div className="setting-row">
+            <span className="setting-label">
+              <label htmlFor="endpoint-switch">Usage endpoint</label>
+              <InfoTip label="About the usage endpoint">Reads your actual limits from Claude Code&apos;s undocumented usage endpoint, which also detects your plan. It uses your Claude Code login token.</InfoTip>
+            </span>
+            <input
+              checked={current.endpointEnabled}
+              className="switch"
+              id="endpoint-switch"
+              onChange={e => edit({ endpointEnabled: e.target.checked })}
+              role="switch"
+              type="checkbox"
+            />
+          </div>
+          {current.endpointEnabled && (
+            <>
+              <div className="setting-row">
+                <span className="setting-label">
+                  <label htmlFor="throttle-input">Check every</label>
+                  <InfoTip label="About the check interval">15 minutes at least: the endpoint shares Claude Code&apos;s own rate limit.</InfoTip>
+                </span>
+                {numberInput('throttleMinutes', 'throttle-input', 'min')}
+              </div>
+              {fieldError('throttleMinutes', 'throttle-input')}
+            </>
+          )}
+        </div>
+        <details className="settings-group settings-advanced" onToggle={e => setAdvancedOpen(e.currentTarget.open)} open={advancedOpen}>
+          <summary>
+            <ChevronRight aria-hidden="true" className="settings-chevron" size={16} />
+            Advanced
+          </summary>
+          <div className="settings-advanced-body">
+            <p className="setting-caption">
+              Counts as a limit hit from
+              <InfoTip label="About the limit hit thresholds">A past window counts as having hit its limit when a reading reached this %: close to 100%, a new agent run stops almost at once and the week is as good as spent.</InfoTip>
+            </p>
+            <div className="setting-row">
+              <label className="setting-label" htmlFor="threshold-input">5-hour window</label>
+              {numberInput('limitThreshold', 'threshold-input', '%')}
+            </div>
+            {fieldError('limitThreshold', 'threshold-input')}
+            <div className="setting-row">
+              <label className="setting-label" htmlFor="week-threshold-input">Week</label>
+              {numberInput('weekLimitThreshold', 'week-threshold-input', '%')}
+            </div>
+            {fieldError('weekLimitThreshold', 'week-threshold-input')}
+          </div>
+        </details>
+        {dirty && (
+          <div className="settings-actions">
+            <span className={failed ? 'field-error' : 'helper'} role={failed ? 'alert' : undefined}>
+              {failed ? 'Not saved: your changes are kept.' : 'Unsaved changes'}
+            </span>
+            <button disabled={busy} onClick={reset} type="button">Discard</button>
+            <button className="primary" disabled={busy} type="submit">Save</button>
+          </div>
+        )}
+      </form>
+      <ConfirmDialog
+        confirmLabel="Turn on and save"
+        icon={<KeyRound aria-hidden="true" size={20} />}
+        onCancel={() => setConfirming(undefined)}
+        onConfirm={() => {
+          send(confirming!);
+          setConfirming(undefined);
+        }}
+        open={confirming !== undefined}
+        title="Turn on the usage endpoint?"
+      >
+        <p>
+          The dashboard will read your actual limits from Claude Code&apos;s undocumented usage endpoint, using your Claude Code login token (
+          <code>~/.claude/.credentials.json</code>
+          ).
         </p>
-      )}
-      <div className="cal-section">
-        <label className="checkbox">
-          <input
-            aria-labelledby="endpoint-label"
-            checked={summary.endpointEnabled}
-            disabled={busy}
-            onChange={e => void onSaveSettings({ endpointEnabled: e.target.checked })}
-            type="checkbox"
-          />
-          <span>
-            <span id="endpoint-label">Read limits from the undocumented usage endpoint</span>
-            {' '}
-            <InfoTip label="About the usage endpoint">Uses the login token Claude Code keeps in ~/.claude/.credentials.json: held in memory, sent only to api.anthropic.com, never logged or stored. It also detects your plan.</InfoTip>
-          </span>
-        </label>
-        <form className="inline-form" onSubmit={saveThrottle}>
-          <div className="field">
-            <div className="field-label">
-              <label htmlFor="throttle-input">Minutes between endpoint calls</label>
-              <InfoTip label="About minutes between endpoint calls">15 at least: the endpoint shares Claude Code&apos;s own rate limit.</InfoTip>
-            </div>
-            <input id="throttle-input" max="1440" min="15" onChange={e => setEditedThrottle(e.target.value)} required step="1" type="number" value={throttle} />
-          </div>
-          <button disabled={busy} type="submit">Save</button>
-        </form>
-      </div>
-      <div className="cal-section">
-        <form className="inline-form" onSubmit={saveThreshold}>
-          <div className="field">
-            <div className="field-label">
-              <label htmlFor="threshold-input">5-hour limit hit from (%)</label>
-              <InfoTip label="About the 5-hour limit threshold">A past 5-hour window counts as having hit the limit when a reading reached this %: close to 100%, a new agent run stops almost at once.</InfoTip>
-            </div>
-            <input id="threshold-input" max="100" min="50" onChange={e => setEditedThreshold(e.target.value)} required step="1" type="number" value={threshold} />
-          </div>
-          <button disabled={busy} type="submit">Save</button>
-        </form>
-        <form className="inline-form" onSubmit={saveWeekThreshold}>
-          <div className="field">
-            <div className="field-label">
-              <label htmlFor="week-threshold-input">Weekly limit hit from (%)</label>
-              <InfoTip label="About the weekly limit threshold">A past week counts as having hit the limit when its final reading reached this %: close to 100%, the week is as good as spent.</InfoTip>
-            </div>
-            <input id="week-threshold-input" max="100" min="50" onChange={e => setEditedWeekThreshold(e.target.value)} required step="1" type="number" value={weekThreshold} />
-          </div>
-          <button disabled={busy} type="submit">Save</button>
-        </form>
-      </div>
+        <ul>
+          <li>Held in memory only, never logged or stored</li>
+          <li>Sent only to api.anthropic.com</li>
+          <li>Never refreshed or changed</li>
+        </ul>
+        <p className="helper">You can turn it off again at any time.</p>
+      </ConfirmDialog>
     </section>
   );
 }

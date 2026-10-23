@@ -12,7 +12,7 @@ import { periodStart, toLocalInput, withPeriod } from '@/dashboard/planPeriods';
 interface Props {
   busy: boolean;
   summary: Summary;
-  onSaveSettings: (settings: SettingsUpdate) => Promise<void>;
+  onSaveSettings: (settings: SettingsUpdate) => Promise<unknown>;
 }
 
 const today = () => toLocalInput(new Date().toISOString()).slice(0, 10);
