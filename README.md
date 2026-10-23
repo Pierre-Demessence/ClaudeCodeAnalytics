@@ -21,6 +21,7 @@ limits, and shows where the usage goes. Nothing leaves your machine.
 - **History**: past 5-hour sessions and weeks, the ones that hit the limit or got rate-limited.
 - **Plan fit**: whether Pro, Max 5× or Max 20× would have fit your last weeks.
 - **Taskbar widget** (Windows): both limits at a glance, always visible.
+- **Costs no usage**: it never calls Claude, so it uses no tokens and doesn't count toward your limits.
 - **Private by design**: never stores message content; anonymize mode for screenshots.
 - Light and dark themes, colorblind-friendly charts (every series has a texture).
 
@@ -78,7 +79,9 @@ npm run dashboard               # builds and opens the dashboard
 
 Run `npm run hook:install` without `--apply` to print the hook and add it yourself.
 The hook imports new transcripts in the background after every Claude Code
-response; opening the dashboard does too.
+response; opening the dashboard does too. Neither uses any of your usage: they
+read files Claude Code already writes and never call Claude, and the hook adds
+nothing to your conversation.
 
 **Limit readings.** The % of your limits comes from one of two sources, set in
 the Calibration tab:
@@ -86,7 +89,8 @@ the Calibration tab:
 - **Manual**: type in what `/usage` shows from time to time.
 - **Usage endpoint** (opt-in): reads the numbers behind `/usage` automatically,
   at most every 15 minutes. It uses Claude Code's undocumented endpoint and your
-  login token; see [Privacy](#privacy).
+  login token; see [Privacy](#privacy). Like `/usage`, it only reads the
+  numbers and costs no usage.
 
 The forecasts appear after a few readings; until then, everything else already works.
 
