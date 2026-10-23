@@ -35,8 +35,7 @@ export function App() {
   // Overlapping requests (auto-reload during a save) may finish out of order: only the latest one counts.
   const latestRequestRef = useRef(0);
 
-  /** Resolves to whether the action succeeded, even when a newer request supersedes its result. */
-  const run = useCallback(async (action: () => Promise<Summary>): Promise<boolean> => {
+  const run = useCallback(async (action: () => Promise<Summary>) => {
     const request = ++latestRequestRef.current;
     setBusy(true);
     try {
@@ -45,12 +44,10 @@ export function App() {
         setSummary(next);
         setError(undefined);
       }
-      return true;
     }
     catch (e) {
       if (request === latestRequestRef.current)
         setError(e instanceof Error ? e.message : String(e));
-      return false;
     }
     finally {
       if (request === latestRequestRef.current)
@@ -117,7 +114,16 @@ export function App() {
                     busy={busy}
                     onAddReading={reading => run(() => addReading(reading))}
                     onDeleteReading={ts => run(() => deleteReading(ts))}
-                    onSaveSettings={settings => run(() => saveSettings(settings))}
+                    onSaveSettings={async (settings) => {
+                      // The settings card keeps its edits when the save fails, so it needs to know.
+                      let saved = false;
+                      await run(async () => {
+                        const next = await saveSettings(settings);
+                        saved = true;
+                        return next;
+                      });
+                      return saved;
+                    }}
                     summary={shown}
                   />
                 )}

@@ -10,8 +10,8 @@ import { SettingsCard } from '@/dashboard/SettingsCard';
 interface Props {
   busy: boolean;
   summary: Summary;
-  onAddReading: (reading: ManualReading) => Promise<unknown>;
-  onDeleteReading: (ts: string) => Promise<unknown>;
+  onAddReading: (reading: ManualReading) => Promise<void>;
+  onDeleteReading: (ts: string) => Promise<void>;
   /** Resolves to whether the settings were saved. */
   onSaveSettings: (settings: SettingsUpdate) => Promise<boolean>;
 }
@@ -31,7 +31,13 @@ export function Calibration({ busy, onAddReading, onDeleteReading, onSaveSetting
           <CollectionCard summary={summary} />
         </div>
       </div>
-      <PlanHistoryCard busy={busy} onSaveSettings={onSaveSettings} summary={summary} />
+      <PlanHistoryCard
+        busy={busy}
+        onSaveSettings={async (settings) => {
+          await onSaveSettings(settings);
+        }}
+        summary={summary}
+      />
     </>
   );
 }
