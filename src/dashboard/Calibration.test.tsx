@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { Summary } from '@/dashboard/api';
@@ -415,6 +415,19 @@ describe('calibration tab', () => {
       fireEvent.change(input, { target: { value: '2025-12-20T09:30' } });
       fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
       expect(onSaveSettings).toHaveBeenCalledWith({ planHistory: [history[0], { from: new Date('2025-12-20T09:30').toISOString(), plan: 'max5', source: 'manual' }] });
+    });
+
+    it('keeps the edit open when the save fails, and closes it once saved', async () => {
+      const props = renderTab(withHistory());
+      props.onSaveSettings.mockResolvedValueOnce(false);
+      fireEvent.click(screen.getByRole('button', { name: /^Edit the start of Max 5×/ }));
+      fireEvent.change(screen.getByLabelText('Start of Max 5×'), { target: { value: '2025-12-20T09:30' } });
+      fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
+      await act(async () => {});
+      expect((screen.getByLabelText('Start of Max 5×') as HTMLInputElement).value).toBe('2025-12-20T09:30');
+      fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
+      await act(async () => {});
+      expect(screen.queryByLabelText('Start of Max 5×')).toBeNull();
     });
 
     it('refuses a start another period already has, and cancels the edit', () => {

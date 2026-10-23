@@ -12,7 +12,8 @@ import { periodStart, toLocalInput, withPeriod } from '@/dashboard/planPeriods';
 interface Props {
   busy: boolean;
   summary: Summary;
-  onSaveSettings: (settings: SettingsUpdate) => Promise<unknown>;
+  /** Resolves to whether the settings were saved. */
+  onSaveSettings: (settings: SettingsUpdate) => Promise<boolean>;
 }
 
 const today = () => toLocalInput(new Date().toISOString()).slice(0, 10);
@@ -47,7 +48,11 @@ export function PlanHistoryCard({ busy, onSaveSettings, summary }: Props) {
       return;
     // A start set by hand is no longer the collector's detection.
     const edited = planHistory.map((period, i) => (i === editing.index ? { ...period, from: editedFrom!, source: 'manual' as const } : period));
-    void onSaveSettings({ planHistory: edited.sort((a, b) => Date.parse(a.from) - Date.parse(b.from)) }).then(() => setEditing(undefined));
+    // A failed save keeps the edit open so it can be retried.
+    void onSaveSettings({ planHistory: edited.sort((a, b) => Date.parse(a.from) - Date.parse(b.from)) }).then((ok) => {
+      if (ok)
+        setEditing(undefined);
+    });
   };
 
   return (
