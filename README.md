@@ -107,7 +107,7 @@ once you turn it on.
 | --- | --- | --- |
 | `~/.claude/projects/**/*.jsonl` | Token counts, model, session, working directory, branch, tool names and sizes, skill and slash command names, conversation titles, and the times of rate-limit hits, overloads and compactions. Never message content or tool inputs. | Every collector run |
 | `~/.claude/projects/**/*.meta.json` | A subagent's type, never its description. | Every collector run |
-| `~/.claude.json` (or `~/.claude/.claude.json`) | `subscriptionCreatedAt` only (the billing day), never the email or account ids. | Every collector run |
+| `~/.claude.json` (or `~/.claude/.claude.json`) | `subscriptionCreatedAt` only (the billing day, unless the plan history sets it), never the email or account ids. | Every collector run |
 | `~/.claude/.credentials.json` | The OAuth access token, its expiry, the plan type and rate-limit tier. | Only with the usage endpoint on |
 | `~/.claude/settings.json` | Read and edited, with a backup, to add the hook. | Only when you run `hook:install -- --apply` |
 

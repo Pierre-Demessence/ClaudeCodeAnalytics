@@ -3115,6 +3115,15 @@ button.primary:hover:not(:disabled) {
   display: block;
 }
 
+.row-buttons {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.plan-note {
+  margin-top: 12px;
+}
+
 /* A modal question (ConfirmDialog.tsx); the native dialog centres it and draws the backdrop. */
 .confirm-dialog {
   width: min(480px, calc(100vw - 32px));

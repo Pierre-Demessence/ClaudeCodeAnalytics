@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { UsageRecord } from '@/core/types';
+import type { PlanPeriod, UsageRecord } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
 import type { Bucket } from '@/dashboard/usageData';
 
@@ -29,13 +29,13 @@ function rec(ago: number, extra: Partial<UsageRecord> = {}): UsageRecord {
   return { cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, cwd: 'S:\\Dev\\app', input: 0, key: ts + JSON.stringify(extra), model: 'claude-opus-5-5', output: 1_000_000, project: 'p', sessionId: 's1', ts, ...extra };
 }
 
-function summary(records: UsageRecord[], subscriptionStart?: number): Summary {
+function summary(records: UsageRecord[], subscriptionStart?: number, planHistory: PlanPeriod[] = []): Summary {
   const resetsAt = new Date(NOW + 3 * DAY_MS).toISOString();
   return {
     ...buildSummary({
       endpointEnabled: true,
       now: NOW,
-      planHistory: [],
+      planHistory,
       records,
       snapshots: [{ source: 'endpoint', ts: new Date(NOW - 10 * 60_000).toISOString(), weekly: 42, weeklyResetsAt: resetsAt }],
       subscriptionStart,
@@ -131,6 +131,16 @@ describe('usage tab', () => {
     const value = card('Subscription vs API prices');
     expect(within(value).getByRole('button', { name: 'This billing cycle' }).getAttribute('aria-pressed')).toBe('true');
     expect([...value.querySelectorAll('.stats div')].map(div => div.textContent)).toEqual(['Subscription$20', 'API value$40', 'Saved$2050% below API']);
+  });
+
+  it('takes the credit for the unused plan off an upgrade', () => {
+    const planHistory: PlanPeriod[] = [
+      { from: new Date(NOW - 40 * DAY_MS).toISOString(), plan: 'pro', source: 'manual' },
+      { from: new Date(NOW - 5 * DAY_MS).toISOString(), plan: 'max5', source: 'manual' },
+    ];
+    render(<Usage summary={summary([rec(9 * DAY_MS), rec(2 * DAY_MS)], NOW - 10 * DAY_MS, planHistory)} />);
+    const subscription = card('Subscription vs API prices').querySelector('.stats div')!;
+    expect(subscription.textContent).toMatch(/^Subscription\$\d+after \$\d+ credit for unused Pro$/);
   });
 
   it('opens on all time when the last 4 weeks had no usage', () => {

@@ -1,4 +1,4 @@
-import type { PlanPeriod } from './types.ts';
+import type { Plan, PlanPeriod } from './types.ts';
 
 import { DAY_MS } from './calibration.ts';
 import { PLAN_PRICES, planAt } from './plans.ts';
@@ -7,10 +7,18 @@ import { PLAN_PRICES, planAt } from './plans.ts';
 export const MONTH_MS = 30.4375 * DAY_MS;
 const RECENT_MS = 28 * DAY_MS;
 
+/** The unused time of the plan left by an upgrade, refunded on the new plan's first charge. */
+export interface Credit {
+  amount: number;
+  plan: Plan;
+}
+
 export interface Value {
   /** What the usage would have cost at public API prices. */
   apiCost: number;
-  /** What the plan cost: the price of each billing date in the window, or its list price prorated by time. */
+  /** The credits for unused time included in `paid`; only with the billing date. */
+  credits?: Credit[];
+  /** What the plan cost: the charges in the window, or the list price prorated by time. */
   paid: number;
   /** `apiCost - paid`; negative when the plan cost more than the usage was worth. */
   saved: number;
@@ -36,6 +44,17 @@ export interface ValueForMoneyInput {
   subscriptionStart?: number;
 }
 
+/**
+ * When the paid subscription started: the first plan period's start when it was set by hand,
+ * else the account's date. A detected first period only marks when the collector first saw the
+ * plan, and one from the epoch keeps the plan assumed before any history.
+ */
+export function subscriptionStartOf(planHistory: readonly PlanPeriod[], accountStart: number | undefined): number | undefined {
+  const first = planHistory[0];
+  const from = first ? Date.parse(first.from) : 0;
+  return first?.source === 'manual' && from > 0 ? from : accountStart;
+}
+
 const priceAt = (planHistory: readonly PlanPeriod[], time: number) => PLAN_PRICES[planAt(planHistory, new Date(time).toISOString())];
 
 /** The `n`th billing date: the start's day of the month and time, `n` months on, cut to the month's last day. */
@@ -46,12 +65,47 @@ function billingDate(start: number, n: number): number {
   return Date.UTC(at.getUTCFullYear(), month, Math.min(at.getUTCDate(), lastDay), at.getUTCHours(), at.getUTCMinutes(), at.getUTCSeconds(), at.getUTCMilliseconds());
 }
 
-/** The billing dates from the start up to `now`. */
-function billingDates(start: number, now: number): number[] {
-  const dates: number[] = [];
-  for (let n = 0; billingDate(start, n) <= now; n++)
-    dates.push(billingDate(start, n));
-  return dates;
+/** One charge and the billing cycle it pays for, from `start` to the next charge. */
+interface Cycle {
+  credit?: Credit;
+  paid: number;
+  start: number;
+}
+
+/**
+ * The charges from the subscription start up to `now`. Each billing date charges the plan then
+ * active; it recurs on the same day each month. An upgrade starts a new cycle there and then: the
+ * new plan's full price less the unused time of the plan paid for, and the billing day moves to it.
+ * A downgrade waits for the next billing date and refunds nothing, so a plan no dearer than the one
+ * paid for this cycle charges nothing.
+ */
+function billingCycles(planHistory: readonly PlanPeriod[], subscriptionStart: number, now: number): Cycle[] {
+  const changes = planHistory.map(period => Date.parse(period.from)).filter(time => time > subscriptionStart && time <= now).sort((a, b) => a - b);
+  const planOn = (time: number) => planAt(planHistory, new Date(time).toISOString());
+  let anchor = subscriptionStart;
+  let n = 0;
+  let paidFor = planOn(anchor);
+  const cycles: Cycle[] = [{ paid: PLAN_PRICES[paidFor], start: anchor }];
+  for (;;) {
+    const start = cycles.at(-1)!.start;
+    const end = billingDate(anchor, n + 1);
+    const upgrade = changes.find(time => time > start && time < end && PLAN_PRICES[planOn(time)] > PLAN_PRICES[paidFor]);
+    if (upgrade !== undefined) {
+      const credit = { amount: PLAN_PRICES[paidFor] * (end - upgrade) / (end - start), plan: paidFor };
+      paidFor = planOn(upgrade);
+      cycles.push({ credit, paid: PLAN_PRICES[paidFor] - credit.amount, start: upgrade });
+      anchor = upgrade;
+      n = 0;
+    }
+    else if (end <= now) {
+      paidFor = planOn(end);
+      cycles.push({ paid: PLAN_PRICES[paidFor], start: end });
+      n++;
+    }
+    else {
+      return cycles;
+    }
+  }
 }
 
 /** The list price of the plan active at each moment of `[from, to]`, prorated by time. */
@@ -65,18 +119,24 @@ function proratedPrice(planHistory: readonly PlanPeriod[], from: number, to: num
 }
 
 /** The usage since `from` at API prices against `paid`; absent without cost. */
-function valueSince(input: ValueForMoneyInput, from: number, paid: number): Value | undefined {
+function valueSince(input: ValueForMoneyInput, from: number, paid: number, credits: Credit[] = []): Value | undefined {
   const apiCost = input.costBetween(from, input.now);
   if (!(apiCost > 0))
     return undefined;
   const saved = apiCost - paid;
-  return { apiCost, paid, saved, savedPercent: saved / apiCost * 100 };
+  return { apiCost, paid, saved, savedPercent: saved / apiCost * 100, ...(credits.length > 0 && { credits }) };
+}
+
+/** The usage since the first cycle began against what its cycles cost. */
+function valueOfCycles(input: ValueForMoneyInput, cycles: readonly Cycle[]): Value | undefined {
+  const credits = cycles.flatMap(cycle => cycle.credit ? [cycle.credit] : []);
+  return valueSince(input, cycles[0]!.start, cycles.reduce((sum, cycle) => sum + cycle.paid, 0), credits);
 }
 
 /**
  * What the plan bought: the usage at API prices against what the plan cost.
- * With the billing date, that is the price charged on each billing date (at the plan then
- * active) against the usage since the current cycle began, and since the subscription began.
+ * With the billing date, that is the charges (see `billingCycles`) against the usage since the
+ * current cycle began, and since the subscription began.
  * Without it, the list price prorated by time over the last 4 weeks and since the first message,
  * neither starting before the first message.
  */
@@ -84,13 +144,8 @@ export function valueForMoney(input: ValueForMoneyInput): ValueForMoney | undefi
   const { dataStart, now, planHistory, subscriptionStart } = input;
   const result = ((): ValueForMoney => {
     if (subscriptionStart !== undefined && subscriptionStart <= now) {
-      const dates = billingDates(subscriptionStart, now);
-      const cycleStart = dates.at(-1)!;
-      return {
-        allTime: valueSince(input, subscriptionStart, dates.reduce((sum, date) => sum + priceAt(planHistory, date), 0)),
-        kind: 'cycle',
-        recent: valueSince(input, cycleStart, priceAt(planHistory, cycleStart)),
-      };
+      const cycles = billingCycles(planHistory, subscriptionStart, now);
+      return { allTime: valueOfCycles(input, cycles), kind: 'cycle', recent: valueOfCycles(input, cycles.slice(-1)) };
     }
     const from = Math.max(dataStart, now - RECENT_MS);
     return {

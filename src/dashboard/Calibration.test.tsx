@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { Summary } from '@/dashboard/api';
@@ -6,6 +6,7 @@ import type { Summary } from '@/dashboard/api';
 import { WEEK_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
 import { Calibration } from '@/dashboard/Calibration';
+import { toLocalInput } from '@/dashboard/planPeriods';
 import { TipProvider } from '@/dashboard/Tip';
 
 const NOW = Date.now();
@@ -382,6 +383,7 @@ describe('calibration tab', () => {
       { from: new Date(0).toISOString(), plan: 'pro' as const, source: 'manual' as const },
       { from: '2026-01-01T00:00:00.000Z', plan: 'max5' as const, source: 'detected' as const },
     ];
+    const planTable = () => screen.getAllByRole('table').at(-1)!;
     const withHistory = () => summary({ limits: { ...summary().limits, readingsPerPeriod: [12, 1486] }, plan: 'max5', planHistory: history });
 
     it('lists periods newest first with the current one marked, until, source and readings', () => {
@@ -400,6 +402,41 @@ describe('calibration tab', () => {
       const { onSaveSettings } = renderTab(withHistory());
       fireEvent.click(screen.getByRole('button', { name: /^Remove Pro/ }));
       expect(onSaveSettings).toHaveBeenCalledWith({ planHistory: [history[1]] });
+    });
+
+    it('edits the start of a period, which becomes manual, and keeps the history in order', () => {
+      const { onSaveSettings } = renderTab(withHistory());
+      const edit = screen.getByRole('button', { name: /^Edit the start of Max 5×/ });
+      fireEvent.click(edit);
+      // A browser runs the click's default action after React renders: the Edit button must not have become Save.
+      expect(edit.isConnected).toBe(false);
+      const input = screen.getByLabelText('Start of Max 5×') as HTMLInputElement;
+      expect(input.value).toBe(toLocalInput(history[1]!.from));
+      fireEvent.change(input, { target: { value: '2025-12-20T09:30' } });
+      fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
+      expect(onSaveSettings).toHaveBeenCalledWith({ planHistory: [history[0], { from: new Date('2025-12-20T09:30').toISOString(), plan: 'max5', source: 'manual' }] });
+    });
+
+    it('keeps the edit open when the save fails, and closes it once saved', async () => {
+      const props = renderTab(withHistory());
+      props.onSaveSettings.mockResolvedValueOnce(false);
+      fireEvent.click(screen.getByRole('button', { name: /^Edit the start of Max 5×/ }));
+      fireEvent.change(screen.getByLabelText('Start of Max 5×'), { target: { value: '2025-12-20T09:30' } });
+      fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
+      await act(async () => {});
+      expect((screen.getByLabelText('Start of Max 5×') as HTMLInputElement).value).toBe('2025-12-20T09:30');
+      fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
+      await act(async () => {});
+      expect(screen.queryByLabelText('Start of Max 5×')).toBeNull();
+    });
+
+    it('refuses a start another period already has, and cancels the edit', () => {
+      renderTab(withHistory());
+      fireEvent.click(screen.getByRole('button', { name: /^Edit the start of Max 5×/ }));
+      fireEvent.change(screen.getByLabelText('Start of Max 5×'), { target: { value: toLocalInput(history[0]!.from) } });
+      expect((within(planTable()).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByLabelText('Start of Max 5×')).toBeNull();
     });
 
     it('shows the assumed plan as one row without Remove when there is no history', () => {

@@ -34,7 +34,7 @@ import { planAt, planFromSubscription } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
-import { valueForMoney } from './valueForMoney.ts';
+import { subscriptionStartOf, valueForMoney } from './valueForMoney.ts';
 import { buildWeekHistory, DEFAULT_WEEK_LIMIT_THRESHOLD } from './weekHistory.ts';
 import { weekBucketer, weekStarter, windowStartOf } from './weekWindows.ts';
 
@@ -55,7 +55,7 @@ export interface SummaryInput {
   planHistory: readonly PlanPeriod[];
   records: readonly UsageRecord[];
   snapshots: readonly Snapshot[];
-  /** When the paid subscription started (ms); it is billed on the same day each month. */
+  /** When the paid subscription started (ms), from Claude Code's account; a manual first plan period overrides it. */
   subscriptionStart?: number;
   /** Minutes between endpoint calls; 15 by default. */
   throttleMinutes?: number;
@@ -351,6 +351,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const prepared = prepareSummary(input);
   const { calibration, costBetween, current, first, fiveHourCalibration, fiveHourSession, limitThreshold, plan, resets, sessionHits, sessionWindows, snapshots, weekHits, weekLimitThreshold, weeks, weekStartOf } = prepared;
   const latest = snapshots.at(-1);
+  const subscriptionStart = subscriptionStartOf(planHistory, input.subscriptionStart);
   // A loop, not Math.max(...): spreading a year of records overflows the call stack.
   let latestRecord: UsageRecord | undefined;
   for (const record of records) {
@@ -404,7 +405,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     modelRatios: modelRatios(records, now - TYPICAL_DAYS * DAY_MS, now, timeZone),
     multipliers: buildMultipliers(limitsInput),
     plan,
-    planFit: buildPlanFitInput({ calibrationK: calibration?.k, plan, planHistory, sessionWindows, subscriptionStart: input.subscriptionStart, weekHistory }),
+    planFit: buildPlanFitInput({ calibrationK: calibration?.k, plan, planHistory, sessionWindows, subscriptionStart, weekHistory }),
     planHistory,
     planSource: (planHistory.findLast(period => Date.parse(period.from) <= now) ?? planHistory[0])?.source,
     rangeBasis: { firstMessage: records.length > 0 ? first : undefined, resets },
@@ -412,7 +413,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     throttleMinutes: input.throttleMinutes ?? 15,
     timeZone,
     unknownModels,
-    value: valueForMoney({ costBetween, dataStart: first, now, planHistory, subscriptionStart: input.subscriptionStart }),
+    value: valueForMoney({ costBetween, dataStart: first, now, planHistory, subscriptionStart }),
     weekHistory,
     weekLimitThreshold,
     weekly,
