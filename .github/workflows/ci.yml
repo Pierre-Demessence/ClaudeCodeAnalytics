@@ -22,3 +22,15 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # The widget is Windows-only, and its golden images are rendered with Windows' fonts.
+  widget:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: widget
+      - run: cargo test --locked --manifest-path widget/Cargo.toml
+      - run: cargo clippy --locked --manifest-path widget/Cargo.toml --all-targets -- -D warnings
