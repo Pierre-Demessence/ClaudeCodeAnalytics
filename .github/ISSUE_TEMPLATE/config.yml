@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/security/advisories/new
+    about: A token or private data leaking. Report it privately, not in an issue.

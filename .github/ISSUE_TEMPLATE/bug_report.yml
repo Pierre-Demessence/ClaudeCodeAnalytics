@@ -1,0 +1,67 @@
+name: Bug report
+description: Something is wrong, broken or shows a wrong number.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Don't paste transcript content, tokens or anything from `~/.claude/.credentials.json`. Turn on anonymize mode (the eye button) before taking screenshots.
+        A security problem (a token or private data leaking)? Don't file it here: see [SECURITY.md](https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the Sessions tab
+        2. …
+    validations:
+      required: true
+  - type: dropdown
+    id: run
+    attributes:
+      label: How you run it
+      multiple: true
+      options:
+        - npm run dashboard
+        - npm run dev
+        - Docker (npm run docker:up)
+        - Taskbar widget
+        - Collector or hook only
+    validations:
+      required: true
+  - type: dropdown
+    id: readings
+    attributes:
+      label: Limit readings
+      description: Calibration tab, Settings and Readings cards.
+      options:
+        - Usage endpoint
+        - Manual
+        - None yet
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: OS, Node (`node -v`), Claude Code (`claude -v`), and this project's release or commit (`git rev-parse --short HEAD`).
+      placeholder: Windows 11, Node 22.18.0, Claude Code 2.1.300, 4e11c9e
+    validations:
+      required: true
+  - type: textarea
+    id: collection
+    attributes:
+      label: Collection status
+      description: The Calibration tab's "Collection" card, with anonymize mode off so a "Last run failed" message shows. Remove any path you don't want public.
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, browser console errors, the terminal output.

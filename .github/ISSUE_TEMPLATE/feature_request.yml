@@ -1,0 +1,28 @@
+name: Feature request
+description: An idea for a new view, number or improvement.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [docs/backlog.md](https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/blob/main/docs/backlog.md) first: the idea may already be listed, and a comment on why you need it helps. [docs/decisions.md](https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/blob/main/docs/decisions.md) explains choices that may look odd.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to know or do
+      description: The question you can't answer today, or the task that's awkward. Start from the need, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: How it could look or work, if you have one in mind.
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to build it?
+      options:
+        - No, just suggesting
+        - Yes, with some guidance
+        - Yes, I'll open a pull request

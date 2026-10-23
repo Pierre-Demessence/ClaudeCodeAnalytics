@@ -4,11 +4,20 @@ Agent operating notes for **Claude Code Analytics**: a local dashboard (Vite +
 React + TypeScript strict) estimating Claude Code plan usage from local
 transcripts and the plan-limit endpoint.
 
+Before opening a pull request, read `CONTRIBUTING.md`: the docs a change must
+update and what the description holds.
+
+A few notes depend on a setup a contributor may not have: the Docker dashboard
+behind Traefik (which the taskbar widget polls), the Claude Design canvas (the
+maintainer's only), and a hook installed from this clone. Each says so; skip it
+when that setup isn't yours.
+
 ## Commands
 
 - Dashboard: `npm run dashboard` (build + preview) or `npm run dev`
 - Always-on dashboard: `npm run docker:up` (rebuild + restart the container
-  at `http://analytics.claudecode.localhost`, behind Traefik)
+  at `http://analytics.claudecode.localhost`, behind Traefik). Needs a running
+  Traefik on an external `proxy` network; skip it if you don't have one.
 - Taskbar widget: `npm run widget:dev` (debug build, redraws when
   `widget/widget.svg` is saved) / `npm run widget:install` (release build copied
   to `%LOCALAPPDATA%Claude Code Analytics Widget` and started) /
@@ -41,7 +50,7 @@ Run lint, test and build before considering work done.
   is its look, `src/` the logic (`view` texts and flags, `template` fills the SVG,
   `render` draws it with resvg, `fetch`, `dock`, `window` with the click and menu
   handling, `theme`, `autostart`); `core/widget.ts` builds the API's answer.
-- `docs/` — `backlog.md`, `decisions.md`, `plans/`; `screenshots/` holds the README's
+- `docs/` — `backlog.md`, `decisions.md`, `roadmap.md`, `plans/` (see "Docs"); `screenshots/` holds the README's
   images: each tab in light and dark, anonymize mode on, 1280 px wide at 2× scale, cut
   below the last whole card.
 - `Dockerfile`, `docker-compose.yml` — the always-on dashboard behind Traefik.
@@ -92,9 +101,32 @@ Run lint, test and build before considering work done.
   applied to the summary in `App.tsx`. A new field showing one of those must be
   added there (ranged data goes through `anonymizeRanged`, applied in `useHistoryView`),
   and views must read it from the summary or the history view, never from another source.
-- Claude Design: one canvas for the project, "Claude Code Analytics redesign"
-  (<https://claude.ai/artifact/Fw9e29WbgMikfa9CK5WyfV>). A new design is a page in
-  it (board files named by feature), never a new artifact.
+- Claude Design (maintainer only: the canvas is private): one canvas for the project,
+  "Claude Code Analytics redesign" (<https://claude.ai/artifact/Fw9e29WbgMikfa9CK5WyfV>).
+  A new design is a page in it (board files named by feature), never a new artifact.
+  Contributors skip it and show UI changes with screenshots in the pull request.
+
+## Docs
+
+- `README.md`: what users see and do. Its "Privacy" table lists everything the
+  collector reads; a change reading a new file or field updates it.
+- `docs/backlog.md`: everything not done (bugs, debt, ideas), one line each, with
+  a `file:line` pointer where useful. Something found out of scope goes there at
+  once instead of being fixed silently; an item is deleted in the commit that
+  completes it.
+- `docs/decisions.md`: only decisions where a reader of the code would ask "why
+  this way and not X?" and the answer is not in the code, a comment or this file.
+  The decision, why, and the alternatives someone would plausibly re-propose. A
+  reversed decision replaces its entry.
+- `docs/roadmap.md`: the order of the scheduled work; an item is deleted when done.
+- `docs/plans/<feature>.md`: the plan of a large change (goal, acceptance criteria,
+  design, checklist). Anything deferred goes to the backlog when it is deferred;
+  the plan is deleted in the feature's final commit.
+- Docs describe the current state in the present tense: no "previously" or "now",
+  no dates, version stamps or changelog lines, no frontmatter. Done items are
+  deleted, not ticked or struck through (only an in-progress plan ticks its
+  checklist). Items are referred to by name or tag (`[forensics]`), never by
+  position.
 
 ## Invariants
 
@@ -105,8 +137,8 @@ Run lint, test and build before considering work done.
 - The usage endpoint needs a `claude-code/<version>` User-Agent; keep the
   throttle (default 15 min) and never add a retry loop: it shares a tight rate
   limit with Claude Code's own `/usage`.
-- The installed Claude Code hook runs `src/collector/cli.ts` from this working
-  copy, so uncommitted collector changes go live at the next response. Keep
+- A Claude Code hook installed from this clone runs `src/collector/cli.ts` from this
+  working copy, so uncommitted collector changes go live at the next response. Keep
   the collector runnable; it fails silently in the hook (check `lastError` in
   the status).
 - The data dir (`~/.claude-code-analytics/`, or `CCA_DATA_DIR`) holds the
@@ -126,7 +158,8 @@ Run lint, test and build before considering work done.
 - Bump `SCAN_FORMAT` (`collector/store.ts`) only when records gain fields that
   old messages need: the next run re-reads every transcript once. Make the bump
   the last edit, after the tests pass, since the hook runs it on the real data.
-  The dashboard runs the collector too: rebuild the container (`docker:up`).
+  The dashboard runs the collector too: with the Docker setup, rebuild the container
+  (`docker:up`).
 - The API is loopback-only: POST endpoints require `application/json` and a
   same-origin `Origin`; reads rely on Vite's default `allowedHosts`. Never set
   `server.host` or `allowedHosts: true` without adding a Host check. The Docker
