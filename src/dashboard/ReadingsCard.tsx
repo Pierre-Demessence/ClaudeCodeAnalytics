@@ -11,8 +11,8 @@ import { toLocalInput } from '@/dashboard/planPeriods';
 interface Props {
   busy: boolean;
   summary: Summary;
-  onAddReading: (reading: ManualReading) => Promise<void>;
-  onDeleteReading: (ts: string) => Promise<void>;
+  onAddReading: (reading: ManualReading) => Promise<unknown>;
+  onDeleteReading: (ts: string) => Promise<unknown>;
 }
 
 const FIRST_ROWS = 10;
