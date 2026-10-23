@@ -57,6 +57,7 @@ everyone. The rules that matter most in review:
 | If your change… | Update |
 | --- | --- |
 | Changes what users see or do | `README.md`, if it describes it |
+| Is noteworthy for users | `CHANGELOG.md`, under Unreleased |
 | Reads a new file or field | The README's "Privacy" table |
 | Completes a backlog item | Delete it from `docs/backlog.md` |
 | Finds a bug or idea you won't fix now | Add one line to `docs/backlog.md` |
