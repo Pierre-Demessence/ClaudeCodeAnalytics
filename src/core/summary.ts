@@ -44,6 +44,10 @@ const TYPICAL_DAYS = 28;
 const DAILY_CHART_DAYS = 35;
 /** Readings older than this get an estimated current % from transcripts. */
 const STALE_READING_MS = 30 * 60_000;
+/** Fewer days than this under the current plan give no weekly pace of their own: the forecast keeps the full typical days. */
+const MIN_PLAN_DAYS = 3;
+/** From this far into a week, its forecast rests on the week's own pace alone; before, past days steady it. */
+const OWN_PACE_AFTER_MS = 3 * DAY_MS;
 
 export interface SummaryInput {
   endpointEnabled: boolean;
@@ -97,6 +101,8 @@ export interface CurrentWeek {
   readAt: string;
   resetsAt: string;
   source: Snapshot['source'];
+  /** This week's own fit, used for the week's estimate, forecast, pacing and active time when present. */
+  weekCalibration?: Calibration;
   /** Weekly % at the last reading; 0 when `withoutReading`. */
   weekly: number;
   /** No reading yet in this window: it follows the last known reset, usage comes from transcripts. */
@@ -217,9 +223,14 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
   const fiveHourCalibration = fitRatio(fiveHourCalibrationPoints(planSnapshots, costBetween, first), now);
   const yesterday = dayKey(now - DAY_MS, timeZone);
   const typicalFrom = [firstDay, dayKey(now - TYPICAL_DAYS * DAY_MS, timeZone)].sort().at(-1)!;
-  const dailyCosts = typicalFrom <= yesterday
-    ? dailyCostSeries(records, timeZone, typicalFrom, yesterday).map(d => d.cost)
+  const dailyCostsFrom = (from: string) => from <= yesterday
+    ? dailyCostSeries(records, timeZone, from, yesterday).map(d => d.cost)
     : [];
+  // The weekly pace comes from the days under the current plan: a plan change moves the usage with it.
+  const planPeriod = planHistory.findLast(period => Date.parse(period.from) <= now);
+  const planFrom = planPeriod ? [typicalFrom, dayKey(Date.parse(planPeriod.from), timeZone)].sort().at(-1)! : typicalFrom;
+  const planDays = dailyCostsFrom(planFrom);
+  const dailyCosts = planDays.length >= MIN_PLAN_DAYS ? planDays : dailyCostsFrom(typicalFrom);
   const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
   const weekLimitThreshold = input.weekLimitThreshold ?? DEFAULT_WEEK_LIMIT_THRESHOLD;
   const hits = dedupeHits(input.events ?? []).filter(event => event.kind === 'limit');
@@ -266,13 +277,20 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     // Weekly windows are fixed 7-day blocks: a week without a reading yet follows the last known reset.
     const resetsAt = withoutReading ? windowStartOf(now, latestReset) + WEEK_MS : latestReset;
     const windowFrom = resetsAt - WEEK_MS;
+    // Weeks of one plan can burn the limit at very different rates per dollar (model mix):
+    // with enough readings of its own, the week uses its own ratio rather than the pooled one.
+    const weekReadings = snapshots.filter(s => Date.parse(s.weeklyResetsAt) === resetsAt);
+    const weekCalibration = withoutReading
+      ? undefined
+      : fitRatio(calibrationPoints(planSnapshots.filter(s => Date.parse(s.weeklyResetsAt) === resetsAt), costBetween, first), now);
+    const weekK = (weekCalibration ?? calibration)?.k;
 
     let used: number | undefined;
     let estimatedNow: number | undefined;
     if (!withoutReading) {
       used = latest.weekly;
       // A stale reading misses the usage since; with a calibration, add it back from transcripts.
-      const sinceReading = calibration ? calibration.k * costBetween(readAt, now) : 0;
+      const sinceReading = weekK !== undefined ? weekK * costBetween(readAt, now) : 0;
       if (now - readAt > STALE_READING_MS && sinceReading > 0)
         estimatedNow = Math.min(100, latest.weekly + sinceReading);
     }
@@ -287,8 +305,10 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
 
     if (used !== undefined) {
       const week = {
-        k: calibration?.k,
+        k: weekK,
+        ownPaceAfterMs: OWN_PACE_AFTER_MS,
         paceSamples: dailyCosts,
+        resampleSum: true,
         resetsAt,
         sampleMs: DAY_MS,
         typical: typicalBase && { high: typicalBase.high, low: typicalBase.low, median: typicalBase.median },
@@ -301,20 +321,21 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
 
       const resetsAtIso = new Date(resetsAt).toISOString();
       current = {
-        activeLeftByFamily: activeLeftByFamily({ k: calibration?.k, paces: paceByFamily, used: estimatedNow ?? used }),
-        activeLeftMs: activeTimeLeft({ k: calibration?.k, pace: activePace, used: estimatedNow ?? used }),
+        activeLeftByFamily: activeLeftByFamily({ k: weekK, paces: paceByFamily, used: estimatedNow ?? used }),
+        activeLeftMs: activeTimeLeft({ k: weekK, pace: activePace, used: estimatedNow ?? used }),
         estimatedNow,
         forecast,
         readAt: latest.ts,
         resetsAt: withoutReading ? resetsAtIso : latest.weeklyResetsAt,
         source: latest.source,
+        weekCalibration,
         weekly: used,
         withoutReading: withoutReading || undefined,
         pacing: weekPacing({
           costBetween,
-          k: calibration?.k,
+          k: weekK,
           now,
-          readings: snapshots.filter(s => Date.parse(s.weeklyResetsAt) === resetsAt),
+          readings: weekReadings,
           resetsAt,
           usedNow: estimatedNow ?? used,
           windowMs: WEEK_MS,

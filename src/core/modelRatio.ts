@@ -5,7 +5,7 @@ import type { UsageRecord } from './types.ts';
 import { activeByFamily, familyPaces } from './activeTime.ts';
 import { dayKey } from './aggregate.ts';
 import { HOUR_MS } from './calibration.ts';
-import { quantile } from './stats.ts';
+import { quantile, seeded } from './stats.ts';
 
 /** Days a model needs to have been used on for its ratios to be resampled. */
 const MIN_FAMILY_DAYS = 2;
@@ -35,17 +35,6 @@ export interface ModelRatio {
   to: Family;
   /** Ratio of tokens per active hour. */
   volume: number;
-}
-
-/** Small seeded generator (mulberry32): repeatable, unlike `Math.random`. */
-function seeded(seed: number): () => number {
-  let state = seed;
-  return () => {
-    state = (state + 0x6D2B79F5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
-  };
 }
 
 /** Per local day, active time and cost of each family. Active time restarts each day; a gap over midnight is lost. */

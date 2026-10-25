@@ -179,7 +179,7 @@ the flat pace for irregular hours; that is why stage 3 is gated on the backtest.
 
 - [ ] `AGENTS.md`: layout (new modules, backtest command)
 - [ ] `docs/decisions.md`: pace measured per model, not scaled; schedule profile outcome
-- [ ] `docs/backlog.md`: delete "Weekday-aware daily usage" and the bootstrap item if stage 3 ships
+- [ ] `docs/backlog.md`: delete "Weekday-aware daily usage" if stage 3 ships
 - [ ] Delete this plan in the final commit, naming its path in the message
 
 Status: stages 1 and 2 committed, stage 2b done (uncommitted), all in the `forecast-backtest` worktree. The data

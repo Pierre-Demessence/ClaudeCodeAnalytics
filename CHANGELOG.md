@@ -6,6 +6,14 @@ Noteworthy changes for users. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The weekly forecast and "Room left" no longer understate a heavy week. The
+  current week uses its own % per dollar once it has 3 readings, the typical pace
+  comes from the days under your current plan, the days left are projected as a
+  resampled total instead of the median day times the days left, and over the
+  week's first 3 days the projection moves to the week's own pace.
+
 ## [0.2.0]
 
 ### Changed

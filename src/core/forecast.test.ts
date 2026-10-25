@@ -75,4 +75,96 @@ describe('forecastWindow', () => {
     expect(forecast.median).toBeCloseTo(150);
     expect(forecast.capAt).toBeCloseTo(start + HOUR_MS + 70 / 30 * HOUR_MS);
   });
+
+  describe('resampling the sum of the periods left', () => {
+    // A day of $100 among idle days: the median day is $0, the mean $20.
+    const skewed = { ...week, asOf: resetsAt - 7 * DAY_MS, k: 1, paceSamples: [0, 0, 0, 0, 100], used: 0 };
+
+    it('projects near the sum of the means, not the median day times the days left', () => {
+      expect(forecastWindow(skewed)!.median).toBe(0);
+      const forecast = forecastWindow({ ...skewed, resampleSum: true })!;
+      expect(forecast.method).toBe('calibrated');
+      // 7 days at $20 on average: 140 points, in steps of 100 per busy day drawn.
+      expect(forecast.median).toBeGreaterThanOrEqual(100);
+      expect(forecast.median).toBeLessThanOrEqual(200);
+      expect(forecast.low).toBeLessThanOrEqual(forecast.median);
+      expect(forecast.median).toBeLessThanOrEqual(forecast.high);
+    });
+
+    it('gives the same forecast for the same input', () => {
+      expect(forecastWindow({ ...skewed, resampleSum: true })).toEqual(forecastWindow({ ...skewed, resampleSum: true }));
+    });
+
+    it('times the cap at the median rate', () => {
+      const forecast = forecastWindow({ ...skewed, resampleSum: true, used: 50 })!;
+      const rate = (forecast.median - 50) / 7;
+      expect(forecast.capAt).toBeCloseTo(skewed.asOf + 50 / rate * DAY_MS);
+    });
+
+    it('matches the plain projection for a constant pace, fractions of a period included', () => {
+      const asOf = resetsAt - 2.5 * DAY_MS;
+      const forecast = forecastWindow({ ...week, asOf, k: 0.5, paceSamples: [20, 20], resampleSum: true, used: 10 })!;
+      expect(forecast.median).toBeCloseTo(35);
+      expect(forecast.low).toBeCloseTo(35);
+      expect(forecast.high).toBeCloseTo(35);
+    });
+
+    it('projects nothing beyond what is used at the reset', () => {
+      const forecast = forecastWindow({ ...week, asOf: resetsAt, k: 1, paceSamples: [10], resampleSum: true, used: 40 })!;
+      expect(forecast).toEqual({ high: 40, low: 40, median: 40, method: 'calibrated' });
+    });
+  });
+
+  describe('blending in the window\'s own pace', () => {
+    const start = resetsAt - WEEK_MS;
+    const ownPaceAfterMs = 3 * DAY_MS;
+    const base = { ...week, k: 1, paceSamples: [0, 5, 10, 20, 40], resampleSum: true };
+    const at = (days: number, used: number, blend = true) =>
+      forecastWindow({ ...base, asOf: start + days * DAY_MS, ownPaceAfterMs: blend ? ownPaceAfterMs : undefined, used })!;
+    /** Projected points per day left for each of low, median, high. */
+    const ratesOf = (forecast: ReturnType<typeof at>, days: number, used: number) =>
+      [forecast.low, forecast.median, forecast.high].map(p => (p - used) / (7 - days));
+
+    it('matches the typical pace at the window start', () => {
+      expect(at(0, 0)).toEqual(at(0, 0, false));
+    });
+
+    it('rests on the window\'s own pace alone from the blend time on', () => {
+      // 30 % over 3 days: 10 points a day for the 4 days left.
+      expect(at(3, 30).median).toBeCloseTo(70);
+      // 60 % over 4 days: 15 points a day for the 3 days left.
+      expect(at(4, 60).median).toBeCloseTo(105);
+    });
+
+    it('averages the own and typical pace halfway through the blend', () => {
+      const typical = ratesOf(at(1.5, 30, false), 1.5, 30)[1]!;
+      // 30 % over 1.5 days: 20 points a day.
+      expect(ratesOf(at(1.5, 30), 1.5, 30)[1]).toBeCloseTo((20 + typical) / 2);
+    });
+
+    it('keeps the typical spread around the blended centre', () => {
+      const [low, median, high] = ratesOf(at(4, 60), 4, 60) as [number, number, number];
+      const [tLow, tMedian, tHigh] = ratesOf(at(4, 60, false), 4, 60) as [number, number, number];
+      expect(high - median).toBeCloseTo(tHigh - tMedian);
+      expect(median - low).toBeCloseTo(tMedian - tLow);
+      expect(high - low).toBeGreaterThan(0);
+    });
+
+    it('floors the band at what is used for an idle week', () => {
+      const forecast = at(3.5, 0);
+      expect(forecast.low).toBe(0);
+      expect(forecast.median).toBe(0);
+      expect(forecast.high).toBeGreaterThanOrEqual(0);
+      expect(at(3.5, 0, false).median).toBeGreaterThan(0);
+    });
+
+    it('gives the same forecast for the same input', () => {
+      expect(at(2, 25)).toEqual(at(2, 25));
+    });
+
+    it('leaves the forecast without resampling unchanged', () => {
+      const input = { ...week, asOf: start + 4 * DAY_MS, k: 1, paceSamples: [10, 20], used: 60 };
+      expect(forecastWindow({ ...input, ownPaceAfterMs })).toEqual(forecastWindow(input));
+    });
+  });
 });
