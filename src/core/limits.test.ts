@@ -50,6 +50,19 @@ describe('buildLimits drift', () => {
     expect(drift.map(w => w.resetsAt)).toEqual([reset(3), reset(6)]);
   });
 
+  it('skips a window holding a plan change, whose cost since the start includes the old plan', () => {
+    const upgrade = new Date(windowStartOfWeek(5) + 2 * DAY_MS).toISOString();
+    const { drift } = limits([3, 4, 5, 6].map(i => reading(i, 30)), {
+      plan: 'max5',
+      planHistory: [
+        { from: new Date(0).toISOString(), plan: 'pro', source: 'manual' },
+        { from: upgrade, plan: 'max5', source: 'manual' },
+      ],
+    });
+    // The reading of week 5 is on Max 5×, but the window began on Pro.
+    expect(drift.map(w => w.resetsAt)).toEqual([reset(6)]);
+  });
+
   it('keeps the last 12 windows and marks the running one', () => {
     const { drift } = limits(Array.from({ length: 12 }, (_, i) => reading(i, 30)));
     expect(drift).toHaveLength(12);

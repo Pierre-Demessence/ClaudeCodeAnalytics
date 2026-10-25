@@ -197,13 +197,14 @@ function weekSpan(week: WeekRow, sessionWindows: readonly FiveHourWindow[], subs
 
 /**
  * The finished weeks with a percent and the finished 5-hour windows with a
- * peak since the oldest of those weeks, on the current plan. A reading stops
+ * peak since the oldest of those weeks, on the current plan. A week holding a
+ * plan change is left out: its final % covers only the new plan's part. A reading stops
  * where a limit stopped the user, so each demand is the reading plus the time
  * the limit hid, at the user's typical pace (the weeks' and the sessions' own).
  */
 export function buildPlanFitInput({ calibrationK, plan, planHistory, sessionWindows, subscriptionStart, weekHistory }: PlanFitSource): PlanFitInput {
   const spans = weekHistory.weeks
-    .filter(week => !week.inProgress && week.percent !== undefined)
+    .filter(week => !week.inProgress && week.percent !== undefined && !week.planChange)
     .reverse()
     .map(week => weekSpan(week, sessionWindows, subscriptionStart));
   const weekPace = pooledPace(

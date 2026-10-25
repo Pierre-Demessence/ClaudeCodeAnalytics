@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlanPeriod } from './types.ts';
 
-import { convertPercent, planAt, planFromSubscription, withDetectedPlan } from './plans.ts';
+import { convertPercent, planAt, planChangeWithin, planFromSubscription, withDetectedPlan } from './plans.ts';
 
 const history: PlanPeriod[] = [
   { from: '2026-09-01T00:00:00Z', plan: 'pro', source: 'detected' },
@@ -18,6 +18,30 @@ describe('planAt', () => {
   it('uses the first plan before history starts, and Pro without history', () => {
     expect(planAt(history, '2026-01-01T00:00:00Z')).toBe('pro');
     expect(planAt([], '2026-01-01T00:00:00Z')).toBe('pro');
+  });
+});
+
+describe('planChangeWithin', () => {
+  const at = (ts: string) => Date.parse(ts);
+
+  it('is true when a period of another plan starts inside the window', () => {
+    expect(planChangeWithin(history, at('2026-10-07T20:00:00Z'), at('2026-10-14T20:00:00Z'))).toBe(true);
+  });
+
+  it('is false when the change falls outside the window or on its start', () => {
+    expect(planChangeWithin(history, at('2026-09-30T20:00:00Z'), at('2026-10-07T20:00:00Z'))).toBe(false);
+    expect(planChangeWithin(history, at('2026-10-10T00:00:00Z'), at('2026-10-17T00:00:00Z'))).toBe(false);
+    expect(planChangeWithin(history, at('2026-10-14T20:00:00Z'), at('2026-10-21T20:00:00Z'))).toBe(false);
+  });
+
+  it('does not count the first period, nor a period that keeps the plan', () => {
+    expect(planChangeWithin(history, at('2026-08-27T00:00:00Z'), at('2026-09-03T00:00:00Z'))).toBe(false);
+    const same: PlanPeriod[] = [...history, { from: '2026-10-20T00:00:00Z', plan: 'max5', source: 'detected' }];
+    expect(planChangeWithin(same, at('2026-10-17T00:00:00Z'), at('2026-10-24T00:00:00Z'))).toBe(false);
+  });
+
+  it('is false without history', () => {
+    expect(planChangeWithin([], 0, Number.MAX_SAFE_INTEGER)).toBe(false);
   });
 });
 

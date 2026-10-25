@@ -186,6 +186,16 @@ describe('buildPlanFitInput', () => {
     expect(input.weeks[0]).toEqual({ cost: 100, demand: 30, estimated: false, floor: 30, hiddenHours: 0, shift: 0, start: iso(START) });
   });
 
+  it('leaves out a week holding a plan change, and the sessions that started in it', () => {
+    const input = buildPlanFitInput({
+      ...base,
+      sessionWindows: [window(START + 2 * HOUR), window(START + WEEK_MS + 2 * HOUR), window(START + 2 * WEEK_MS + 2 * HOUR)],
+      weekHistory: history([row(2), row(1, { planChange: true }), row(0)]),
+    });
+    expect(input.weeks.map(w => w.start)).toEqual([iso(START), iso(START + 2 * WEEK_MS)]);
+    expect(input.sessions).toHaveLength(2);
+  });
+
   it('marks a week without a final reading as estimated', () => {
     const input = buildPlanFitInput({ ...base, weekHistory: history([row(0, { percentEstimated: true })]) });
     expect(input.weeks[0]).toMatchObject({ demand: 50, estimated: true, floor: 50 });
