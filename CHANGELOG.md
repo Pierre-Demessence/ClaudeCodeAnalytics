@@ -31,6 +31,9 @@ Noteworthy changes for users. The format follows
   instead of $0.20. Sonnet 5.5 usage costs less in every dollar figure, and moving
   Opus 5.5 work to Sonnet 5.5 on the Plans tab saves half of its cost, as the list
   prices say.
+- Claude Haiku 5.5 is priced: its messages counted as $0 and the model was listed
+  as unknown. A request whose prompt is over 100,000 tokens, cache included, pays
+  its higher prices.
 
 ## [0.2.0]
 

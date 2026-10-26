@@ -39,6 +39,12 @@ describe('detectFlushes', () => {
     expect(flushes[0]!.extra).toBeCloseTo(50_000 * (5 - 0.2) / 1_000_000, 6);
   });
 
+  it('prices the extra at the rates the turn was billed at, a long Haiku 5.5 prompt included', () => {
+    const flush = { ...turn(270 + 600, { read: 30_000, write5m: 80_000 }), model: 'claude-haiku-5-5' };
+    // A 110k-token prompt pays Haiku 5.5's higher prices: written at $0.625/M instead of read at $0.05/M.
+    expect(detectFlushes([...steady(), flush], [])[0]!.extra).toBeCloseTo(80_000 * (0.625 - 0.05) / 1_000_000, 6);
+  });
+
   it('does not flag a write within the cache lifetime when the reads hold', () => {
     expect(detectFlushes([...steady(), turn(270 + 200, { write5m: 50_000 })], [])).toEqual([]);
   });

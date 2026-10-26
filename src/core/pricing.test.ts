@@ -50,6 +50,26 @@ describe('messageCost', () => {
   it('prices Sonnet 5.5 cache reads at 5% of its input price, as Opus 5.5', () => {
     expect(costParts({ ...base, model: 'claude-sonnet-5-5' })?.cacheRead).toBeCloseTo(0.1);
   });
+
+  describe('haiku 5.5, priced by the length of the prompt', () => {
+    const haiku = (tokens: Partial<UsageRecord>): UsageRecord => ({ ...base, cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, input: 0, model: 'claude-haiku-5-5', output: 1_000, ...tokens });
+
+    it('uses the base prices up to 100,000 prompt tokens', () => {
+      // 10k input at $0.10, 90k cache reads at $0.01, 1k output at $0.50 per million.
+      expect(messageCost(haiku({ cacheRead: 90_000, input: 10_000 })).cost).toBeCloseTo(0.0024, 8);
+    });
+
+    it('bills the whole request at the higher prices over 100,000 prompt tokens, cache reads and writes included', () => {
+      // 10k input at $0.50, 140k cache reads at $0.05, 1k output at $2.50 per million.
+      expect(messageCost(haiku({ cacheRead: 140_000, input: 10_000 })).cost).toBeCloseTo(0.0145, 8);
+      // 60k written for 5 minutes at $0.625, 50k read at $0.05, 1k output at $2.50.
+      expect(messageCost(haiku({ cacheRead: 50_000, cacheWrite5m: 60_000 })).cost).toBeCloseTo(0.0425, 8);
+    });
+
+    it('is a known model', () => {
+      expect(priceFor('claude-haiku-5-5')).toEqual({ cacheRead: 0.01, input: 0.1, output: 0.5 });
+    });
+  });
 });
 
 describe('costParts', () => {

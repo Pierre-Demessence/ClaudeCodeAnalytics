@@ -6,7 +6,7 @@ import { startOfDay } from './aggregate.ts';
 import { sessionProjects } from './breakdown.ts';
 import { detectFlushes } from './cacheAnomalies.ts';
 import { DAY_MS, WEEK_MS } from './calibration.ts';
-import { costParts, messageCost, priceFor } from './pricing.ts';
+import { costParts, messageCost, priceOf } from './pricing.ts';
 import { addDays, DAILY_RANGE_MAX_DAYS, rangeDays } from './range.ts';
 import { compareVersions } from './versions.ts';
 import { weekStarter } from './weekWindows.ts';
@@ -177,7 +177,7 @@ function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], 
     read += record.cacheRead;
     input += inputTokens(record);
     const parts = costParts(record);
-    const price = priceFor(record.model);
+    const price = priceOf(record);
     if (!parts || !price)
       continue;
     saved += parts.cacheRead * (price.input / price.cacheRead - 1);

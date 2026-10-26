@@ -1,6 +1,6 @@
 import type { ApiEvent, UsageRecord } from './types.ts';
 
-import { costParts } from './pricing.ts';
+import { costParts, priceOf } from './pricing.ts';
 import { median } from './stats.ts';
 
 /** How long each prompt cache lives without a hit. */
@@ -33,10 +33,11 @@ export interface Flush {
 
 const writtenBy = (record: UsageRecord) => record.cacheWrite5m + record.cacheWrite1h;
 
-/** What the turn's cache writes cost beyond reading the same tokens; 0 for an unpriced model. */
+/** What the turn's cache writes cost beyond reading the same tokens, at the price the turn was billed at; 0 for an unpriced model. */
 function extraCost(record: UsageRecord): number {
-  const written = costParts(record);
-  const asRead = costParts({ ...record, cacheRead: writtenBy(record), cacheWrite1h: 0, cacheWrite5m: 0, input: 0, output: 0 });
+  const price = priceOf(record);
+  const written = costParts(record, price);
+  const asRead = costParts({ ...record, cacheRead: writtenBy(record), cacheWrite1h: 0, cacheWrite5m: 0, input: 0, output: 0 }, price);
   return written && asRead ? written.cacheWrite5m + written.cacheWrite1h - asRead.cacheRead : 0;
 }
 
