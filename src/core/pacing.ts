@@ -39,6 +39,8 @@ export interface PacingInput {
   /** The window's parts, oldest first; the last one is running. */
   parts: readonly WindowPart[];
   resetsAt: number;
+  /** Weekly % the room left counts from, when the usage since a reading too recent to show adds to it; `usedNow` by default. */
+  roomFrom?: number;
   /** Weekly % now: the last reading, or the estimate since it. */
   usedNow: number;
   windowMs: number;
@@ -56,7 +58,7 @@ function pointsOf(readings: readonly Snapshot[], start: number, until: number, i
 }
 
 /** How the weekly % builds up over the current window since its last restart, and the daily budget left. */
-export function weekPacing({ costBetween, k, now, parts, resetsAt, usedNow, windowMs }: PacingInput): WeekPacing {
+export function weekPacing({ costBetween, k, now, parts, resetsAt, roomFrom, usedNow, windowMs }: PacingInput): WeekPacing {
   const from = resetsAt - windowMs;
   const running = parts.at(-1) ?? { end: resetsAt, plan: 'pro' as const, readings: [], start: from };
   const restarted = parts.length > 1;
@@ -78,6 +80,6 @@ export function weekPacing({ costBetween, k, now, parts, resetsAt, usedNow, wind
     pacing.spentPerDay = costBetween(running.start, now) / (elapsed / DAY_MS);
   const daysLeft = (resetsAt - now) / DAY_MS;
   if (k !== undefined && k > 0 && daysLeft > 0)
-    pacing.roomPerDay = Math.max(0, 100 - usedNow) / k / daysLeft;
+    pacing.roomPerDay = Math.max(0, 100 - (roomFrom ?? usedNow)) / k / daysLeft;
   return pacing;
 }

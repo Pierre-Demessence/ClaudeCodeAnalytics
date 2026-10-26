@@ -317,12 +317,16 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
 
     let used: number | undefined;
     let estimatedNow: number | undefined;
+    // Where the projections start: the reading plus the usage since it, shown as an estimate only once the reading is stale.
+    let projectedFrom: number | undefined;
     if (!withoutReading) {
       used = latest.weekly;
       // A stale reading misses the usage since; with a calibration, add it back from transcripts.
       const sinceReading = weekK !== undefined ? weekK * costBetween(readAt, now) : 0;
-      if (now - readAt > STALE_READING_MS && sinceReading > 0)
-        estimatedNow = Math.min(100, latest.weekly + sinceReading);
+      if (sinceReading > 0)
+        projectedFrom = Math.min(100, latest.weekly + sinceReading);
+      if (now - readAt > STALE_READING_MS)
+        estimatedNow = projectedFrom;
     }
     else {
       // No Claude Code usage this week is a known 0 %; other usage needs a calibration to become a %.
@@ -334,6 +338,7 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     }
 
     if (used !== undefined) {
+      const from = estimatedNow ?? projectedFrom ?? used;
       const week = {
         k: weekK,
         ownPaceAfterMs: OWN_PACE_AFTER_MS,
@@ -348,12 +353,12 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
       const forecast = estimatedNow !== undefined || withoutReading
         // Uncalibrated, a week without a reading has no pace of its own (claude.ai use is unseen): project it from its start, i.e. the typical week.
         ? forecastWindow({ ...week, asOf: calibration || !withoutReading ? now : windowFrom, used: estimatedNow ?? used })
-        : forecastWindow({ ...week, asOf: calibration ? now : readAt, used });
+        : forecastWindow({ ...week, asOf: calibration ? now : readAt, used: from });
 
       const resetsAtIso = new Date(resetsAt).toISOString();
       current = {
-        activeLeftByFamily: activeLeftByFamily({ k: weekK, paces: paceByFamily, used: estimatedNow ?? used }),
-        activeLeftMs: activeTimeLeft({ k: weekK, pace: activePace, used: estimatedNow ?? used }),
+        activeLeftByFamily: activeLeftByFamily({ k: weekK, paces: paceByFamily, used: from }),
+        activeLeftMs: activeTimeLeft({ k: weekK, pace: activePace, used: from }),
         estimatedNow,
         forecast,
         readAt: latest.ts,
@@ -368,6 +373,7 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
           now,
           parts: weekParts,
           resetsAt,
+          roomFrom: from,
           usedNow: estimatedNow ?? used,
           windowMs: WEEK_MS,
         }),

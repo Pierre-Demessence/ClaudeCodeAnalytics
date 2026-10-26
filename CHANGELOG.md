@@ -55,6 +55,9 @@ Noteworthy changes for users. The format follows
 - The weekly forecast's typical pace starts again only at a plan change. A plan
   period that keeps the plan, such as the one recorded when you turn the usage
   endpoint on, made it forget the days before it for the next four weeks.
+- The weekly projection, the active use left and the room per day count the usage
+  since the last reading even while that reading is under 30 minutes old (the card
+  still shows it as read). They left out up to half an hour of usage.
 
 ## [0.2.0]
 

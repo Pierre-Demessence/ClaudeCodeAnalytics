@@ -129,8 +129,10 @@ less time left. Without a calibration, a % cannot become dollars: no value.
 
 A completed week whose last reading is more than 12 h before reset is extended
 with the calibrated cost since, marked "est." and capped at 100%. A current
-reading older than 30 minutes gets an estimated current % from transcripts, and
-the projection starts from it.
+reading older than 30 minutes gets an estimated current % from transcripts. The
+projection, the active use left and the room per day start from the reading plus
+the usage since it even before then: during a heavy half hour on a small plan, a
+reading shown as read trails by several points.
 
 ## Manual plan periods win over detection
 

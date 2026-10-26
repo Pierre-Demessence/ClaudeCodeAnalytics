@@ -346,6 +346,22 @@ describe('buildSummary', () => {
     expect(current.forecast!.median).toBeLessThanOrEqual(current.forecast!.high);
   });
 
+  it('projects from the usage since a reading too recent to show as an estimate', () => {
+    const windowStart = Date.parse(RESET) - 7 * DAY_MS;
+    // As above, $100 a day at 0.1 %/$, and a reading 10 minutes ago: 50 % for $500.
+    const heavy = [1, 2, 3, 4, 5].flatMap(d => [1, 2, 3, 4].map(m => rec(NOW - d * DAY_MS + m * 60_000)));
+    const snapshots = [...[1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET)), snap(NOW - 10 * 60_000, 50, RESET)];
+    const run = (extra: UsageRecord[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [...records, ...heavy, ...extra], snapshots, timeZone: 'UTC' }).current!;
+    const quiet = run([]);
+    // $20 since the reading: 2 % the card does not show yet, but the projections start from.
+    const busy = run([rec(NOW - 5 * 60_000)]);
+    expect(busy).toMatchObject({ estimatedNow: undefined, weekly: 50 });
+    // The week's own pace carries the 2 % on over the 1⅓ days left, as it does the 50 % over 5⅔ days.
+    expect(busy.forecast!.median - quiet.forecast!.median).toBeCloseTo(2 * (1 + (4 / 3) / (17 / 3)));
+    expect(quiet.pacing.roomPerDay! - busy.pacing.roomPerDay!).toBeCloseTo(20 / (4 / 3));
+    expect(busy.activeLeftMs!).toBeLessThan(quiet.activeLeftMs!);
+  });
+
   it('forecasts the 5-hour window from the calibrated session pace', () => {
     const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
     // Today's session opened at 10:00 and resets at 15:00; $20 per record.
