@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { appendFile, copyFile, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -78,8 +78,14 @@ async function readJsonLines<T>(path: string): Promise<T[]> {
 async function writeAtomic(path: string, content: string): Promise<void> {
   // Unique per write: the dashboard server can write the same file twice at once.
   const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(temp, content);
-  await rename(temp, path);
+  try {
+    await writeFile(temp, content);
+    await rename(temp, path);
+  }
+  catch (error) {
+    await rm(temp, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 /** Files in the data dir; every read and write of collector data goes through here. */

@@ -8,6 +8,8 @@ Noteworthy changes for users. The format follows
 
 ### Fixed
 
+- Failed collector writes clean up their temporary files instead of leaving them
+  in the data directory.
 - The weekly forecast and "Room left" no longer understate a heavy week. The
   current week uses its own % per dollar once it has 3 readings, the typical pace
   comes from the days under your current plan, the days left are projected as a
