@@ -6,6 +6,13 @@ Noteworthy changes for users. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A week in which you change plans no longer skews the forecasts and the plan
+  comparison: its peak % covers only the new plan's part of the week. Such a week
+  is marked on the Weeks tab and left out of the calibration, the typical week,
+  the median peak and the plan comparison.
+
 ## [0.2.0]
 
 ### Changed

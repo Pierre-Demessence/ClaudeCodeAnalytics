@@ -113,6 +113,10 @@ Run lint, test and build before considering work done.
 
 - `README.md`: what users see and do. Its "Privacy" table lists everything the
   collector reads; a change reading a new file or field updates it.
+- `CHANGELOG.md`: every change a user can notice (a feature, a fix, a different
+  number or behavior), under Unreleased, in the commit that makes it, pull request
+  or not. Not refactors, tests, CI, dev dependencies or docs. The release commit
+  moves Unreleased under the new version.
 - `docs/backlog.md`: everything not done (bugs, debt, ideas), one line each, with
   a `file:line` pointer where useful. Something found out of scope goes there at
   once instead of being fixed silently; an item is deleted in the commit that
@@ -125,8 +129,8 @@ Run lint, test and build before considering work done.
 - `docs/plans/<feature>.md`: the plan of a large change (goal, acceptance criteria,
   design, checklist). Anything deferred goes to the backlog when it is deferred;
   the plan is deleted in the feature's final commit.
-- Docs describe the current state in the present tense: no "previously" or "now",
-  no dates, version stamps or changelog lines, no frontmatter. Done items are
+- Docs other than `CHANGELOG.md` describe the current state in the present tense:
+  no "previously" or "now", no dates, version stamps or changelog lines, no frontmatter. Done items are
   deleted, not ticked or struck through (only an in-progress plan ticks its
   checklist). Items are referred to by name or tag (`[forensics]`), never by
   position.
