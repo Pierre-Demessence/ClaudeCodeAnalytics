@@ -2694,6 +2694,10 @@ button.primary:hover:not(:disabled) {
 
 .wk-uncapped {
   font-variant-numeric: tabular-nums;
+}
+
+/* Under the median peak it is a sentence that wraps; only the timeline's column keeps it on one line. */
+.wk-percent .wk-uncapped {
   white-space: nowrap;
 }
 

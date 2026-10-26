@@ -90,6 +90,8 @@ Noteworthy changes for users. The format follows
   rounds them to the minute, which can tip either way) count as one week. Such a
   week showed twice in the Weeks tab and the typical week, and a restart between
   two of its readings went unseen.
+- On a phone, the Weeks tab's median peak card wraps its estimate without the
+  limit instead of running past the card's edge.
 
 ## [0.2.0]
 

@@ -7,7 +7,6 @@ orders the ones that are scheduled.
 ## Bugs
 
 - Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
-- Weeks tab on a phone: the median peak card's "≈ 26% without the limit" runs past the card's edge (`src/dashboard/Weeks.tsx:91`), since `.wk-uncapped` never wraps (`src/dashboard/styles.css:2695`).
 
 ## Features
 
