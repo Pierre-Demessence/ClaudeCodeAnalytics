@@ -484,6 +484,14 @@ at the plan active then. Rejected: prorating the price over the days with data,
 which reads $6 for a $20 Pro plan ten days into a cycle; it remains the fallback
 without the date. Assumes monthly billing and list prices, in dollars before VAT.
 
+"All time" counts only the cycles that end after the first imported message:
+Claude Code deletes transcripts after `cleanupPeriodDays` (30 by default), so a
+subscription older than that would set every charge since it began against one
+month of usage. The cycle the first message falls in keeps its whole charge.
+Rejected: prorating that cycle from the first message, since nothing tells deleted
+transcripts from days without usage, and a new subscription's first cycle would
+lose the days before its first message.
+
 The start is the first plan period's when it was set by hand, else
 `oauthAccount.subscriptionCreatedAt` in `~/.claude.json`, which can predate the
 first payment (a failed one sets it). A detected first period only marks when the

@@ -65,9 +65,10 @@ function billingDate(start: number, n: number): number {
   return Date.UTC(at.getUTCFullYear(), month, Math.min(at.getUTCDate(), lastDay), at.getUTCHours(), at.getUTCMinutes(), at.getUTCSeconds(), at.getUTCMilliseconds());
 }
 
-/** One charge and the billing cycle it pays for, from `start` to the next charge. */
+/** One charge and the billing cycle it pays for, from `start` to the next charge at `end`. */
 interface Cycle {
   credit?: Credit;
+  end: number;
   paid: number;
   start: number;
 }
@@ -85,27 +86,39 @@ function billingCycles(planHistory: readonly PlanPeriod[], subscriptionStart: nu
   let anchor = subscriptionStart;
   let n = 0;
   let paidFor = planOn(anchor);
-  const cycles: Cycle[] = [{ paid: PLAN_PRICES[paidFor], start: anchor }];
+  const cycles: Cycle[] = [{ end: Infinity, paid: PLAN_PRICES[paidFor], start: anchor }];
   for (;;) {
-    const start = cycles.at(-1)!.start;
+    const cycle = cycles.at(-1)!;
     const end = billingDate(anchor, n + 1);
-    const upgrade = changes.find(time => time > start && time < end && PLAN_PRICES[planOn(time)] > PLAN_PRICES[paidFor]);
+    const upgrade = changes.find(time => time > cycle.start && time < end && PLAN_PRICES[planOn(time)] > PLAN_PRICES[paidFor]);
     if (upgrade !== undefined) {
-      const credit = { amount: PLAN_PRICES[paidFor] * (end - upgrade) / (end - start), plan: paidFor };
+      const credit = { amount: PLAN_PRICES[paidFor] * (end - upgrade) / (end - cycle.start), plan: paidFor };
       paidFor = planOn(upgrade);
-      cycles.push({ credit, paid: PLAN_PRICES[paidFor] - credit.amount, start: upgrade });
+      cycle.end = upgrade;
+      cycles.push({ credit, end: Infinity, paid: PLAN_PRICES[paidFor] - credit.amount, start: upgrade });
       anchor = upgrade;
       n = 0;
     }
     else if (end <= now) {
       paidFor = planOn(end);
-      cycles.push({ paid: PLAN_PRICES[paidFor], start: end });
+      cycle.end = end;
+      cycles.push({ end: Infinity, paid: PLAN_PRICES[paidFor], start: end });
       n++;
     }
     else {
+      cycle.end = end;
       return cycles;
     }
   }
+}
+
+/**
+ * The cycles with usage to set against them: Claude Code deletes old transcripts, so a cycle that
+ * ended before the first message is left out. The one the first message falls in keeps its whole
+ * charge: its first days may have had no usage at all, as a new subscription's often do.
+ */
+function coveredCycles(cycles: readonly Cycle[], dataStart: number): Cycle[] {
+  return cycles.filter(cycle => cycle.end > dataStart);
 }
 
 /** The list price of the plan active at each moment of `[from, to]`, prorated by time. */
@@ -136,7 +149,8 @@ function valueOfCycles(input: ValueForMoneyInput, cycles: readonly Cycle[]): Val
 /**
  * What the plan bought: the usage at API prices against what the plan cost.
  * With the billing date, that is the charges (see `billingCycles`) against the usage since the
- * current cycle began, and since the subscription began.
+ * current cycle began, and since the subscription began; the cycles before the first message
+ * have no usage to set against them (see `coveredCycles`).
  * Without it, the list price prorated by time over the last 4 weeks and since the first message,
  * neither starting before the first message.
  */
@@ -144,7 +158,7 @@ export function valueForMoney(input: ValueForMoneyInput): ValueForMoney | undefi
   const { dataStart, now, planHistory, subscriptionStart } = input;
   const result = ((): ValueForMoney => {
     if (subscriptionStart !== undefined && subscriptionStart <= now) {
-      const cycles = billingCycles(planHistory, subscriptionStart, now);
+      const cycles = coveredCycles(billingCycles(planHistory, subscriptionStart, now), dataStart);
       return { allTime: valueOfCycles(input, cycles), kind: 'cycle', recent: valueOfCycles(input, cycles.slice(-1)) };
     }
     const from = Math.max(dataStart, now - RECENT_MS);

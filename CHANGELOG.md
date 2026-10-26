@@ -34,6 +34,10 @@ Noteworthy changes for users. The format follows
 - Claude Haiku 5.5 is priced: its messages counted as $0 and the model was listed
   as unknown. A request whose prompt is over 100,000 tokens, cache included, pays
   its higher prices.
+- "All time" on the Subscription card no longer counts the billing cycles that
+  ended before your oldest transcript: Claude Code deletes transcripts after 30
+  days, so a subscription older than that set months of charges against one month
+  of usage.
 
 ## [0.2.0]
 

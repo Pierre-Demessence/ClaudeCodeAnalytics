@@ -147,6 +147,30 @@ describe('valueForMoney', () => {
       expect(value(feb)).toBe(40);
     });
 
+    describe('transcripts that start long after the subscription', () => {
+      // Subscribed in January; Claude Code kept the transcripts from 26 September on.
+      const january = Date.parse('2026-01-15T10:00:00Z');
+      const dataStart = Date.parse('2026-09-26T10:00:00Z');
+      const seen = (from: number, to: number) => costBetween(Math.max(from, dataStart), Math.max(to, dataStart));
+      const at = Date.parse('2026-10-26T10:00:00Z');
+
+      it('leaves out the cycles that ended before the first transcript, and charges the one it falls in in full', () => {
+        const value = valueForMoney({ costBetween: seen, dataStart, now: at, planHistory: [period(january - DAY_MS, 'max5')], subscriptionStart: january })!;
+        // The 15 Sep and 15 Oct charges: the eight before them have no usage to set against.
+        expect(value.allTime!.paid).toBe(200);
+        expect(value.allTime!.apiCost).toBeCloseTo(30 * 10);
+        expect(value.recent!.paid).toBe(100);
+      });
+
+      it('leaves out the credit of an upgrade in a cycle left out', () => {
+        const history = [period(january - DAY_MS, 'pro'), period(Date.parse('2026-03-03T10:00:00Z'), 'max5')];
+        const value = valueForMoney({ costBetween: seen, dataStart, now: at, planHistory: history, subscriptionStart: january })!;
+        // The upgrade moved the billing day to the 3rd: the 3 Sep and 3 Oct charges remain.
+        expect(value.allTime!.paid).toBe(200);
+        expect(value.allTime!.credits).toBeUndefined();
+      });
+    });
+
     it('ignores usage before the subscription started', () => {
       const value = valueForMoney({ costBetween, dataStart: start - 30 * DAY_MS, now, planHistory: pro, subscriptionStart: start })!;
       expect(value.allTime!.apiCost).toBeCloseTo((now - start) / DAY_MS * 10);
