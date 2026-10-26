@@ -103,8 +103,6 @@ estimates of when the result becomes judgeable, not limits in the code.
 
 ## Technical debt
 
-- `writeAtomic` (`src/collector/store.ts:77`) leaves its temp file behind when `rename` throws: the data dir holds `messages-2026-10.jsonl.41372.<uuid>.tmp` from 2026-10-12 (3.6 MB). The cause is probably a Windows `EPERM`/`EBUSY` while another process reads the target (not confirmed). Remove the temp file on failure, and check whether that write was retried.
-
 - The server has no timer: the collector runs only when a client asks (Claude Code hook, the widget's 60 s poll, a dashboard tab, Refresh), so readings resume after a boot only while the widget or a tab is open. A server-side loop in `src/server/api.ts` (`configureServer`/`configurePreviewServer`, about every 60 s, same throttle) would make the dashboard work alone; then drop the 30 s retry in `App.tsx` (`RETRY_MS`). Cost: a permanent background transcript scan.
 - `[forensics]` "By skill or command" lists `${name}` and `…` as skills on the local data (seen in the Breakdown tab, last 4 weeks). Probably a `Skill` call or slash command whose name was never substituted; find the source line and decide whether `parseSkillSignal` should ignore such names (`src/core/transcript.ts`). Unchecked.
 - `[forensics]` Cache flushes of subagents: detection skips them because parallel subagents interleave in a session; it needs `agentId` stored per record (a `SCAN_FORMAT` bump).

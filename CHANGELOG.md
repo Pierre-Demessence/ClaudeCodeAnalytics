@@ -79,6 +79,9 @@ Noteworthy changes for users. The format follows
   the cache reads saved.
 - A cache flush's extra cost counts only the tokens written again, the previous
   prompt, and no longer the turn's new tokens, which a live cache writes too.
+- A write to the data dir that fails no longer leaves its temp file there, such
+  as `messages-2026-10.jsonl.<pid>.<id>.tmp`. One left by an earlier version can
+  be deleted.
 
 ## [0.2.0]
 

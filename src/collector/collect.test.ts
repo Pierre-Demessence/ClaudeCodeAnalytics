@@ -170,6 +170,19 @@ describe('collect', () => {
     expect(status.lastRunAt).toBe(new Date(NOW).toISOString());
   });
 
+  it('imports the messages again at the next run when a run fails to write them', async () => {
+    const crash = vi.spyOn(Store.prototype, 'saveRecords').mockRejectedValueOnce(new Error('EPERM'));
+    try {
+      await expect(collect({ claudeDir, dataDir, fetchImpl, now: NOW })).rejects.toThrow('EPERM');
+    }
+    finally {
+      crash.mockRestore();
+    }
+    expect(await new Store(dataDir).loadRecords()).toHaveProperty('size', 0);
+    await collect({ claudeDir, dataDir, fetchImpl, now: NOW + 60_000 });
+    expect(await new Store(dataDir).loadRecords()).toHaveProperty('size', 2);
+  });
+
   it('releases the lock and resets the status when status.json is corrupt', async () => {
     await mkdir(dataDir, { recursive: true });
     await writeFile(join(dataDir, 'status.json'), '{corrupt');
