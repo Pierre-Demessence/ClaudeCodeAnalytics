@@ -46,7 +46,7 @@ export function CacheCard({ cache, range }: { cache: Activity['cache']; range?: 
                 <strong>{formatUsdShort(week.saved)}</strong>
                 <span>
                   {`saved ${scope}`}
-                  <InfoTip label="About saved">{`Cost of the cached input at the full input price, minus what cache reads cost, ${scope}.`}</InfoTip>
+                  <InfoTip label="About saved">{`Cost of the cached input at the full input price, minus what cache reads and cache writes cost, ${scope}. A write costs more than plain input, so it pays off only once read again.`}</InfoTip>
                 </span>
               </div>
               <div>

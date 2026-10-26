@@ -51,7 +51,7 @@ export interface DayFlushes {
 export interface CacheWeek {
   /** Share of input tokens read from the cache, 0–1. */
   readShare: number;
-  /** What the cache reads would have cost as fresh input, minus what they cost. */
+  /** What the cached input would have cost as fresh input, minus what reading it and writing it to the cache cost. */
   saved: number;
   /** Share of the cost spent writing the cache, 0–1. */
   writeCostShare: number;
@@ -176,11 +176,13 @@ function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], 
   for (const record of week) {
     read += record.cacheRead;
     input += inputTokens(record);
-    const parts = costParts(record);
     const price = priceOf(record);
-    if (!parts || !price)
+    const parts = costParts(record, price);
+    // The same tokens as plain input, at the price the message was billed at: no cache read, no cache write.
+    const uncached = costParts({ ...record, cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, input: inputTokens(record) }, price);
+    if (!parts || !uncached)
       continue;
-    saved += parts.cacheRead * (price.input / price.cacheRead - 1);
+    saved += uncached.input - (parts.input + parts.cacheRead + parts.cacheWrite5m + parts.cacheWrite1h);
     writeCost += parts.cacheWrite5m + parts.cacheWrite1h;
     cost += parts.input + parts.output + parts.cacheWrite5m + parts.cacheWrite1h + parts.cacheRead;
   }

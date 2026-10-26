@@ -70,6 +70,9 @@ Noteworthy changes for users. The format follows
   5.5's, its cache reads 1.25 times.
 - The active use left on the limit cards stops at the reset: a 5-hour window
   resetting in 30 minutes could show more active use left than it has time.
+- The cache card's "saved" takes off what the cache writes cost beyond plain
+  input (a quarter more for 5 minutes, double for an hour): it counted only what
+  the cache reads saved.
 
 ## [0.2.0]
 

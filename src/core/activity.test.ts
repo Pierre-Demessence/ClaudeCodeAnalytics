@@ -50,8 +50,8 @@ describe('cache', () => {
       rec('2026-10-02T10:00:00Z', { cacheWrite5m: 1_000_000 }),
     ]);
     expect(cache.week!.readShare).toBeCloseTo(0.45);
-    // 0.9 M tokens at $4 instead of $0.2.
-    expect(cache.week!.saved).toBeCloseTo(3.42);
+    // 0.9 M tokens read at $0.2 instead of $4, less the $1 more that writing 1 M tokens costs ($5 instead of $4).
+    expect(cache.week!.saved).toBeCloseTo(3.42 - 1);
     expect(cache.week!.writeCostShare).toBeCloseTo(5 / 5.58);
   });
 
