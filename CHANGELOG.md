@@ -58,6 +58,9 @@ Noteworthy changes for users. The format follows
 - The weekly projection, the active use left and the room per day count the usage
   since the last reading even while that reading is under 30 minutes old (the card
   still shows it as read). They left out up to half an hour of usage.
+- After a plan change, the 5-hour forecast takes its typical session pace from
+  the sessions under the new plan once there are 3, as the weekly forecast does:
+  the sessions a smaller plan's limit cut short held it down.
 
 ## [0.2.0]
 

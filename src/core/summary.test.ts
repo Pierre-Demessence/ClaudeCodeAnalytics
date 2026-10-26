@@ -380,6 +380,22 @@ describe('buildSummary', () => {
     expect(summary.fiveHourSession?.forecast?.median).toBeCloseTo(36);
   });
 
+  it('takes the 5-hour session pace from the sessions under the current plan, once there are 3', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    const today = [at('10:00'), at('11:00'), at('11:55')].map(ts => rec(ts));
+    const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';
+    const snapshots = [['10:30', 10], ['11:30', 20], ['11:50', 20]].map(([time, fiveHour]) =>
+      snap(at(time as string), 30, RESET, { fiveHour: fiveHour as number, fiveHourResetsAt }));
+    // The last 4 days' sessions run at $80 each ($16/hour) against $20 before.
+    const heavy = [1, 2, 3, 4].flatMap(d => [1, 2, 3].map(m => rec(NOW - d * DAY_MS + m * 10 * 60_000)));
+    const upgradeAt = (ms: number): PlanPeriod[] => [{ from: '2026-01-01T00:00:00.000Z', plan: 'pro', source: 'manual' }, { from: new Date(ms).toISOString(), plan: 'max5', source: 'manual' }];
+    const median = (planHistory: PlanPeriod[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory, records: [...records, ...heavy, ...today], snapshots, timeZone: 'UTC' }).fiveHourSession?.forecast?.median;
+    // Upgraded 4½ days ago: $16/hour × 0.5 %/$ × 3 hours left = 24 points.
+    expect(median(upgradeAt(NOW - 4.5 * DAY_MS))).toBeCloseTo(30 + 24);
+    // Two sessions since a change are too few: the last 28 days stand, mostly $4/hour.
+    expect(median(upgradeAt(NOW - 2.5 * DAY_MS))).toBeCloseTo(36);
+  });
+
   it('gives the active use left at the usual active pace', () => {
     const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
     // $60 over 20 active minutes: $180 per active hour.

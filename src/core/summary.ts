@@ -48,6 +48,8 @@ const DAILY_CHART_DAYS = 35;
 const STALE_READING_MS = 30 * 60_000;
 /** Fewer days than this under the current plan give no weekly pace of their own: the forecast keeps the full typical days. */
 const MIN_PLAN_DAYS = 3;
+/** Fewer finished 5-hour sessions than this under the current plan give no session pace of their own: the forecast keeps the last 28 days. */
+const MIN_PLAN_SESSIONS = 3;
 /** From this far into a week, its forecast rests on the week's own pace alone; before, past days steady it. */
 const OWN_PACE_AFTER_MS = 3 * DAY_MS;
 
@@ -264,7 +266,9 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
   const sessionHits = hits.filter(hit => hitScope(hit) === 'session');
   const weekHits = hits.filter(hit => hitScope(hit) === 'week');
   const sessionWindows = fiveHourWindows({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, planHistory, records, snapshots });
-  const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
+  // The session pace comes from the sessions under the current plan too: a smaller plan's limit cut its sessions short.
+  const planSessions = sessionPaces(sessionWindows, Math.max(now - TYPICAL_DAYS * DAY_MS, latestChange?.at ?? -Infinity));
+  const paceSamples = planSessions.length >= MIN_PLAN_SESSIONS ? planSessions : sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
   const activePace = activeHourlyPace(records, now - TYPICAL_DAYS * DAY_MS, now);
   const paceByFamily = familyPaces(records, now - TYPICAL_DAYS * DAY_MS, now);
 

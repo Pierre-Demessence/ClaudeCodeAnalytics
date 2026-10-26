@@ -107,7 +107,9 @@ two inputs of its own. Its % per $ is fitted separately on the 5-hour readings,
 since the ratio between the 5-hour and weekly limits is not published; the
 endpoint gives no Claude Code share for that window, so claude.ai usage counts
 in the fit. Its pace is the average $/hour of each 5-hour session in the last
-4 weeks, idle time included, rebuilt from message times. Daily cost / 24 was
+4 weeks, idle time included, rebuilt from message times; after a plan change, of the
+sessions since it once there are 3, as for the weekly pace (a smaller plan's limit
+cut its sessions short). Daily cost / 24 was
 rejected: a session only exists while working, so it would understate the
 pace. Every reading gets the usage since it added back, not only stale ones:
 15 minutes is 5% of a 5-hour window.
