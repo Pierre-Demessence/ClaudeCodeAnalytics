@@ -27,6 +27,10 @@ Noteworthy changes for users. The format follows
 - The 5-hour window from before an upgrade now ends where the new one starts, so
   the usage after an upgrade no longer lands in the old window, and the Plans tab
   no longer counts the estimated sessions of an earlier plan too small.
+- Sonnet 5.5 cache reads are priced at their list price, $0.10 per million tokens
+  instead of $0.20. Sonnet 5.5 usage costs less in every dollar figure, and moving
+  Opus 5.5 work to Sonnet 5.5 on the Plans tab saves half of its cost, as the list
+  prices say.
 
 ## [0.2.0]
 

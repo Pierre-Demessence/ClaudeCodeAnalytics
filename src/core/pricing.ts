@@ -7,7 +7,7 @@ export interface ModelPrice {
   output: number;
 }
 
-// Anthropic API list prices (checked 2026-10-02). Matched by longest prefix so
+// Anthropic API list prices (checked 2026-10-26). Matched by longest prefix so
 // dated ids like `claude-haiku-4-5-20251001` resolve.
 const PRICES: Record<string, ModelPrice> = {
   'claude-fable-5': { cacheRead: 1, input: 10, output: 50 },
@@ -20,7 +20,7 @@ const PRICES: Record<string, ModelPrice> = {
   'claude-opus-5-5': { cacheRead: 0.2, input: 4, output: 20 },
   'claude-sonnet-4-6': { cacheRead: 0.3, input: 3, output: 15 },
   'claude-sonnet-5': { cacheRead: 0.2, input: 2, output: 10 },
-  'claude-sonnet-5-5': { cacheRead: 0.2, input: 2, output: 10 },
+  'claude-sonnet-5-5': { cacheRead: 0.1, input: 2, output: 10 },
 };
 
 const CACHE_WRITE_5M = 1.25;

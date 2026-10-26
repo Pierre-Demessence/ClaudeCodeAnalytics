@@ -46,6 +46,10 @@ describe('messageCost', () => {
   it('flags unknown models with zero cost', () => {
     expect(messageCost({ ...base, model: 'claude-unknown-9' })).toEqual({ cost: 0, known: false });
   });
+
+  it('prices Sonnet 5.5 cache reads at 5% of its input price, as Opus 5.5', () => {
+    expect(costParts({ ...base, model: 'claude-sonnet-5-5' })?.cacheRead).toBeCloseTo(0.1);
+  });
 });
 
 describe('costParts', () => {
@@ -61,12 +65,12 @@ describe('costParts', () => {
 
 describe('sonnetSaving', () => {
   it('is the Opus cost minus the same tokens at the newest Sonnet price', () => {
-    // Sonnet 5.5: 2 input + 10 output + 2.5 (1.25× write) + 4 (2× write) + 0.2 read = 18.7, against Opus 5.5's 37.2.
-    expect(sonnetSaving(base)).toBeCloseTo(18.5);
+    // Sonnet 5.5: 2 input + 10 output + 2.5 (1.25× write) + 4 (2× write) + 0.1 read = 18.6, half of Opus 5.5's 37.2.
+    expect(sonnetSaving(base)).toBeCloseTo(18.6);
   });
 
   it('drops the fast-mode surcharge, which Sonnet does not have', () => {
-    expect(sonnetSaving({ ...base, speed: 'fast' })).toBeCloseTo(74.4 - 18.7);
+    expect(sonnetSaving({ ...base, speed: 'fast' })).toBeCloseTo(74.4 - 18.6);
   });
 
   it('is zero for other families and unknown models', () => {
