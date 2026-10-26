@@ -135,13 +135,13 @@ function pressureByCost(spend: readonly { cost: number; ms: number }[], k: numbe
 const sumOnPlan = (parts: readonly PartPercent[], plan: Plan) => parts.reduce((sum, part) => sum + convertPercent(part.percent, part.plan, plan), 0);
 
 /**
- * Whether a week hit the limit: its final reading is not an estimate and reaches the threshold. A restarted
- * window hits when any part ended on a reading at the threshold of its own plan.
+ * Whether a week hit the limit: its final reading is not an estimate and reaches the threshold on the plan it
+ * was read on (`planPercent`). A restarted window hits when any part ended on a reading at the threshold of its own plan.
  */
-function hitOf(parts: readonly WeekPart[] | undefined, percent: number | undefined, estimated: boolean, threshold: number): boolean {
+function hitOf(parts: readonly WeekPart[] | undefined, planPercent: number | undefined, estimated: boolean, threshold: number): boolean {
   if (parts)
     return parts.some(part => !part.percentEstimated && part.planPercent >= threshold);
-  return !estimated && percent !== undefined && percent >= threshold;
+  return !estimated && planPercent !== undefined && planPercent >= threshold;
 }
 
 /** The weekly windows starting in a range, or the last 12: final %, cost per day, sessions and projects. */
@@ -184,6 +184,8 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     const projects = [...week.projects.values()].sort((a, b) => b.cost - a.cost);
 
     let percent: number | undefined;
+    // The final % on the plan the week was read on: what its limit is judged against.
+    let planPercent: number | undefined;
     let percentEstimated = false;
     let source: WeekRow['source'] = 'reading';
     let pressure: { at: string; percent: number } | undefined;
@@ -192,6 +194,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     const share = shares.find(s => Date.parse(s.resetsAt) === end);
     if (current && Date.parse(current.resetsAt) === end) {
       percent = current.estimatedNow ?? current.weekly;
+      planPercent = percent;
       percentEstimated = current.estimatedNow !== undefined || current.withoutReading === true;
       partsOf = current.parts;
       if (current.parts)
@@ -201,6 +204,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     }
     else if (share) {
       percent = convertPercent(share.percent, share.plan, plan);
+      planPercent = share.percent;
       percentEstimated = share.estimated;
       partsOf = share.parts;
       completed = true;
@@ -250,7 +254,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       cost: week.cost,
       days: week.days.map((cost, i) => (start + i * DAY_MS > now ? null : cost)),
       end: new Date(end).toISOString(),
-      hit: source === 'reading' && hitOf(parts, percent, percentEstimated, weekLimitThreshold) ? true : undefined,
+      hit: source === 'reading' && hitOf(parts, planPercent, percentEstimated, weekLimitThreshold) ? true : undefined,
       inProgress: inProgress ? true : undefined,
       limitHits: weekHits.length > 0 ? weekHits : undefined,
       messages: week.messages,

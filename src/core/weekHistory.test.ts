@@ -177,6 +177,15 @@ describe('hit', () => {
     expect(weeks({ shares: [share(97)], snapshots: [snap(1)], weekLimitThreshold: 90 }).weeks[0]!.hit).toBe(true);
   });
 
+  it('reads the threshold on the plan of the week, not on the current plan', () => {
+    // A Pro week at its limit reads 20% of Max 5×; a Max 20× week at 30% reads 600% of Pro.
+    const pro = weeks({ shares: [{ ...share(100), plan: 'pro' }], snapshots: [snap(1, 100)] }).weeks[0]!;
+    expect(pro).toMatchObject({ hit: true, percent: 20 });
+    const max20 = weeks({ plan: 'pro', shares: [{ ...share(30), plan: 'max20' }], snapshots: [snap(1, 30)] }).weeks[0]!;
+    expect(max20.percent).toBe(600);
+    expect(max20.hit).toBeUndefined();
+  });
+
   it('never counts a reading extended from before the reset, nor the running estimate', () => {
     const extended = weeks({ shares: [{ ...share(100), estimated: true }], snapshots: [snap(1)] }).weeks[0]!;
     expect(extended).toMatchObject({ percent: 100, percentEstimated: true });

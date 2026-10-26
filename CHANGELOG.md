@@ -38,6 +38,10 @@ Noteworthy changes for users. The format follows
   ended before your oldest transcript: Claude Code deletes transcripts after 30
   days, so a subscription older than that set months of charges against one month
   of usage.
+- The Weeks tab judges whether a week hit the limit on the plan of that week. After
+  an upgrade, the weeks that reached the old plan's limit kept their percent on the
+  new plan (a fifth of it from Pro to Max 5×) and lost their mark; after a
+  downgrade, weeks far from their limit could gain one.
 
 ## [0.2.0]
 
