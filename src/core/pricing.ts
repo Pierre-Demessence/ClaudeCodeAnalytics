@@ -103,6 +103,15 @@ export function messageCost(record: UsageRecord): { cost: number; known: boolean
   return { cost: totalOf(parts), known: true };
 }
 
+/**
+ * API-equivalent cost of a message's tokens on another model, at standard speed; undefined when
+ * that model has no price. The prompt's length picks that model's price, as it would on its own.
+ */
+export function costAt(record: UsageRecord, model: string): number | undefined {
+  const price = priceOf({ ...record, model });
+  return price && totalOf(partsAt(record, price, false));
+}
+
 /** The Sonnet an Opus message is re-priced at: what the same work costs today. */
 const SONNET_MODEL = 'claude-sonnet-5-5';
 
@@ -111,9 +120,9 @@ const SONNET_MODEL = 'claude-sonnet-5-5';
  * (same tokens, no fast-mode surcharge, which Sonnet lacks); 0 for any other model.
  */
 export function sonnetSaving(record: UsageRecord): number {
-  const sonnet = priceFor(SONNET_MODEL);
-  if (!record.model.startsWith('claude-opus-') || !sonnet)
-    return 0;
+  const sonnet = costAt(record, SONNET_MODEL);
   const parts = costParts(record);
-  return parts ? totalOf(parts) - totalOf(partsAt(record, sonnet, false)) : 0;
+  if (!record.model.startsWith('claude-opus-') || sonnet === undefined || !parts)
+    return 0;
+  return totalOf(parts) - sonnet;
 }

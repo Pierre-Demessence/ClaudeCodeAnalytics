@@ -64,6 +64,10 @@ Noteworthy changes for users. The format follows
 - The Usage tab's costliest messages say "after a pause" when the main
   conversation waited while a subagent worked: the subagent's messages hid the
   pause, though it keeps a cache of its own.
+- The active use left for a model you use too little to measure prices your usual
+  tokens on that model. It scaled by the output price alone, while cache reads are
+  most of the cost and their price differs: Fable 5.1 output costs 2.5 times Opus
+  5.5's, its cache reads 1.25 times.
 
 ## [0.2.0]
 

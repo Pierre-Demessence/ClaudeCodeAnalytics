@@ -83,11 +83,20 @@ describe('familyPaces', () => {
     expect(sonnetPace.lowConfidence).toBeUndefined();
   });
 
-  it('estimates a thin family from the pooled pace and its price', () => {
+  it('estimates a thin family from the pooled pace, the usual tokens re-priced on its model', () => {
     const opusPace = byFamily(familyPaces([...sonnet, ...opus], START, END)).opus!;
-    // Pooled: $325 over 200 active minutes = $97.5/h. Active-time-weighted output price: (180 × 15 + 20 × 20) / 200 = $15.5/MTok.
-    expect(opusPace.pace).toBeCloseTo(97.5 * 20 / 15.5);
+    // Pooled: $325 over 200 active minutes = $97.5/h. The same 21M output tokens cost $420 on Opus 5.5.
+    expect(opusPace.pace).toBeCloseTo(97.5 * 420 / 325);
     expect(opusPace.lowConfidence).toBe(true);
+  });
+
+  it('re-prices every kind of token, not the output alone', () => {
+    // Cache reads only: $0.30 per million on Sonnet 4.6, $0.25 on Fable 5.1, whose output costs over 3 times as much.
+    const reads = (minute: number, model?: string): UsageRecord => ({ ...record(minute, model), cacheRead: 1_000_000, output: 0 });
+    const fable = byFamily(familyPaces([...Array.from({ length: 19 }, (_, i) => reads(i * 10)), reads(190, 'claude-fable-5-1'), reads(200, 'claude-fable-5-1')], START, END)).fable!;
+    // The 21M cache reads cost $5.25 on Fable 5.1, over 200 active minutes.
+    expect(fable.pace).toBeCloseTo(5.25 / (200 / 60));
+    expect(fable.lowConfidence).toBe(true);
   });
 
   it('gives a family seen once an estimate too', () => {
