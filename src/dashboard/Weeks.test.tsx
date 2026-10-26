@@ -131,18 +131,22 @@ describe('weeks tab', () => {
     renderTab({ ...data, planFit: { ...data.planFit, weeks: [{ cost: 40, demand: 42, estimated: true, floor: 20, hiddenHours: 86.4, shift: 0, start: pro.start }] } });
     const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
     expect(lines[1]!.querySelector<HTMLElement>('.week-bar.hit')!.style.width).toBe('100%');
-    expect(lines[1]!.querySelector('.wk-peak')!.textContent).toBe('100% Pro');
-    expect(lines[1]!.querySelector('.wk-uncapped')!.textContent).toBe('≈ 210% Pro');
+    // Its plan is not named on the row, only in the tooltips.
+    expect(lines[1]!.querySelector('.wk-peak')!.textContent).toBe('100%');
+    expect(lines[1]!.querySelector('.wk-uncapped')!.textContent).toBe('≈ 210%');
     expect(tipOf(lines[1]!.querySelector('.wk-uncapped')!)).toContain('At least 100% of Pro: 3.6 days were hidden');
     // The median peak, 20% of Max 5×, is the Pro limit.
     expect(lines[1]!.querySelector<HTMLElement>('.week-typical')!.style.left).toBe('100%');
-    expect(card('Weekly usage, last 12 weeks').textContent).toContain('typical week (median 20% of Max 5×)');
+    // The legend leaves the median to the median peak card.
+    const legend = card('Weekly usage, last 12 weeks').querySelector('.session-legend')!.textContent;
+    expect(legend).toContain('typical week');
+    expect(legend).not.toContain('median');
     // The week in progress restarted with the upgrade: its parts add up on Max 5×.
     expect(lines[0]!.querySelector('.wk-peak')!.textContent).not.toContain('Pro');
     expect(lines[0]!.querySelector<HTMLElement>('.week-typical')!.style.left).toBe('20%');
     const rows = within(card('Week list')).getAllByRole('row').slice(1);
-    expect(rows[1]!.querySelectorAll('td')[4]!.textContent).toBe('100% Pro');
-    expect(rows[1]!.querySelectorAll('td')[5]!.textContent).toBe('≈ 210% Pro');
+    expect(rows[1]!.querySelectorAll('td')[4]!.textContent).toBe('100%');
+    expect(rows[1]!.querySelectorAll('td')[5]!.textContent).toBe('≈ 210%');
   });
 
   it('flags a week whose usage reset without a plan change, with its own icon and badge', () => {

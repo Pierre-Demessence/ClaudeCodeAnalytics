@@ -40,11 +40,12 @@ Noteworthy changes for users. The format follows
   of usage.
 - The Weeks tab shows each week on the plan it ran on, and judges on that plan
   whether the week hit the limit. After the upgrade from Pro to Max 5×, a Pro week
-  at its limit read 20% on a fifth of a bar, without its mark; it reads "100% Pro"
-  on a full bar, and its estimate without the limit and the typical-week tick are
-  on Pro too. After a downgrade, weeks far from their limit could gain a mark. A
-  week whose usage restarted still adds its parts up on your current plan, like
-  the median peak.
+  at its limit read 20% on a fifth of a bar, without its mark; it reads 100% on a
+  full bar, and its estimate without the limit and the typical-week tick are on Pro
+  too, as their tooltips say. After a downgrade, weeks far from their limit could
+  gain a mark. A week whose usage restarted still adds its parts up on your current
+  plan, like the median peak. The legend no longer repeats the median, which the
+  median peak card shows.
 - The Sessions tab shows a 5-hour window without a reading on the plan it ran on,
   like the windows with one: after the upgrade from Pro to Max 5×, the estimated
   Pro windows read about a fifth of their %.

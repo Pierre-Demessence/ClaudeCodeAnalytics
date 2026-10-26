@@ -65,9 +65,9 @@ export function dayHeaders(startIso: string, timeZone: string): string[] {
  * The plan a week's peak is shown on when it is not `plan`, the current one: a week shows on the plan it was read on,
  * and a restarted one adds its parts up on `plan`.
  */
-export const otherPlan = (week: WeekRow, plan: Plan): Plan | undefined => (week.plan !== undefined && week.plan !== plan ? week.plan : undefined);
+const otherPlan = (week: WeekRow, plan: Plan): Plan | undefined => (week.plan !== undefined && week.plan !== plan ? week.plan : undefined);
 
-/** "47%", "~47%" when estimated, "–" without a percent; on the week's own plan (`otherPlan` names it). */
+/** "47%", "~47%" when estimated, "–" without a percent; on the week's own plan. */
 export function percentText(week: WeekRow): string {
   const percent = week.planPercent ?? week.percent;
   if (percent === undefined)

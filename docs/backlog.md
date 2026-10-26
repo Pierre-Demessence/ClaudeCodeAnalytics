@@ -46,6 +46,10 @@ Improvements to something that exists.
 - `[forecast]` The 5-hour forecast (`src/core/forecast.ts:119`) blends nothing toward the window's own pace, and its samples are whole-window averages, idle tail included, applied to the hours left wherever the window stands. Backtest two variants on the 5-hour windows: the weekly blend toward the own pace, and samples taken from each past window's cost after the same elapsed time, over the hours left.
 - `[forecast]` Active time per family (`activeByFamily`, `src/core/activeTime.ts:41`) gives each gap to the message that ends it, so subagent bursts (Explore on Haiku) take active time from the Opus main thread: the Opus-only pace reads high, the Haiku one low, and the model ratios inherit it. Measure the share of active time credited to subagent messages; if it is large, build the timeline from main-thread messages and give each subagent's cost to the main thread's family.
 
+### Weeks
+
+- Show which plan the bar and % of a week from an earlier plan are on, without a label on every row: only the plan-change mark (on the week of the change) and the tooltips of its estimate and of the typical-week tick say so (`src/dashboard/Weeks.tsx`).
+
 ### Plans and what-if
 
 - The what-if only moves Opus work to Sonnet; other shifts (Sonnet to Haiku, a lower effort) would reuse the same linear `shift` per week and session.

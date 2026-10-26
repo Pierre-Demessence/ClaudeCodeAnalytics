@@ -4,7 +4,7 @@ import type { FitWeek, PlanFitInput } from '@/core/planFit';
 import type { WeekPart, WeekRow } from '@/core/weekHistory';
 
 import { chartBars } from '@/dashboard/plansData';
-import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, otherPlan, percentText, projectsText, resetText, restartTip, typicalTick, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
+import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, restartTip, typicalTick, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 function week(extra: Partial<WeekRow> = {}): WeekRow {
   return { blockedSessions: 0, cappedSessions: 0, cost: 0, days: [], end: '2026-10-08T05:00:00.000Z', messages: 0, projectCount: 0, projects: [], sessions: 0, source: 'reading', start: '2026-10-01T05:00:00.000Z', ...extra };
@@ -51,16 +51,13 @@ describe('labels', () => {
     expect(percentText(week())).toBe('–');
   });
 
-  it('shows a week on its own plan, and names it when it is not the current one', () => {
+  it('shows a week\'s % on its own plan', () => {
     // A Pro week at its limit, now on Max 5×.
     const pro = week({ percent: 20, plan: 'pro', planPercent: 100 });
     expect(percentText(pro)).toBe('100%');
     expect(percentText({ ...pro, percentEstimated: true })).toBe('~100%');
-    expect(otherPlan(pro, 'max5')).toBe('pro');
-    expect(otherPlan(pro, 'pro')).toBeUndefined();
     // A restarted week has no plan of its own: its parts add up on the current plan.
     expect(percentText(week({ percent: 29 }))).toBe('29%');
-    expect(otherPlan(week({ percent: 29 }), 'max5')).toBeUndefined();
   });
 
   it('shows up to two project names, then how many more', () => {

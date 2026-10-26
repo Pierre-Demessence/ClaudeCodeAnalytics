@@ -1,12 +1,10 @@
 import { ArrowRightLeft, RotateCcw, TriangleAlert } from 'lucide-react';
 
-import type { Plan } from '@/core/types';
 import type { WeekRow } from '@/core/weekHistory';
 import type { Summary } from '@/dashboard/api';
 import type { HistoryView } from '@/dashboard/history';
 
 import { dayKey } from '@/core/aggregate';
-import { PLAN_LABELS } from '@/core/plans';
 import { BlockedIcon } from '@/dashboard/BlockedIcon';
 import { formatDollars, formatInteger, formatPercent, formatUsd } from '@/dashboard/format';
 import { defaultView, rangeText } from '@/dashboard/history';
@@ -16,26 +14,13 @@ import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
 import { InfoTip } from '@/dashboard/Tip';
 import { usePage } from '@/dashboard/usePage';
 import { useTip } from '@/dashboard/useTip';
-import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, otherPlan, percentText, projectsText, resetText, restartTip, typicalTick, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
+import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, restartTip, typicalTick, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 const HitIcon = ({ size = 14 }: { size?: number }) => <TriangleAlert aria-hidden="true" className="icon-inline icon-critical" size={size} />;
 
 const PlanChangeIcon = ({ size = 14 }: { size?: number }) => <ArrowRightLeft aria-hidden="true" className="icon-inline" size={size} />;
 
 const ResetIcon = ({ size = 14 }: { size?: number }) => <RotateCcw aria-hidden="true" className="icon-inline" size={size} />;
-
-/** A % of a week, then the plan it is a % of when that is not the current plan (`otherPlan`). */
-function WithPlan({ plan, text }: { plan: Plan | undefined; text: string }) {
-  return plan
-    ? (
-        <>
-          {text}
-          {' '}
-          <span className="wk-plan">{PLAN_LABELS[plan]}</span>
-        </>
-      )
-    : text;
-}
 
 /** A week whose usage restarted: a plan change, or a reset without one. */
 const isRestarted = (week: WeekRow) => week.planChange || week.parts;
@@ -119,8 +104,6 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
   const maxDay = Math.max(0, ...weeks.flatMap(w => w.days.map(cost => cost ?? 0)));
   const legend = heatLegend(bounds);
   const headers = weeks[0] ? dayHeaders(weeks[0].start, timeZone) : [];
-  // With weeks of another plan, the median names its plan: their ticks sit elsewhere.
-  const mixed = weeks.some(week => otherPlan(week, planFit.plan));
   return (
     <section className="card">
       <div className="card-head">
@@ -149,7 +132,6 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                 {weeks.map((week) => {
                   const uncapped = uncappedOf(planFit, week);
                   const percent = week.planPercent ?? week.percent;
-                  const plan = otherPlan(week, planFit.plan);
                   const tick = stats.medianPercent === undefined ? undefined : typicalTick(week, stats.medianPercent, planFit.plan);
                   return (
                     <div className="wk-row" key={week.start}>
@@ -191,8 +173,8 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                             </span>
                           )}
                         </span>
-                        <strong className="wk-peak"><WithPlan plan={plan} text={percentText(week)} /></strong>
-                        {uncapped && <span className="wk-uncapped" {...tip(uncappedTip(week, uncapped, planFit.plan, timeZone))}><WithPlan plan={plan} text={uncappedText(uncapped.demand)} /></span>}
+                        <strong className="wk-peak">{percentText(week)}</strong>
+                        {uncapped && <span className="wk-uncapped" {...tip(uncappedTip(week, uncapped, planFit.plan, timeZone))}>{uncappedText(uncapped.demand)}</span>}
                       </div>
                     </div>
                   );
@@ -208,7 +190,7 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                 {stats.medianPercent !== undefined && (
                   <li>
                     <span className="legend-typical" />
-                    {`typical week (median ${formatPercent(stats.medianPercent)}${mixed ? ` of ${PLAN_LABELS[planFit.plan]}` : ''})`}
+                    typical week
                   </li>
                 )}
                 <li>
@@ -290,7 +272,6 @@ function List({ summary, view }: { summary: Summary; view: HistoryView }) {
                   <tbody>
                     {weeks.slice(start, end).map((week) => {
                       const uncapped = uncappedOf(planFit, week);
-                      const plan = otherPlan(week, planFit.plan);
                       return (
                         <tr key={week.start}>
                           <th scope="row">
@@ -321,8 +302,8 @@ function List({ summary, view }: { summary: Summary; view: HistoryView }) {
                           </td>
                           <td>{formatInteger(week.messages)}</td>
                           <td><strong>{formatUsd(week.cost)}</strong></td>
-                          <td><strong><WithPlan plan={plan} text={percentText(week)} /></strong></td>
-                          <td {...(uncapped ? tip(uncappedTip(week, uncapped, planFit.plan, timeZone)) : {})}>{uncapped && <WithPlan plan={plan} text={uncappedText(uncapped.demand)} />}</td>
+                          <td><strong>{percentText(week)}</strong></td>
+                          <td {...(uncapped ? tip(uncappedTip(week, uncapped, planFit.plan, timeZone)) : {})}>{uncapped ? uncappedText(uncapped.demand) : ''}</td>
                           <td className="secondary">{week.source}</td>
                         </tr>
                       );
