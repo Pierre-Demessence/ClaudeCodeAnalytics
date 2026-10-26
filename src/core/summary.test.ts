@@ -416,6 +416,18 @@ describe('buildSummary', () => {
     expect(summary.current?.activeLeftMs).toBeCloseTo((100 - 30) / weeklyK! / 180 * HOUR_MS);
   });
 
+  it('stops the active use left at the reset when the window resets first', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    const today = [at('10:00'), at('10:10'), at('10:20')].map(ts => rec(ts));
+    // The same 47 minutes of active use left, in a window that resets in 30.
+    const fiveHourResetsAt = '2026-10-20T12:30:00.000Z';
+    const snapshots = [['10:05', 10], ['10:15', 20], ['10:25', 30]].map(([time, percent]) =>
+      snap(at(time as string), percent as number, RESET, { fiveHour: percent as number, fiveHourResetsAt }));
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [rec(NOW - 40 * DAY_MS), ...today], snapshots, timeZone: 'UTC' });
+    expect(summary.fiveHourSession?.activeLeftMs).toBe(30 * 60_000);
+    expect(summary.fiveHourSession?.activeLeftByFamily).toEqual([{ family: 'opus', lowConfidence: true, ms: 30 * 60_000 }]);
+  });
+
   it('gives the active use left per model family and names the family in use', () => {
     const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
     const today = [rec(at('10:00')), rec(at('10:10'), 'claude-sonnet-4-6'), rec(at('10:20'), 'claude-sonnet-4-6')];

@@ -68,6 +68,8 @@ Noteworthy changes for users. The format follows
   tokens on that model. It scaled by the output price alone, while cache reads are
   most of the cost and their price differs: Fable 5.1 output costs 2.5 times Opus
   5.5's, its cache reads 1.25 times.
+- The active use left on the limit cards stops at the reset: a 5-hour window
+  resetting in 30 minutes could show more active use left than it has time.
 
 ## [0.2.0]
 

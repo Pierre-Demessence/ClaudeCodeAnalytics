@@ -125,7 +125,8 @@ sessions since they share the limits; longer gaps are pauses. Counting every
 clock hour with a message was rejected: a single message would count a full
 hour and understate the pace. The cost of a burst's first message has no
 active time before it, which overstates the pace slightly; that errs toward
-less time left. Without a calibration, a % cannot become dollars: no value.
+less time left. Without a calibration, a % cannot become dollars: no value. The
+value stops at the reset: the use after it counts toward the next window.
 
 ## Estimated weeks and stale readings
 

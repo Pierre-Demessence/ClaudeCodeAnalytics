@@ -28,17 +28,20 @@ export interface FamilyActiveLeft {
   ms: number;
 }
 
-/** Active time left before the limit if only each family were used, at its own pace. */
-export function activeLeftByFamily({ k, paces, used }: { k?: number; paces: readonly FamilyPace[]; used: number }): FamilyActiveLeft[] {
+/** Active time left before the limit if only each family were used, at its own pace; never past the reset. */
+export function activeLeftByFamily({ k, paces, until, used }: { k?: number; paces: readonly FamilyPace[]; until?: number; used: number }): FamilyActiveLeft[] {
   return paces.flatMap(({ family, lowConfidence, pace }) => {
-    const ms = activeTimeLeft({ k, pace, used });
+    const ms = activeTimeLeft({ k, pace, until, used });
     return ms === undefined ? [] : [{ family, ...lowConfidence && { lowConfidence }, ms }];
   });
 }
 
-/** Active time (ms) until `used` reaches 100 % at `pace` $/hour, with `k` % per dollar. */
-export function activeTimeLeft({ k, pace, used }: { k?: number; pace?: number; used: number }): number | undefined {
+/**
+ * Active time (ms) until `used` reaches 100 % at `pace` $/hour, with `k` % per dollar, and never more
+ * than `until`, the time to the reset: the use after it counts toward the next window.
+ */
+export function activeTimeLeft({ k, pace, until = Infinity, used }: { k?: number; pace?: number; until?: number; used: number }): number | undefined {
   if (!k || !pace || k < 0 || pace < 0 || used >= 100)
     return undefined;
-  return (100 - used) / k / pace * HOUR_MS;
+  return Math.min((100 - used) / k / pace * HOUR_MS, Math.max(0, until));
 }

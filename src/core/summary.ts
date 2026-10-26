@@ -299,8 +299,10 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
         });
       }
       const fiveHourUsed = fiveHourSession.estimatedNow ?? fiveHour;
-      fiveHourSession.activeLeftMs = activeTimeLeft({ k: fiveHourCalibration?.k, pace: activePace, used: fiveHourUsed });
-      fiveHourSession.activeLeftByFamily = activeLeftByFamily({ k: fiveHourCalibration?.k, paces: paceByFamily, used: fiveHourUsed });
+      // Without a reset time (manual readings), the window ends within 5 hours of the reading.
+      const fiveHourUntil = (latest.fiveHourResetsAt ? Date.parse(latest.fiveHourResetsAt) : readAt + FIVE_HOURS_MS) - now;
+      fiveHourSession.activeLeftMs = activeTimeLeft({ k: fiveHourCalibration?.k, pace: activePace, until: fiveHourUntil, used: fiveHourUsed });
+      fiveHourSession.activeLeftByFamily = activeLeftByFamily({ k: fiveHourCalibration?.k, paces: paceByFamily, until: fiveHourUntil, used: fiveHourUsed });
     }
 
     const latestReset = Date.parse(latest.weeklyResetsAt);
@@ -361,8 +363,8 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
 
       const resetsAtIso = new Date(resetsAt).toISOString();
       current = {
-        activeLeftByFamily: activeLeftByFamily({ k: weekK, paces: paceByFamily, used: from }),
-        activeLeftMs: activeTimeLeft({ k: weekK, pace: activePace, used: from }),
+        activeLeftByFamily: activeLeftByFamily({ k: weekK, paces: paceByFamily, until: resetsAt - now, used: from }),
+        activeLeftMs: activeTimeLeft({ k: weekK, pace: activePace, until: resetsAt - now, used: from }),
         estimatedNow,
         forecast,
         readAt: latest.ts,
