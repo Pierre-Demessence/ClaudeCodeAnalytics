@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { UsageRow } from '@/core/aggregate';
 
+import { formatTokens } from '@/dashboard/format';
 import { causeText, heatStep, toBuckets } from '@/dashboard/usageData';
 
 function row(bucket: string, model: string, cost: number): UsageRow {
@@ -37,7 +38,7 @@ describe('heatStep', () => {
 describe('causeText', () => {
   it('names the cost component, its tokens and the pause', () => {
     const outlier = { name: 'app', cause: 'cacheWrite1h' as const, cost: 4.4, path: 'app', tokens: 554_000, ts: '2026-10-01T10:00:00Z' };
-    expect(causeText(outlier)).toBe('1h cache write, 554k tokens');
-    expect(causeText({ ...outlier, pauseMs: 3.5 * 3_600_000 })).toBe('1h cache write, 554k tokens, after a 3 h 30 min pause');
+    expect(causeText(outlier)).toBe(`1h cache write, ${formatTokens(554_000)} tokens`);
+    expect(causeText({ ...outlier, pauseMs: 3.5 * 3_600_000 })).toBe(`1h cache write, ${formatTokens(554_000)} tokens, after a 3 h 30 min pause`);
   });
 });

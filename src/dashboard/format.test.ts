@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCountdown, formatDuration, formatResets, formatUsd, formatUsdShort } from '@/dashboard/format';
+import { formatCountdown, formatDuration, formatResets, formatTokens, formatUsd, formatUsdShort } from '@/dashboard/format';
 
 describe('formatCountdown', () => {
   const now = Date.parse('2026-10-02T12:00:00Z');
@@ -46,6 +46,16 @@ describe('formatDuration', () => {
   it('shows hours and minutes, or minutes alone', () => {
     expect(formatDuration((2 * 60 + 10) * 60_000)).toBe('2 h 10 min');
     expect(formatDuration(45 * 60_000)).toBe('45 min');
+  });
+});
+
+describe('formatTokens', () => {
+  // The suffix's case depends on the ICU data: "554k" in older versions, "554K" in CLDR 47.
+  it('writes compact numbers with at most one decimal', () => {
+    expect(formatTokens(950)).toBe('950');
+    expect(formatTokens(1_540)).toMatch(/^1\.5k$/i);
+    expect(formatTokens(554_000)).toMatch(/^554k$/i);
+    expect(formatTokens(3_000_000)).toMatch(/^3m$/i);
   });
 });
 

@@ -7,7 +7,7 @@ import type { Bucket } from '@/dashboard/usageData';
 
 import { DAY_MS, HOUR_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
-import { formatUsd } from '@/dashboard/format';
+import { formatTokens, formatUsd } from '@/dashboard/format';
 import { viewOver } from '@/dashboard/rangeTesting';
 import { TipProvider } from '@/dashboard/Tip';
 import { Usage } from '@/dashboard/Usage';
@@ -105,7 +105,7 @@ describe('usage tab', () => {
     const costs = card('Cost per message');
     expect(within(costs).getByText('The 5 costliest of 6 messages over $1.')).toBeTruthy();
     expect(within(costs).getAllByRole('row')).toHaveLength(5);
-    expect(within(costs).getAllByText(/^1h cache write, 500k tokens/)).toHaveLength(5);
+    expect(within(costs).getAllByText(new RegExp(`^1h cache write, ${formatTokens(500_000)} tokens`))).toHaveLength(5);
     // The 5 newest tie on cost and stay in order: each has an older message 2 hours before it.
     expect(within(costs).getAllByText(/after a 2 h 0 min pause$/)).toHaveLength(5);
   });
