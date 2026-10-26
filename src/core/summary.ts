@@ -38,7 +38,7 @@ import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces }
 import { typicalWeek, weeklyShares } from './share.ts';
 import { subscriptionStartOf, valueForMoney } from './valueForMoney.ts';
 import { buildWeekHistory, DEFAULT_WEEK_LIMIT_THRESHOLD } from './weekHistory.ts';
-import { weekBucketer, weekStarter, windowStartOf } from './weekWindows.ts';
+import { snapResets, weekBucketer, weekStarter, windowStartOf } from './weekWindows.ts';
 
 /** Days of daily cost and 5-hour sessions used as "typical" for forecasts. */
 const TYPICAL_DAYS = 28;
@@ -229,7 +229,7 @@ function borrowedFit(fitOn: (plan: Plan) => Calibration | undefined, plan: Plan,
 /** The part of the summary that does not depend on a range. */
 export function prepareSummary(input: SummaryInput): PreparedSummary {
   const { now, planHistory, records, timeZone } = input;
-  const snapshots = [...input.snapshots].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  const snapshots = snapResets([...input.snapshots].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)));
   const nowIso = new Date(now).toISOString();
   const plan = planAt(planHistory, nowIso);
   const costBetween = createCostIndex(records);

@@ -86,6 +86,10 @@ Noteworthy changes for users. The format follows
   the week's usage, say) reads the point where its limit got close (90%) on the
   plan of that reading, not on the plan of the week's last reading: the plan
   comparison read 92% of Max 5× as 92% of Pro.
+- Readings of one week whose reset times differ by a minute or two (the endpoint
+  rounds them to the minute, which can tip either way) count as one week. Such a
+  week showed twice in the Weeks tab and the typical week, and a restart between
+  two of its readings went unseen.
 
 ## [0.2.0]
 

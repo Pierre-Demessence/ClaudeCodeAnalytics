@@ -1,7 +1,43 @@
 import { describe, expect, it } from 'vitest';
 
+import type { Snapshot } from './types.ts';
+
 import { DAY_MS } from './calibration.ts';
-import { weekBucketer, weekStarter, weekStartFor } from './weekWindows.ts';
+import { snapResets, weekBucketer, weekStarter, weekStartFor } from './weekWindows.ts';
+
+describe('snapResets', () => {
+  const reading = (ts: string, weeklyResetsAt: string): Snapshot => ({ source: 'endpoint', ts, weekly: 10, weeklyResetsAt });
+
+  it('gives a reset time up to 2 minutes off the one of its window\'s first reading', () => {
+    const readings = [
+      reading('2026-10-08T10:00:00Z', '2026-10-14T20:00:00.000Z'),
+      reading('2026-10-09T10:00:00Z', '2026-10-14T20:01:00.000Z'),
+      reading('2026-10-10T10:00:00Z', '2026-10-14T19:58:00.000Z'),
+      reading('2026-10-15T10:00:00Z', '2026-10-21T20:01:00.000Z'),
+      reading('2026-10-16T10:00:00Z', '2026-10-21T20:00:00.000Z'),
+    ];
+    expect(snapResets(readings).map(s => s.weeklyResetsAt)).toEqual([
+      '2026-10-14T20:00:00.000Z',
+      '2026-10-14T20:00:00.000Z',
+      '2026-10-14T20:00:00.000Z',
+      '2026-10-21T20:01:00.000Z',
+      '2026-10-21T20:01:00.000Z',
+    ]);
+  });
+
+  it('keeps a reset time 3 minutes off apart', () => {
+    const readings = [reading('2026-10-08T10:00:00Z', '2026-10-14T20:00:00.000Z'), reading('2026-10-09T10:00:00Z', '2026-10-14T20:03:00.000Z')];
+    expect(snapResets(readings).map(s => s.weeklyResetsAt)).toEqual(['2026-10-14T20:00:00.000Z', '2026-10-14T20:03:00.000Z']);
+  });
+
+  it('writes the reset time as the first reading did, and leaves the other readings as they are', () => {
+    const readings = [reading('2026-10-08T10:00:00Z', '2026-10-14T20:00:00Z'), reading('2026-10-09T10:00:00Z', '2026-10-14T20:00:00.000Z')];
+    const snapped = snapResets(readings);
+    expect(snapped.map(s => s.weeklyResetsAt)).toEqual(['2026-10-14T20:00:00Z', '2026-10-14T20:00:00Z']);
+    expect(snapped[0]).toBe(readings[0]);
+    expect(readings[1]!.weeklyResetsAt).toBe('2026-10-14T20:00:00.000Z');
+  });
+});
 
 describe('weekStartFor', () => {
   const h = 3_600_000;
