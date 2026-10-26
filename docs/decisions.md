@@ -173,6 +173,37 @@ projection is the typical past week (median and quartiles of peak %, on the
 current plan, never below what is used). After 12 hours the window's own trend
 takes over. Only a first week without any history has no projection.
 
+## Weekly forecast: the week's own ratio and pace, days under the current plan, resampled sums
+
+The weekly calibration pools every reading of the current plan, but weeks of one
+plan can burn the limit at very different rates per dollar (two weeks measured
+0.028 and 0.099 % per $, likely the model mix), and the pooled ratio then
+understates a heavy week. So the current week uses its own fit (`weekCalibration`)
+once it has 3 readings of 5% or more, for its estimate since a stale reading, its
+forecast, its pacing and its active time; everything else (past weeks, Plans,
+value, the 5-hour side) keeps the pooled fit. A week holding a plan change gets
+neither its own fit nor its own pace (below): its % restarts at the change while
+its cost and elapsed time count from the window start. The pace comes from the days under
+the current plan (at least 3, within the last 28), since the idle days before an
+upgrade say nothing about the usage after it. The forecast resamples the cost of
+the days left as a sum of days drawn with replacement (seeded, 1000 draws), and
+low/median/high are the quartiles of those sums. Rejected: the median day × the
+days left, which is biased low for skewed usage with idle days (the median of a
+sum of days is near the days × the mean, not the median day); and a weekly
+calibration per model family, since the evidence is two weeks confounded with
+time and the 5-hour readings do not confirm it (backlog). The 5-hour forecast
+keeps the quantile of session paces × hours left: its samples are averages over
+whole sessions, not independent hours.
+
+The past days are only a prior for the week's pace: they are slow to follow an idle
+week or a sudden heavy one. So the centre of the projection blends linearly toward
+the week's own pace (used % over the time elapsed) over its first 3 days, and rests
+on this week alone after that. The band keeps the spread of the resampled days
+around that centre (floored at 0). Rejected: this week only from the start, since one
+day extrapolated to a week swings 4× on this data; and a band from blended quartiles
+(own pace and resampled ones alike), which collapses to a line as the own pace takes
+over, since the week's own pace is a single value.
+
 ## A week without a reading still gets a card
 
 Weekly windows are fixed 7-day blocks, so a week with no reading yet (nothing

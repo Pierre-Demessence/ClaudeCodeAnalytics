@@ -37,6 +37,8 @@ Improvements to something that exists.
 
 - `[forecast]` Carry the uncertainty of `k` into the forecast range, so a weakly calibrated plan shows a wider band.
 - `[forecast]` Say which limit binds first (5-hour or weekly) and show a probability of hitting each, once the scheduled forecast exists.
+- `[forecast]` Show the current week's own ratio (`CurrentWeek.weekCalibration`) on the Fit card, which shows only the pooled one while the week's forecast, pacing and active time use the week's own.
+- `[forecast]` Check whether the usage endpoint's answer holds per-model weekly windows (`seven_day_opus`, `seven_day_sonnet`) that `src/collector/endpoint.ts:76` ignores: it reads only `seven_day` and its breakdown. A per-model limit would explain weeks of one plan disagreeing on the % per dollar.
 
 ### Plans and what-if
 
@@ -63,7 +65,6 @@ estimates of when the result becomes judgeable, not limits in the code.
 
 - Forecast stage 3 (expected active hours from a weekday × hour profile) is paused: the backtest cannot tell whether it beats the flat pace on so little history. The profile needs 3 weeks to exist (`docs/plans/forecast-accuracy.md`) and the backtest needs about 3 more weeks to score it against the flat pace. Plan: `docs/plans/forecast-accuracy.md`.
 - Weekday-aware daily usage (weekends differ) for the forecast. Covered by stage 3 of `docs/plans/forecast-accuracy.md`.
-- The calibrated range applies the 25th/75th percentile day to every remaining day, which overstates the spread of a multi-day total; a bootstrap over days would be tighter. Also covered by stage 3 of the plan.
 - `[forensics]` Calibration cross-check from observed limit hits: the median cost of limit-hit windows is a capacity estimate, floored by the highest cost of a window that did not hit the limit; compare with the demand estimates of limit-hit weeks. Server overloads are stored (`events.jsonl`) but not shown anywhere.
 - `[forensics]` Test the credit scheme cached in `~/.claude.json` (`tengu_amber_tally`: 5-hour credits 10000 / 50000 / 200000 for Pro / Max 5× / Max 20×, and credits per million tokens per model) against the readings: replay the usage under it with the backtest and compare its error with the API-price model. Unverified: units, which token types count, whether the flag is live. Opus 5.5 : Sonnet 5.5 : Haiku 4.5 is 1833 : 1250 : 833 there, against 4 : 2 : 1 by API output price.
 
@@ -72,7 +73,7 @@ estimates of when the result becomes judgeable, not limits in the code.
 ### 12 weeks
 
 - A model of how pace slows as a week nears its limit, to replace the fixed 90% pressure point. Needs many weeks to tell slowing down from a quiet week.
-- `[forecast]` Fit `k` per model family instead of assuming limits scale with API price; needs enough readings per family.
+- `[forecast]` A per-family weekly calibration (% per dollar by model family) instead of assuming limits scale with API price, once enough weeks with different mixes exist to tell model mix from a change in the limits. Two weeks of one plan measured 0.028 and 0.099 % per $; the current week's own fit covers it meanwhile.
 - `[forecast]` Pace by effort level and fast mode (`UsageRecord.effort`, `speed`), once the per-model pace shows how much the model alone explains.
 
 ### Needs a second plan
@@ -84,7 +85,6 @@ estimates of when the result becomes judgeable, not limits in the code.
 - `[forensics]` Verify against a real transcript that a compaction writes `isCompactSummary` or a `compact_boundary` system entry (none in the local transcripts; `src/core/events.ts` assumes both), and the weekly `quotaLimits.rateLimitType` name (only `five_hour` seen; `hitScope` takes `seven_day`/`week`). Until then the no-gap flush leans on the rewritten-share rule.
 - Price the 4.5-generation models (Opus 4.5, Sonnet 4.5) and long-context premiums if they show up in transcripts; they are flagged as unknown today.
 - Treat a `seven_day.resets_at` of null (if the endpoint ever returns it) as "no usage yet" rather than `bad-shape`.
-- Per-model weekly limits (`seven_day_opus` / `seven_day_sonnet` in the endpoint response) if a plan ever reports them.
 
 ## Technical debt
 

@@ -8,6 +8,11 @@ Noteworthy changes for users. The format follows
 
 ### Fixed
 
+- The weekly forecast and "Room left" no longer understate a heavy week. The
+  current week uses its own % per dollar once it has 3 readings, the typical pace
+  comes from the days under your current plan, the days left are projected as a
+  resampled total instead of the median day times the days left, and over the
+  week's first 3 days the projection moves to the week's own pace.
 - A week in which you change plans no longer skews the forecasts and the plan
   comparison: its peak % covers only the new plan's part of the week. Such a week
   is marked on the Weeks tab and left out of the calibration, the typical week,

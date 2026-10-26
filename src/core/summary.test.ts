@@ -197,6 +197,102 @@ describe('buildSummary', () => {
     expect(summary.current?.estimatedNow).toBeGreaterThan(30);
   });
 
+  describe('the current week\'s own ratio', () => {
+    const windowStart = Date.parse(RESET) - 7 * DAY_MS;
+    const lastWeekStart = windowStart - 7 * DAY_MS;
+    // Last week burned 1 %/$ (d × 20 % against d × $20).
+    const lastWeek = [1, 2, 3, 4].map(d => snap(lastWeekStart + d * DAY_MS, d * 20, new Date(windowStart).toISOString()));
+
+    it('uses this week\'s fit with 3 readings of 5 % or more', () => {
+      // This week burns 0.5 %/$; the last reading is 2.5 days old, $40 spent since.
+      const thisWeek = [1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET));
+      const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots: [...lastWeek, ...thisWeek], timeZone: 'UTC' });
+      const current = summary.current!;
+      expect(summary.calibration!.k).toBeGreaterThan(0.6);
+      expect(current.weekCalibration?.k).toBeCloseTo(0.5);
+      expect(current.weekCalibration?.n).toBe(3);
+      expect(current.estimatedNow).toBeCloseTo(50);
+      // 5⅔ days into the week, the forecast follows its own pace: 50 % over 5⅔ days, for the 1⅓ days left.
+      expect(current.forecast?.median).toBeCloseTo(50 + 50 / (17 / 3) * 4 / 3);
+      // 50 points left at 0.5 %/$ over 1⅓ days.
+      expect(current.pacing.roomPerDay).toBeCloseTo(75);
+    });
+
+    it('keeps the pooled ratio with fewer readings of 5 % or more', () => {
+      const thisWeek = [snap(windowStart + DAY_MS / 2, 4, RESET), ...[2, 3].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET))];
+      const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots: [...lastWeek, ...thisWeek], timeZone: 'UTC' });
+      const k = summary.calibration!.k;
+      expect(summary.current?.weekCalibration).toBeUndefined();
+      expect(summary.current?.estimatedNow).toBeCloseTo(30 + k * 40);
+    });
+
+    it('keeps the pooled ratio and the typical pace in a week holding a plan change', () => {
+      // Last week ran whole on Max 5× at 1 %/$; this week starts on Pro and goes back to Max 5× a day in.
+      const planHistory: PlanPeriod[] = [
+        { from: '2026-09-01T00:00:00.000Z', plan: 'max5', source: 'manual' },
+        { from: new Date(windowStart).toISOString(), plan: 'pro', source: 'manual' },
+        { from: new Date(windowStart + DAY_MS).toISOString(), plan: 'max5', source: 'manual' },
+      ];
+      // The % restarts at the change: 5 points a day from then on, against a cost counted from the window start.
+      const thisWeek = [2, 3, 4].map(d => snap(windowStart + d * DAY_MS, (d - 1) * 5, RESET));
+      const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory, records, snapshots: [...lastWeek, ...thisWeek], timeZone: 'UTC' });
+      const current = summary.current!;
+      expect(summary.calibration?.k).toBeCloseTo(1);
+      expect(current.weekCalibration).toBeUndefined();
+      // 15 % at the last reading, $20 since at 1 %/$.
+      expect(current.estimatedNow).toBeCloseTo(35);
+      // The used % covers only part of the elapsed week, so it gives no pace: the $20 days at 1 %/$ do, for the 1⅓ days left.
+      expect(current.forecast?.median).toBeCloseTo(35 + 20 * 4 / 3);
+    });
+  });
+
+  describe('the weekly pace pool', () => {
+    // $20 a day until 6 days ago, then $60 a day; this week burns 0.1 %/$.
+    const recent = Array.from({ length: 5 }, (_, i) => [0, 1, 2].map(m => rec(NOW - (i + 1) * DAY_MS + m * 60_000))).flat();
+    const pooled = [...records.slice(5), ...recent];
+    const windowStart = Date.parse(RESET) - 7 * DAY_MS;
+    const snapshots = [1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 6, RESET));
+    const summaryFrom = (from?: string) => buildSummary({
+      endpointEnabled: true,
+      now: NOW,
+      planHistory: from ? [{ from, plan: 'max5', source: 'manual' }] : [],
+      records: pooled,
+      snapshots,
+      timeZone: 'UTC',
+    });
+
+    it('starts at the current plan period', () => {
+      const current = summaryFrom(new Date(NOW - 5 * DAY_MS).toISOString()).current!;
+      expect(current.estimatedNow).toBeCloseTo(30);
+      // The week's own pace sets the centre (30 % over 5⅔ days); the $60 days alone have no spread.
+      expect(current.forecast).toMatchObject({ method: 'calibrated' });
+      expect(current.forecast?.median).toBeCloseTo(30 + 30 / (17 / 3) * 4 / 3);
+      expect(current.forecast?.low).toBeCloseTo(current.forecast!.median);
+      expect(current.forecast?.high).toBeCloseTo(current.forecast!.median);
+    });
+
+    it('keeps the last 28 days when the plan period has under 3 days', () => {
+      const short = summaryFrom(new Date(NOW - 1.5 * DAY_MS).toISOString()).current!;
+      expect(short.forecast).toEqual(summaryFrom().current!.forecast);
+      // The $20 and $60 days mixed spread the band.
+      expect(short.forecast!.high - short.forecast!.low).toBeGreaterThan(0.1);
+    });
+  });
+
+  it('follows the current week\'s own pace late in the week', () => {
+    const windowStart = Date.parse(RESET) - 7 * DAY_MS;
+    // This week runs at $100 a day against $20 before; it burns 0.1 %/$.
+    const heavy = [1, 2, 3, 4, 5].flatMap(d => [1, 2, 3, 4].map(m => rec(NOW - d * DAY_MS + m * 60_000)));
+    const snapshots = [1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET));
+    const current = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [...records, ...heavy], snapshots, timeZone: 'UTC' }).current!;
+    expect(current.weekCalibration?.k).toBeCloseTo(0.1);
+    // 30 % at the last reading, $200 since: 50 % over 5⅔ days, kept for the 1⅓ days left.
+    expect(current.estimatedNow).toBeCloseTo(50);
+    expect(current.forecast?.median).toBeCloseTo(50 + 50 / (17 / 3) * 4 / 3);
+    expect(current.forecast!.low).toBeLessThanOrEqual(current.forecast!.median);
+    expect(current.forecast!.median).toBeLessThanOrEqual(current.forecast!.high);
+  });
+
   it('forecasts the 5-hour window from the calibrated session pace', () => {
     const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
     // Today's session opened at 10:00 and resets at 15:00; $20 per record.
