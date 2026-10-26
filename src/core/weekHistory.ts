@@ -171,6 +171,10 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
   const ordered = [...starts].sort((a, b) => b - a);
   const shown = range ? ordered.filter(start => start >= range.from && start < range.to) : ordered.slice(0, HISTORY_WEEKS);
 
+  // A reading's % is of the plan active then: a plan change that did not restart the usage leaves readings of two
+  // plans in one part, whose plan is its last reading's. Without a history, that plan is the only one known.
+  const readingPlan = (reading: Snapshot, fallback: Plan) => (planHistory.length > 0 ? planAt(planHistory, reading.ts) : fallback);
+
   const building = new Map<number, Building>(shown.map(start => [start, { cost: 0, days: Array.from<number>({ length: 7 }).fill(0), messages: 0, projects: new Map(), saving: 0, spend: [] }]));
   const projectOf = sessionProjects(records);
   for (const { record, start } of recordStarts) {
@@ -229,7 +233,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       const reached = snapshots
         .filter(s => Date.parse(s.weeklyResetsAt) === end && s.weekly >= PRESSURE_PERCENT)
         .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))[0];
-      pressure = reached && { at: reached.ts, percent: convertPercent(reached.weekly, share.plan, plan) };
+      pressure = reached && { at: reached.ts, percent: convertPercent(reached.weekly, readingPlan(reached, share.plan), plan) };
     }
     else if (calibrationK !== undefined && week.cost > 0) {
       // `calibrationK` is a % of the current plan per dollar; the week's limit and its pressure point are on the
@@ -263,7 +267,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
         plan: part.plan,
         planPercent: part.percent,
         pressureAt: reached?.ts,
-        pressurePercent: reached && convertPercent(reached.weekly, part.plan, plan),
+        pressurePercent: reached && convertPercent(reached.weekly, readingPlan(reached, part.plan), plan),
         start: part.start,
       };
     });

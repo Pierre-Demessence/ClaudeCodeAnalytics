@@ -8,7 +8,6 @@ orders the ones that are scheduled.
 
 - Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
 - Weeks tab on a phone: the median peak card's "≈ 26% without the limit" runs past the card's edge (`src/dashboard/Weeks.tsx:91`), since `.wk-uncapped` never wraps (`src/dashboard/styles.css:2695`).
-- A plan change without a drop in the readings leaves readings of two plans in one window part (`windowParts`, `src/core/restarts.ts:61`), whose plan is its last reading's: `weekHistory.ts` then reads an earlier reading's pressure on the wrong scale. Only reachable for a downgrade or an upgrade the readings do not show as a restart.
 - `windowParts` and `weeklyShares` key a window by its exact reset time (`src/core/restarts.ts:35`, `src/core/share.ts:51`): a reset time that differs by a minute of rounding makes two windows, and a drop between them is not seen (`backtest.ts` tolerates 2 minutes).
 
 ## Features

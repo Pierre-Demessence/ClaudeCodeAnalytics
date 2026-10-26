@@ -167,6 +167,13 @@ describe('pressure point', () => {
     expect(weeks({ plan: 'max5', shares: [share(92, 'pro')], snapshots }).weeks[0]).toMatchObject({ pressurePercent: 92 / 5 });
   });
 
+  it('reads the reading on its own plan when a plan change in the window did not restart the usage', () => {
+    // A downgrade from Max 5× to Pro on day 4 shows as no drop: 92% of Max 5× on day 3 is 460% of Pro.
+    const planHistory = [{ from: iso(weekStart(5)), plan: 'max5' as const, source: 'manual' as const }, { from: iso(weekStart(1) + 4 * DAY_MS), plan: 'pro' as const, source: 'manual' as const }];
+    const snapshots = [reading(92, 3), reading(100, 5)];
+    expect(weeks({ plan: 'pro', planHistory, shares: [share(100, 'pro')], snapshots }).weeks[0]).toMatchObject({ pressureAt: iso(weekStart(1) + 3 * DAY_MS), pressurePercent: 460 });
+  });
+
   it('is absent for a window that never reached it', () => {
     const row = weeks({ shares: [share(89)], snapshots: [reading(89, 3)] }).weeks[0]!;
     expect(row.pressureAt).toBeUndefined();
@@ -360,6 +367,22 @@ describe('plan change', () => {
     expect(pro).toMatchObject({ pressureAt: iso(weekStart(2) + DAY_MS), pressurePercent: 92 / 5 });
     expect(max5!.pressureAt).toBeUndefined();
     expect(rows[0]).toMatchObject({ pressureAt: iso(weekStart(2) + DAY_MS), pressurePercent: 92 / 5 });
+  });
+
+  it('reads a part\'s pressure point on the plan of its reading, not the part\'s last one', () => {
+    // Max 5× from day 3 restarts the usage; back to Pro on day 5 does not: the last part holds readings of both plans.
+    const history = [...planHistory, { from: iso(weekStart(2) + 5 * DAY_MS), plan: 'pro' as const, source: 'manual' as const }];
+    const share = {
+      ...restartedShare,
+      parts: [restartedShare.parts[0]!, { percent: 100, plan: 'pro' as const, start: iso(weekStart(2) + 3 * DAY_MS) }],
+      percent: 200,
+      plan: 'pro' as const,
+    };
+    const readings = [reading(weekStart(2) + DAY_MS, 50), reading(weekStart(2) + 4 * DAY_MS, 92), reading(weekStart(2) + 6 * DAY_MS, 100)];
+    const { weeks: rows } = weeks({ plan: 'pro', planHistory: history, shares: [share], snapshots: readings });
+    // 92% of Max 5× is 460% of Pro.
+    expect(rows[0]!.parts![1]).toMatchObject({ pressureAt: iso(weekStart(2) + 4 * DAY_MS), pressurePercent: 460 });
+    expect(rows[0]).toMatchObject({ pressureAt: iso(weekStart(2) + 4 * DAY_MS), pressurePercent: 460 });
   });
 
   it('adds the earlier parts to the % of the window in progress', () => {

@@ -82,6 +82,10 @@ Noteworthy changes for users. The format follows
 - A write to the data dir that fails no longer leaves its temp file there, such
   as `messages-2026-10.jsonl.<pid>.<id>.tmp`. One left by an earlier version can
   be deleted.
+- A week whose plan changed without its usage restarting (a downgrade that keeps
+  the week's usage, say) reads the point where its limit got close (90%) on the
+  plan of that reading, not on the plan of the week's last reading: the plan
+  comparison read 92% of Max 5× as 92% of Pro.
 
 ## [0.2.0]
 
