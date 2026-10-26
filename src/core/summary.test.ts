@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, PlanPeriod, Snapshot, UsageRecord } from './types.ts';
 
 import { DAY_MS, HOUR_MS } from './calibration.ts';
 import { buildSummary } from './summary.ts';
@@ -32,6 +32,33 @@ describe('buildSummary', () => {
     expect(summary.calibration?.k).toBeCloseTo(0.5, 1);
     expect(summary.current?.forecast?.method).toBe('calibrated');
     expect(summary.weeks).toEqual([]);
+  });
+
+  describe('with a plan change in a week', () => {
+    const upgradeTo = (ms: number): PlanPeriod[] => [
+      { from: '2026-09-01T00:00:00.000Z', plan: 'pro', source: 'detected' },
+      { from: new Date(ms).toISOString(), plan: 'max5', source: 'manual' },
+    ];
+    const windowStart = Date.parse(RESET) - 7 * DAY_MS;
+    const readings = [1, 2, 3, 4].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET));
+
+    it('calibrates only on readings of windows that began on their plan', () => {
+      const run = (planHistory: PlanPeriod[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory, records, snapshots: readings, timeZone: 'UTC' });
+      // Every reading is on Max 5×, but the window began on Pro: its cost since the start includes Pro usage.
+      expect(run(upgradeTo(windowStart + DAY_MS / 2)).calibration).toBeUndefined();
+      expect(run(upgradeTo(windowStart - DAY_MS)).calibration?.k).toBeCloseTo(0.5, 1);
+    });
+
+    it('flags the week, and keeps it out of the typical week and the plan fit', () => {
+      const snapshots = [
+        snap(Date.parse('2026-10-07T19:00:00Z'), 40, '2026-10-07T20:00:00.000Z'),
+        snap(Date.parse('2026-10-14T19:00:00Z'), 5, '2026-10-14T20:00:00.000Z'),
+      ];
+      const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: upgradeTo(Date.parse('2026-10-10T00:00:00Z')), records, snapshots, timeZone: 'UTC' });
+      expect(summary.weeks.map(w => w.planChange)).toEqual([undefined, true]);
+      expect(summary.weekHistory.weeks.filter(w => w.planChange).map(w => w.end)).toEqual(['2026-10-14T20:00:00.000Z']);
+      expect(summary.planFit.weeks.map(w => w.start)).toEqual(['2026-09-30T20:00:00.000Z']);
+    });
   });
 
   it('lists the completed weeks', () => {

@@ -64,6 +64,7 @@ export function buildRanged(input: SummaryInput, range: Range): RangedSummary {
       hits: weekHits,
       now,
       plan,
+      planHistory: input.planHistory,
       range,
       records,
       sessionWindows,

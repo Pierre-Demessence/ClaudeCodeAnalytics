@@ -17,11 +17,17 @@ function reading(i: number, weekly: number): Snapshot {
 /** $100 over the 6 days before a reading, so a weekly % reads straight as a ratio. */
 const costBetween = (from: number, to: number) => (to - from) / (6 * DAY_MS) * 100;
 
-const switchedAt = (i: number) => new Date(FIRST_RESET + i * WEEK_MS - 2 * DAY_MS).toISOString();
-const history: PlanPeriod[] = [
-  { from: new Date(0).toISOString(), plan: 'pro', source: 'manual' },
-  { from: switchedAt(5), plan: 'max5', source: 'manual' },
-];
+/** The switch happens `before` ms ahead of the reset of week `i`; at a window's start, no window holds both plans. */
+function switchedAt(i: number, before = WEEK_MS) {
+  return new Date(FIRST_RESET + i * WEEK_MS - before).toISOString();
+}
+function switchTo(from: string): PlanPeriod[] {
+  return [
+    { from: new Date(0).toISOString(), plan: 'pro', source: 'manual' },
+    { from, plan: 'max5', source: 'manual' },
+  ];
+}
+const history = switchTo(switchedAt(5));
 
 function multipliers(snapshots: Snapshot[], planHistory: PlanPeriod[] = history) {
   return buildMultipliers({ costBetween, dataStart: 0, now: NOW, plan: 'max5', planHistory, snapshots });
@@ -47,6 +53,11 @@ describe('buildMultipliers', () => {
   it('is not measured while a plan has no weeks, or fewer than 3', () => {
     expect(multipliers([...pro, ...max5])[1]!.measured).toBeUndefined();
     expect(multipliers([...pro, ...max5.slice(0, 2)])[0]!.measured).toBeUndefined();
+  });
+
+  it('leaves out the window holding the switch, taken on Max 5× but begun on Pro', () => {
+    const [proToMax5] = multipliers([...pro, ...max5], switchTo(switchedAt(5, 2 * DAY_MS)));
+    expect(proToMax5!.measured).toMatchObject({ fromWeeks: 5, toWeeks: 4 });
   });
 
   it('leaves out the window still running', () => {

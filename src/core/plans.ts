@@ -18,6 +18,18 @@ export function planAt(history: readonly PlanPeriod[], ts: string): Plan {
   return active;
 }
 
+/**
+ * Whether a period of another plan starts inside a window (strictly: a change
+ * at its start leaves it whole). The window then holds two plans' usage, and a
+ * reading of it belongs to neither.
+ */
+export function planChangeWithin(history: readonly PlanPeriod[], from: number, to: number): boolean {
+  return history.some((period, i) => {
+    const time = Date.parse(period.from);
+    return i > 0 && period.plan !== history[i - 1]!.plan && time > from && time < to;
+  });
+}
+
 /** List price in USD per month (monthly billing, checked 2026-10-03). */
 export const PLAN_PRICES: Record<Plan, number> = { max20: 200, max5: 100, pro: 20 };
 

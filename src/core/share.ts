@@ -1,6 +1,7 @@
 import type { Plan, PlanPeriod, Snapshot } from './types.ts';
 
-import { convertPercent, planAt } from './plans.ts';
+import { WEEK_MS } from './calibration.ts';
+import { convertPercent, planAt, planChangeWithin } from './plans.ts';
 import { median, quantile } from './stats.ts';
 
 export interface WeekShare {
@@ -10,6 +11,8 @@ export interface WeekShare {
   /** True when the last reading was well before reset. */
   estimated: boolean;
   plan: Plan;
+  /** A plan change started inside the window: the final % covers the new plan's part only. */
+  planChange?: true;
 }
 
 export interface TypicalWeek {
@@ -55,15 +58,16 @@ export function weeklyShares(
       const percent = estimated && calibration
         ? Math.min(100, last.weekly + convertPercent(calibration.k * costBetween(ts, resetsAt), calibration.plan, plan))
         : last.weekly;
-      return { estimated, percent, plan, resetsAt: last.weeklyResetsAt };
+      return { estimated, percent, plan, planChange: planChangeWithin(planHistory, resetsAt - WEEK_MS, resetsAt) || undefined, resetsAt: last.weeklyResetsAt };
     });
 }
 
-/** Median, quartiles and range of completed weeks, all expressed on `plan`. */
+/** Median, quartiles and range of completed weeks, all expressed on `plan`; a week holding a plan change is left out. */
 export function typicalWeek(shares: readonly WeekShare[], plan: Plan): TypicalWeek | undefined {
-  if (shares.length === 0)
+  const whole = shares.filter(share => !share.planChange);
+  if (whole.length === 0)
     return undefined;
-  const values = shares.map(share => convertPercent(share.percent, share.plan, plan));
+  const values = whole.map(share => convertPercent(share.percent, share.plan, plan));
   return {
     high: quantile(values, 0.75)!,
     low: quantile(values, 0.25)!,

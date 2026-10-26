@@ -7,6 +7,7 @@ orders the ones that are scheduled.
 ## Bugs
 
 - Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
+- A plan upgrade may also move the weekly reset time: unverified, since the data dir holds no upgrade yet (a reading before and after one tells). If it moves, two 7-day windows overlap and `weekStartFor` (`src/core/weekWindows.ts:15`) files the messages from the upgrade to the old reset in the old window, where they belong to the new one.
 
 ## Features
 

@@ -1,4 +1,4 @@
-import { TriangleAlert } from 'lucide-react';
+import { ArrowRightLeft, TriangleAlert } from 'lucide-react';
 
 import type { WeekRow } from '@/core/weekHistory';
 import type { Summary } from '@/dashboard/api';
@@ -17,6 +17,10 @@ import { useTip } from '@/dashboard/useTip';
 import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 const HitIcon = ({ size = 14 }: { size?: number }) => <TriangleAlert aria-hidden="true" className="icon-inline icon-critical" size={size} />;
+
+const PlanChangeIcon = ({ size = 14 }: { size?: number }) => <ArrowRightLeft aria-hidden="true" className="icon-inline" size={size} />;
+
+const PLAN_CHANGE_TIP = 'A plan change started in this week. Its peak % covers the new plan only, so the week is left out of the median peak, the calibration, the drift and the plan comparison.';
 
 /** Rows per page of the week list. */
 const LIST_ROWS = 12;
@@ -72,7 +76,7 @@ function Stats({ summary, view }: { summary: Summary; view: HistoryView }) {
           <InfoTip label="About median peak">
             {stats.medianPercent === undefined
               ? 'No finished week with a percent yet.'
-              : 'Median of the finished weeks\' peak weekly %, estimates included, on your current plan. The tick on every bar marks it.'}
+              : 'Median of the finished weeks\' peak weekly %, estimates included, on your current plan; a week with a plan change is left out. The tick on every bar marks it.'}
           </InfoTip>
         </span>
         {uncapped !== undefined && <span className="wk-uncapped">{`${uncappedText(uncapped)} without the limit`}</span>}
@@ -150,6 +154,11 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                           )}
                         </span>
                         <span className="wk-flags">
+                          {week.planChange && (
+                            <span aria-label="Plan change in this week" className="wk-plan-change" role="img" {...tip(PLAN_CHANGE_TIP)}>
+                              <PlanChangeIcon />
+                            </span>
+                          )}
                           {week.hit && <HitIcon />}
                           {(week.blockedSessions > 0 || week.limitHits) && (
                             <span className="wk-blocked-mark" {...tip(blockedTip(week, timeZone))}>
@@ -191,6 +200,12 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                   <BlockedIcon />
                   blocked by a rate limit
                 </li>
+                {weeks.some(w => w.planChange) && (
+                  <li>
+                    <PlanChangeIcon />
+                    plan change in the week
+                  </li>
+                )}
               </ul>
             </>
           )}
@@ -250,6 +265,12 @@ function List({ summary, view }: { summary: Summary; view: HistoryView }) {
                           <th scope="row">
                             {formatWeekRange(week, timeZone)}
                             {week.inProgress && <span className="session-now">in progress</span>}
+                            {week.planChange && (
+                              <span className="session-now wk-plan-change" {...tip(PLAN_CHANGE_TIP)}>
+                                <PlanChangeIcon size={13} />
+                                plan change
+                              </span>
+                            )}
                           </th>
                           <td {...(week.projects.length > 0 ? tip(week.projects.map(p => p.path).join('\n')) : {})}>{projectsText(week)}</td>
                           <td className="wk-sessions-cell">

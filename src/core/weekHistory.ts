@@ -1,11 +1,11 @@
 import type { Range } from './range.ts';
 import type { FiveHourWindow } from './sessions.ts';
 import type { WeekShare } from './share.ts';
-import type { ApiEvent, Plan, Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, Plan, PlanPeriod, Snapshot, UsageRecord } from './types.ts';
 
 import { sessionProjects } from './breakdown.ts';
 import { DAY_MS, WEEK_MS } from './calibration.ts';
-import { convertPercent } from './plans.ts';
+import { convertPercent, planChangeWithin } from './plans.ts';
 import { messageCost, sonnetSaving } from './pricing.ts';
 import { median } from './stats.ts';
 
@@ -38,6 +38,8 @@ export interface WeekRow {
   percent?: number;
   /** Not a final reading: extended from an early one, estimated now, or from transcripts. */
   percentEstimated?: true;
+  /** A plan change started inside the window, which keeps its 7 days: the final % covers the new plan's part only, and the plan comparison, typical week and calibration leave it out. */
+  planChange?: true;
   /** ISO; the first reading of the week at `PRESSURE_PERCENT`, or for a week estimated from transcripts the message at which `k × cost so far` reaches it. */
   pressureAt?: string;
   /** The weekly % at `pressureAt`, on the current plan. */
@@ -55,7 +57,7 @@ export interface WeekRow {
 }
 
 export interface WeekHistory {
-  /** Medians leave out the window in progress; the cost median also leaves out windows without Claude Code messages. */
+  /** Medians leave out the window in progress; the % median also leaves out windows holding a plan change, the cost median windows without Claude Code messages. */
   stats: { blocked: number; hit: number; medianCost?: number; medianPercent?: number };
   /** The windows starting in the range, or the last 12 without one; newest first. */
   weeks: WeekRow[];
@@ -71,6 +73,8 @@ export interface WeekHistoryInput {
   now: number;
   /** The plan the percents are shown on. */
   plan: Plan;
+  /** Marks the windows holding a plan change. */
+  planHistory: readonly PlanPeriod[];
   /** Lists the windows that start in it, without a cap; without one, the last 12. */
   range?: Range;
   records: readonly UsageRecord[];
@@ -108,7 +112,7 @@ function pressureByCost(spend: readonly { cost: number; ms: number }[], k: numbe
 
 /** The weekly windows starting in a range, or the last 12: final %, cost per day, sessions and projects. */
 export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
-  const { calibrationK, current, hits = [], now, plan, range, records, sessionWindows, shares, snapshots, weekLimitThreshold, weekStartOf } = input;
+  const { calibrationK, current, hits = [], now, plan, planHistory, range, records, sessionWindows, shares, snapshots, weekLimitThreshold, weekStartOf } = input;
 
   const starts = new Set<number>(snapshots.map(s => Date.parse(s.weeklyResetsAt) - WEEK_MS));
   if (current)
@@ -185,6 +189,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       messages: week.messages,
       percent,
       percentEstimated: percentEstimated ? true : undefined,
+      planChange: planChangeWithin(planHistory, start, end) || undefined,
       pressureAt: pressure?.at,
       pressurePercent: pressure?.percent,
       projectCount: projects.length,
@@ -203,7 +208,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       blocked: rows.filter(w => w.blockedSessions > 0 || w.limitHits).length,
       hit: rows.filter(w => w.hit).length,
       medianCost: median(done.filter(w => w.messages > 0).map(w => w.cost)),
-      medianPercent: median(done.filter(w => w.percent !== undefined).map(w => w.percent!)),
+      medianPercent: median(done.filter(w => w.percent !== undefined && !w.planChange).map(w => w.percent!)),
     },
   };
 }

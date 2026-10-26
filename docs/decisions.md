@@ -318,6 +318,19 @@ are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,
 and fixed blocks ignore DST. The Overview's "Past weeks" card was removed: the
 tab shows the same windows with more.
 
+## A week holding a plan change keeps its 7 days and is left out of the fits
+
+Anthropic resets the usage on an upgrade, so the window's readings go from the old
+plan's % to the new plan's from about 0: its final % covers the new plan's part only,
+and its cost since the window start includes the old plan's usage. Such a week is
+flagged (`planChange`), shown on the Weeks tab, and left out of the calibration, the
+drift, the typical week, the median peak and the plan comparison. A downgrade is
+flagged the same way: the limit the % is read against changes inside the window
+either way. Rejected: cutting
+the window at the upgrade, because the plan comparison treats a week as 7 days and
+fills the time it did not observe at the typical pace (`weekSpan` in `planFit.ts`), so
+a shortened window reads as a mostly hidden week.
+
 ## Plans tab: best plan by verdict, Opus as Sonnet at today's price
 
 Each plan gets one verdict from the finished weeks among the last 12 windows

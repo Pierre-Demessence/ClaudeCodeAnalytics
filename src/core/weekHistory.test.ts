@@ -32,6 +32,7 @@ function session(startMs: number, extra: Partial<FiveHourWindow> = {}): FiveHour
 const base: WeekHistoryInput = {
   now: NOW,
   plan: 'max5',
+  planHistory: [],
   records: [],
   sessionWindows: [],
   shares: [],
@@ -251,6 +252,40 @@ describe('projects', () => {
     const { weeks: rows } = weeks({ records });
     expect(rows[0]!.projectCount).toBe(7);
     expect(rows[0]!.projects.map(p => p.name)).toEqual(['p6', 'p5', 'p4', 'p3', 'p2']);
+  });
+});
+
+describe('plan change', () => {
+  const share = (i: number, percent: number) => ({ estimated: false, percent, plan: 'max5' as const, resetsAt: iso(weekStart(i) + WEEK_MS) });
+  const planHistory = [
+    { from: iso(weekStart(5)), plan: 'pro' as const, source: 'detected' as const },
+    { from: iso(weekStart(2) + 3 * DAY_MS), plan: 'max5' as const, source: 'manual' as const },
+  ];
+
+  it('marks the window the new plan started in, with its full length', () => {
+    const { weeks: rows } = weeks({ planHistory, shares: [share(1, 60), share(2, 20), share(3, 50)], snapshots: [snap(1), snap(2), snap(3)] });
+    expect(rows.map(w => [w.start, w.planChange])).toEqual([
+      [iso(weekStart(1)), undefined],
+      [iso(weekStart(2)), true],
+      [iso(weekStart(3)), undefined],
+    ]);
+    expect(rows[1]).toMatchObject({ end: iso(weekStart(1)), start: iso(weekStart(2)) });
+  });
+
+  it('marks nothing without a change in the history', () => {
+    const { weeks: rows } = weeks({ planHistory: planHistory.slice(0, 1), shares: [share(2, 20)], snapshots: [snap(2)] });
+    expect(rows.some(w => w.planChange)).toBe(false);
+  });
+
+  it('leaves its percent out of the median peak, but keeps its cost in the median cost', () => {
+    const { stats } = weeks({
+      planHistory,
+      // $20, $40 (the flagged week) and $60: dropping the flagged week would move the median cost to 40.
+      records: [rec(weekStart(1) + 1000), rec(weekStart(2) + 1000), rec(weekStart(2) + 2000), rec(weekStart(3) + 1000), rec(weekStart(3) + 2000), rec(weekStart(3) + 3000)],
+      shares: [share(1, 60), share(2, 20), share(3, 100)],
+      snapshots: [snap(1), snap(2), snap(3)],
+    });
+    expect(stats).toMatchObject({ medianCost: 40, medianPercent: 80 });
   });
 });
 

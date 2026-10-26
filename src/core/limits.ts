@@ -1,7 +1,7 @@
 import type { Plan, PlanPeriod, Snapshot } from './types.ts';
 
 import { WEEK_MS, windowStart } from './calibration.ts';
-import { planAt } from './plans.ts';
+import { planAt, planChangeWithin } from './plans.ts';
 import { median } from './stats.ts';
 
 /** Weekly windows drawn in the drift chart. */
@@ -58,7 +58,7 @@ export interface LimitsInput {
 
 export const isOff = (ratio: number, usual: number): boolean => Math.abs(ratio - usual) / usual > OFF_THRESHOLD;
 
-/** The last 12 windows taken on `plan` (the current one by default), oldest first. */
+/** The last 12 windows taken on `plan` (the current one by default), oldest first. A window holding a plan change is left out: its cost since the start includes the other plan's usage. */
 export function driftWindows({ costBetween, dataStart, now, plan, planHistory, snapshots }: LimitsInput, onPlan: Plan = plan): DriftWindow[] {
   const lastByWindow = new Map<string, Snapshot>();
   for (const snapshot of snapshots) {
@@ -67,7 +67,7 @@ export function driftWindows({ costBetween, dataStart, now, plan, planHistory, s
       lastByWindow.set(snapshot.weeklyResetsAt, snapshot);
   }
   return [...lastByWindow.values()]
-    .filter(last => last.weekly >= MIN_PERCENT_FOR_DRIFT && planAt(planHistory, last.ts) === onPlan && windowStart(last) >= dataStart)
+    .filter(last => last.weekly >= MIN_PERCENT_FOR_DRIFT && planAt(planHistory, last.ts) === onPlan && windowStart(last) >= dataStart && !planChangeWithin(planHistory, windowStart(last), Date.parse(last.weeklyResetsAt)))
     .sort((a, b) => Date.parse(a.weeklyResetsAt) - Date.parse(b.weeklyResetsAt))
     .flatMap((last): DriftWindow[] => {
       const cost = costBetween(windowStart(last), Date.parse(last.ts));

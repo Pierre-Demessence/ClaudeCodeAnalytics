@@ -111,6 +111,15 @@ describe('buildRanged over a past range', () => {
   });
 });
 
+describe('buildRanged with a plan change', () => {
+  it('flags the week the new plan started in, as the summary does', () => {
+    const upgraded: SummaryInput = { ...input, planHistory: [{ from: new Date(WEEK_START - 20 * DAY_MS).toISOString(), plan: 'pro', source: 'detected' }, { from: new Date(WEEK_START - 3 * DAY_MS).toISOString(), plan: 'max5', source: 'manual' }] };
+    const flagged = buildSummary(upgraded).weekHistory.weeks.find(w => w.planChange)!;
+    expect(flagged.start).toBe(new Date(WEEK_START - WEEK_MS).toISOString());
+    expect(buildRanged(upgraded, { from: Date.parse(flagged.start), to: Date.parse(flagged.end) }).weekHistory.weeks).toEqual([flagged]);
+  });
+});
+
 describe('buildRanged across a DST change', () => {
   // Paris springs forward on 2026-03-29: the local day of the 29th lasts 23 hours.
   const paris: SummaryInput = {

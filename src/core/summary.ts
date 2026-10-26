@@ -21,7 +21,7 @@ import { familyPaces } from './activeTime.ts';
 import { buildActivity } from './activity.ts';
 import { aggregate, createCostIndex, dailyCostSeries, dayKey } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
-import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
+import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS, windowStart } from './calibration.ts';
 import { dedupeHits, hitScope } from './events.ts';
 import { familyOf } from './family.ts';
 import { forecastWindow } from './forecast.ts';
@@ -30,7 +30,7 @@ import { modelRatios } from './modelRatio.ts';
 import { buildMultipliers } from './multipliers.ts';
 import { weekPacing } from './pacing.ts';
 import { buildPlanFitInput } from './planFit.ts';
-import { planAt, planFromSubscription } from './plans.ts';
+import { planAt, planChangeWithin, planFromSubscription } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
@@ -217,9 +217,10 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     first = Math.min(first, Date.parse(record.ts));
   const firstDay = dayKey(first, timeZone);
 
-  // Calibrate only on readings taken under the current plan.
+  // Calibrate only on readings taken under the current plan. The weekly one also skips windows holding a plan change: their cost since the start includes the other plan's usage.
   const planSnapshots = snapshots.filter(s => planAt(planHistory, s.ts) === plan);
-  const calibration = fitRatio(calibrationPoints(planSnapshots, costBetween, first), now);
+  const wholeWeekSnapshots = planSnapshots.filter(s => !planChangeWithin(planHistory, windowStart(s), Date.parse(s.weeklyResetsAt)));
+  const calibration = fitRatio(calibrationPoints(wholeWeekSnapshots, costBetween, first), now);
   const fiveHourCalibration = fitRatio(fiveHourCalibrationPoints(planSnapshots, costBetween, first), now);
   const yesterday = dayKey(now - DAY_MS, timeZone);
   const typicalFrom = [firstDay, dayKey(now - TYPICAL_DAYS * DAY_MS, timeZone)].sort().at(-1)!;
@@ -398,6 +399,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     hits: weekHits,
     now,
     plan,
+    planHistory,
     records,
     sessionWindows,
     shares: weeks,

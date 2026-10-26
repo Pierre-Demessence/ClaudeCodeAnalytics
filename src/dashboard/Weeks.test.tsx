@@ -101,6 +101,21 @@ describe('weeks tab', () => {
     expect(lines[0]!.querySelector('.wk-percent svg')).toBeNull();
   });
 
+  it('flags the week a plan change started in, in the timeline and the list', () => {
+    const planHistory = [
+      { from: '2026-09-01T00:00:00Z', plan: 'pro', source: 'detected' },
+      { from: '2026-10-02T00:00:00Z', plan: 'max5', source: 'manual' },
+    ] as const;
+    renderTab({ ...buildSummary({ endpointEnabled: true, events: [], now: NOW, planHistory, records, snapshots, timeZone: 'UTC' }), status: {} });
+    const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
+    const mark = lines[0]!.querySelector('.wk-plan-change')!;
+    expect(tipOf(mark)).toContain('left out of the median peak, the calibration');
+    expect(lines[1]!.querySelector('.wk-plan-change')).toBeNull();
+    const rows = within(card('Week list')).getAllByRole('row').slice(1);
+    expect(rows[0]!.textContent).toContain('plan change');
+    expect(rows[1]!.textContent).not.toContain('plan change');
+  });
+
   it('marks a week ended by an early reading as estimated, without a hit', () => {
     // The last reading is 2 days before the reset, and reads 100%: extended, so only an estimate.
     renderTab(summary([rec('2026-09-10T09:00:00Z')], [reading('2026-09-15T07:00:00Z', 100, '2026-09-17T07:00:00.000Z')]));
