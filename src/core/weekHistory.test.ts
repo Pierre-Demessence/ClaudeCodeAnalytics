@@ -113,6 +113,18 @@ describe('final percent', () => {
     expect(weeks({ calibrationK: 10, records }).weeks[0]!.percent).toBe(100);
   });
 
+  it('marks an estimated window that started before the oldest transcript with where the transcripts start', () => {
+    // The transcripts start on day 3 of the window 2 weeks back; the window after it is seen whole.
+    const first = weekStart(2) + 3 * DAY_MS;
+    const records = [rec(first), rec(weekStart(1) + DAY_MS)];
+    const { weeks: rows } = weeks({ calibrationK: 1, records });
+    expect(rows.find(w => w.start === iso(weekStart(2)))!.transcriptsFrom).toBe(iso(first));
+    expect(rows.find(w => w.start === iso(weekStart(1)))!.transcriptsFrom).toBeUndefined();
+    // A reading sees the whole window, whatever the transcripts kept.
+    const share = { estimated: false, percent: 40, plan: 'max5' as const, resetsAt: iso(weekStart(1)) };
+    expect(weeks({ calibrationK: 1, records, shares: [share], snapshots: [snap(2)] }).weeks.find(w => w.start === iso(weekStart(2)))!.transcriptsFrom).toBeUndefined();
+  });
+
   it('has no percent without a reading or a calibration', () => {
     const { weeks: rows } = weeks({ records: [rec(weekStart(1) + DAY_MS)] });
     expect(rows[0]!.percent).toBeUndefined();

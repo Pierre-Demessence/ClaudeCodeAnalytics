@@ -87,6 +87,7 @@ describe('estimate without the limit', () => {
     expect(uncappedTip(limited, fitWeek(), 'UTC')).toBe('At least 99%: 3.6 days were hidden (the limit was close by Sat 3 Oct 10:00, 2 sessions blocked by a 5-hour limit) and filled at your typical pace.');
     expect(uncappedTip(week({ percent: 99 }), fitWeek(), 'UTC')).toContain('(before you subscribed)');
     expect(uncappedTip(week({ limitHits: ['2026-10-04T08:00:00.000Z'], percent: 99 }), fitWeek(), 'UTC')).toContain('the weekly limit was hit on Sun 4 Oct 08:00');
+    expect(uncappedTip(week({ percent: 10, source: 'estimated', transcriptsFrom: '2026-10-03T10:00:00.000Z' }), fitWeek(), 'UTC')).toContain('(before the oldest transcript, from Sat 3 Oct 10:00)');
   });
 
   it('equals the Plans chart bar of the same week and the Typical week of the current plan', () => {

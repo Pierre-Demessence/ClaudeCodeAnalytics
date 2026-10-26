@@ -49,6 +49,9 @@ Noteworthy changes for users. The format follows
   plan it ran on and finds the point where its limit got close (90%) on that plan.
   After an upgrade, a Pro week estimated this way never reached 90% of Max 5×, so
   the plan comparison never filled the time its limit hid.
+- The plan comparison no longer counts the week your oldest transcript falls in as
+  a light week: its days before that transcript are filled at your typical pace,
+  like the days before you subscribed, and the Weeks tab says why.
 
 ## [0.2.0]
 

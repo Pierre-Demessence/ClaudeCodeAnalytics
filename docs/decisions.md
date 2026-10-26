@@ -384,7 +384,11 @@ demand is `max(reading, % at the cutoff + hidden hours × typical pace)`. The
 hidden time is what the limit, or a missing subscription, kept out of the
 readings: a week's tail after its pressure point (the first reading at 90%, or a
 weekly hit) and the rest of each capped 5-hour session inside its observed
-time; a week's time before the subscription; a session's tail after its cap.
+time; a week's time before the subscription; a session's tail after its cap. A
+week estimated from transcripts also hides its time before the oldest transcript
+(`transcriptsFrom`): Claude Code deletes old ones, so the first week of the data is
+otherwise a light week. A week with readings needs no such time: the endpoint saw
+all of it.
 The pace is pooled, Σ % at the cutoff over Σ observed hours across the
 comparison, so idle days count and one week cannot set it; under 72 h (weeks) or
 10 h (sessions) observed it is not used and the reading stands. The usage after

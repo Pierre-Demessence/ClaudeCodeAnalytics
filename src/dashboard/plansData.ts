@@ -134,7 +134,7 @@ export function chartBars(input: PlanFitInput, plan: Plan, share: number, timeZo
     const day = formatDay(dayKey(Date.parse(week.start), timeZone));
     const { main } = estimateText(percent, floor);
     const note = hidden
-      ? ` At least ${formatPercent(floor)}: ${daysText(week.hiddenHours)} were hidden (by the limit or before you subscribed) and filled at your typical pace.`
+      ? ` At least ${formatPercent(floor)}: ${daysText(week.hiddenHours)} were hidden (by the limit, before you subscribed or before the oldest transcript) and filled at your typical pace.`
       : week.estimated ? ' Estimated: not a final reading.' : '';
     return {
       estimated: week.estimated && !over,

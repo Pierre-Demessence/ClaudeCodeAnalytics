@@ -173,12 +173,15 @@ interface SpanPart {
   percent: number;
   pressureAt?: number;
   pressurePercent?: number;
+  /** Where the oldest transcript starts, for a week estimated from transcripts that started before it. */
+  seenFrom?: number;
   start: number;
 }
 
 /**
  * Splits a week into the time its usage shows the demand (observed) and the
- * time it does not (hidden): before the subscription, after the cutoff (the
+ * time it does not (hidden): before the subscription, before the oldest
+ * transcript (for a week estimated from transcripts), after the cutoff (the
  * pressure point or a weekly hit, whichever came first), and inside 5-hour
  * sessions after they were capped. A week whose usage restarted is split per
  * part, each with its own cutoff, and the spans are added up.
@@ -197,11 +200,12 @@ function weekSpan(week: WeekRow, sessionWindows: readonly FiveHourWindow[], subs
         percent: week.percent!,
         pressureAt: week.pressureAt === undefined ? undefined : Date.parse(week.pressureAt),
         pressurePercent: week.pressurePercent,
+        seenFrom: week.transcriptsFrom === undefined ? undefined : Date.parse(week.transcriptsFrom),
         start: Date.parse(week.start),
       }];
   const span: WeekSpan = { cutoffPercent: 0, hiddenHours: 0, observedHours: 0, pacePercent: 0, week };
-  for (const { end, percent: final, pressureAt = Infinity, pressurePercent, start } of parts) {
-    const observedStart = Math.min(end, Math.max(start, subscriptionStart ?? start));
+  for (const { end, percent: final, pressureAt = Infinity, pressurePercent, seenFrom, start } of parts) {
+    const observedStart = Math.min(end, Math.max(start, subscriptionStart ?? start, seenFrom ?? start));
     const hitAt = Math.min(Infinity, ...(week.limitHits ?? []).map(ts => Date.parse(ts)).filter(at => at >= start && at < end));
     const cutoff = Math.max(observedStart, Math.min(pressureAt, hitAt, end));
     // The pressure reading stands for the cutoff only when it is the cutoff; after an earlier hit the final % is what the limit froze.

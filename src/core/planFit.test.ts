@@ -273,6 +273,16 @@ describe('buildPlanFitInput', () => {
     expect(input.weeks[1]!.demand).toBe(50);
   });
 
+  it('counts the time before the oldest transcript as hidden in a week estimated from transcripts', () => {
+    // Week 0's transcripts start on its day 6: its 10% comes from its last 2 days.
+    const partial = row(0, { percent: 10, percentEstimated: true, source: 'estimated', transcriptsFrom: iso(START + 5 * DAY_MS) });
+    const input = buildPlanFitInput({ ...base, weekHistory: history([row(2, { percent: 35 }), row(1, { percent: 35 }), partial]) });
+    // The pace is (10 + 35 + 35) / (48 + 168 + 168) h.
+    expect(input.weeks[0]!.hiddenHours).toBeCloseTo(120);
+    expect(input.weeks[0]!.demand).toBeCloseTo(10 + 120 * 80 / 384);
+    expect(input.weeks[1]!.demand).toBe(35);
+  });
+
   it('leaves a week without observed time out of the pace', () => {
     // Subscribed at the very end of week 0, which reads 5%: only weeks 1 and 2 (50% over 168 h each) set the pace.
     const input = buildPlanFitInput({ ...base, subscriptionStart: START + WEEK_MS, weekHistory: history([row(2), row(1), row(0, { percent: 5 })]) });

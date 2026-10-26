@@ -76,6 +76,8 @@ export interface WeekRow {
   source: 'reading' | 'estimated';
   /** ISO. */
   start: string;
+  /** ISO; the oldest imported message, for a week estimated from transcripts that started before it: the time before it is unseen. */
+  transcriptsFrom?: string;
 }
 
 export interface WeekHistory {
@@ -154,6 +156,11 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
   const recordStarts = records.map(record => ({ record, start: weekStartOf(Date.parse(record.ts)) }));
   for (const { start } of recordStarts)
     starts.add(start);
+  // Claude Code deletes old transcripts: a week estimated from them is unseen before the oldest one.
+  // A loop, not Math.min(...): spreading a year of records overflows the call stack.
+  let firstMessage = Infinity;
+  for (const record of records)
+    firstMessage = Math.min(firstMessage, Date.parse(record.ts));
   const ordered = [...starts].sort((a, b) => b - a);
   const shown = range ? ordered.filter(start => start >= range.from && start < range.to) : ordered.slice(0, HISTORY_WEEKS);
 
@@ -191,6 +198,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     let pressure: { at: string; percent: number } | undefined;
     let partsOf: readonly PartPercent[] | undefined;
     let completed = false;
+    let transcriptsFrom: string | undefined;
     const share = shares.find(s => Date.parse(s.resetsAt) === end);
     if (current && Date.parse(current.resetsAt) === end) {
       percent = current.estimatedNow ?? current.weekly;
@@ -223,6 +231,8 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       source = 'estimated';
       const reached = pressureByCost(week.spend, k);
       pressure = reached && { at: reached.at, percent: convertPercent(reached.percent, ranOn, plan) };
+      if (start < firstMessage)
+        transcriptsFrom = new Date(firstMessage).toISOString();
     }
 
     const parts = partsOf?.map((part, i): WeekPart => {
@@ -275,6 +285,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       shift: week.cost > 0 ? week.saving / week.cost : undefined,
       source,
       start: new Date(start).toISOString(),
+      transcriptsFrom,
     };
   });
 

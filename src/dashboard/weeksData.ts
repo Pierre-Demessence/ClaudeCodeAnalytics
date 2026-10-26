@@ -94,6 +94,7 @@ export function uncappedTip(week: WeekRow, fit: FitWeek, timeZone: string): stri
   const reasons = [
     week.pressureAt ? `the limit was close by ${when(week.pressureAt)}` : firstHit && `the weekly limit was hit on ${when(firstHit)}`,
     week.blockedSessions > 0 && `${week.blockedSessions} ${week.blockedSessions === 1 ? 'session' : 'sessions'} blocked by a 5-hour limit`,
+    week.transcriptsFrom && `before the oldest transcript, from ${when(week.transcriptsFrom)}`,
   ].filter(Boolean);
   const why = reasons.length > 0 ? reasons.join(', ') : 'before you subscribed';
   return `At least ${formatPercent(fit.floor)}: ${daysText(fit.hiddenHours)} were hidden (${why}) and filled at your typical pace.`;
