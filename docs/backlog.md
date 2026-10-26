@@ -7,7 +7,6 @@ orders the ones that are scheduled.
 ## Bugs
 
 - Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
-- Sessions tab: an estimated 5-hour window gets `k × cost` from the current plan's 5-hour fit (`src/core/sessions.ts:181`), so after the Pro to Max 5× change an estimated Pro window shows about a fifth of its Pro estimate, while reading windows keep their own plan's %.
 - A plan change without a drop in the readings leaves readings of two plans in one window part (`windowParts`, `src/core/restarts.ts:61`), whose plan is its last reading's: `weekHistory.ts` then reads an earlier reading's pressure on the wrong scale. Only reachable for a downgrade or an upgrade the readings do not show as a restart.
 - `windowParts` and `weeklyShares` key a window by its exact reset time (`src/core/restarts.ts:35`, `src/core/share.ts:51`): a reset time that differs by a minute of rounding makes two windows, and a drop between them is not seen (`backtest.ts` tolerates 2 minutes).
 

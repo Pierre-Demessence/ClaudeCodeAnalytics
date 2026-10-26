@@ -252,10 +252,10 @@ export function buildPlanFitInput({ calibrationK, plan, planHistory, sessionWind
     .filter(w => !w.inProgress && w.peak !== undefined && inKeptWeek(Date.parse(w.start)))
     .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
     .map((w) => {
-      // A window can start just before an upgrade, so its plan is the one it ended on; an estimated peak is already on the current plan.
+      // A window can start just before an upgrade, so its plan is the one it ended on.
       const from = planAt(planHistory, new Date(Date.parse(w.end) - 1).toISOString());
       const cappedAt = w.cappedAt === undefined ? undefined : Date.parse(w.cappedAt);
-      const peak = w.peakEstimated ? w.peak! : convertPercent(w.peak!, from, plan);
+      const peak = convertPercent(w.peak!, from, plan);
       return {
         capPercent: cappedAt === undefined ? peak : convertPercent(w.capPercent ?? LIMIT, from, plan),
         hidden: cappedAt === undefined ? 0 : hours(Date.parse(w.end) - cappedAt),

@@ -42,6 +42,9 @@ Noteworthy changes for users. The format follows
   an upgrade, the weeks that reached the old plan's limit kept their percent on the
   new plan (a fifth of it from Pro to Max 5×) and lost their mark; after a
   downgrade, weeks far from their limit could gain one.
+- The Sessions tab shows a 5-hour window without a reading on the plan it ran on,
+  like the windows with one: after the upgrade from Pro to Max 5×, the estimated
+  Pro windows read about a fifth of their %.
 
 ## [0.2.0]
 

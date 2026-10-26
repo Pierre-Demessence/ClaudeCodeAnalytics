@@ -339,8 +339,9 @@ describe('buildPlanFitInput', () => {
       expect(sessions([window(START + 3 * DAY_MS - 10 * 60_000, { peak: 50 })]).map(s => s.demand)).toEqual([50]);
     });
 
-    it('does not convert the peak of an estimated window, which is on the current plan already', () => {
-      expect(sessions([window(START + DAY_MS, { peak: 50, peakEstimated: true })]).map(s => s.demand)).toEqual([50]);
+    it('converts the peak of an estimated window like a read one, from the plan it ran on', () => {
+      // 50% of Pro is 10% of Max 5×.
+      expect(sessions([window(START + DAY_MS, { peak: 50, peakEstimated: true })]).map(s => s.demand)).toEqual([10]);
     });
   });
 

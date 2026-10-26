@@ -289,7 +289,8 @@ the first message. An upgrade moves the 5-hour reset, so a reading window can st
 before the previous one ends: the previous one ends there, and the messages after
 the upgrade join the new window. A reading window's peak is the highest % read in it, never
 topped up with an estimate; an estimated window's peak is `k × cost` from the
-5-hour calibration, shown with "~". Rejected: the transcript-only rebuild alone.
+5-hour calibration, converted to the plan the window ran on like a reading (`k` is
+fitted on the current plan), and shown with "~". Rejected: the transcript-only rebuild alone.
 
 A window "hit the limit" when a reading reached the limit threshold (setting,
 95% by default, 50–100), not only 100%: close to the limit a new agent run

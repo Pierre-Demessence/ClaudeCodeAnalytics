@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SessionsInput } from './sessions.ts';
-import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, PlanPeriod, Snapshot, UsageRecord } from './types.ts';
 
 import { buildSessions, fiveHourWindows, sessionPaces } from './sessions.ts';
 
@@ -158,6 +158,14 @@ describe('estimated windows', () => {
     const [window] = sessions([rec('2026-10-01T09:00:00Z')]).windows;
     expect(window!.peak).toBeUndefined();
     expect(window!.peakEstimated).toBeUndefined();
+  });
+
+  it('puts the estimate on the plan the window ran on, as a reading is', () => {
+    // `k` is a % of the current plan's limit (Max 5×) per dollar; the first window ran on Pro, a fifth of it.
+    const planHistory: PlanPeriod[] = [{ from: '2026-09-01T00:00:00.000Z', plan: 'pro', source: 'manual' }, { from: '2026-10-02T00:00:00.000Z', plan: 'max5', source: 'manual' }];
+    const { windows } = sessions([rec('2026-10-01T09:00:00Z'), rec('2026-10-02T09:00:00Z')], [], { k: 0.5, planHistory });
+    // $20 × 0.5 = 10% of Max 5×, which is 50% of Pro.
+    expect(windows.map(w => [w.start, w.peak])).toEqual([['2026-10-02T09:00:00.000Z', 10], ['2026-10-01T09:00:00.000Z', 50]]);
   });
 });
 

@@ -262,7 +262,7 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
   const hits = dedupeHits(input.events ?? []).filter(event => event.kind === 'limit');
   const sessionHits = hits.filter(hit => hitScope(hit) === 'session');
   const weekHits = hits.filter(hit => hitScope(hit) === 'week');
-  const sessionWindows = fiveHourWindows({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots });
+  const sessionWindows = fiveHourWindows({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, planHistory, records, snapshots });
   const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
   const activePace = activeHourlyPace(records, now - TYPICAL_DAYS * DAY_MS, now);
   const paceByFamily = familyPaces(records, now - TYPICAL_DAYS * DAY_MS, now);
@@ -427,7 +427,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();
 
   const activity = buildActivity({ chartFrom, events: input.events, now, records, timeZone, weekStart });
-  const sessions = buildSessions({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots, timeZone });
+  const sessions = buildSessions({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, planHistory, records, snapshots, timeZone });
   const weekHistory = buildWeekHistory({
     calibrationK: calibration?.k,
     current,
