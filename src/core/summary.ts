@@ -31,7 +31,7 @@ import { modelRatios } from './modelRatio.ts';
 import { buildMultipliers } from './multipliers.ts';
 import { weekPacing } from './pacing.ts';
 import { buildPlanFitInput } from './planFit.ts';
-import { convertPercent, planAt, planFromSubscription } from './plans.ts';
+import { convertPercent, planAt, planChanges, planFromSubscription } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { endedPartPercent, partStartOf, windowParts } from './restarts.ts';
 import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
@@ -253,8 +253,9 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     ? dailyCostSeries(records, timeZone, from, yesterday).map(d => d.cost)
     : [];
   // The weekly pace comes from the days under the current plan: a plan change moves the usage with it.
-  const planPeriod = planHistory.findLast(period => Date.parse(period.from) <= now);
-  const planFrom = planPeriod ? [typicalFrom, dayKey(Date.parse(planPeriod.from), timeZone)].sort().at(-1)! : typicalFrom;
+  // Only a change counts: a period that keeps the plan (the collector's first detected one) starts nothing.
+  const latestChange = planChanges(planHistory).findLast(change => change.at <= now);
+  const planFrom = latestChange ? [typicalFrom, dayKey(latestChange.at, timeZone)].sort().at(-1)! : typicalFrom;
   const planDays = dailyCostsFrom(planFrom);
   const dailyCosts = planDays.length >= MIN_PLAN_DAYS ? planDays : dailyCostsFrom(typicalFrom);
   const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;

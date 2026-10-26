@@ -306,16 +306,11 @@ describe('buildSummary', () => {
     const pooled = [...records.slice(5), ...recent];
     const windowStart = Date.parse(RESET) - 7 * DAY_MS;
     const snapshots = [1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 6, RESET));
-    const summaryFrom = (from?: string) => buildSummary({
-      endpointEnabled: true,
-      now: NOW,
-      planHistory: from ? [{ from, plan: 'max5', source: 'manual' }] : [],
-      records: pooled,
-      snapshots,
-      timeZone: 'UTC',
-    });
+    const summaryWith = (planHistory: PlanPeriod[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory, records: pooled, snapshots, timeZone: 'UTC' });
+    // A change to Max 5× at `from` (from Max 20×: a downgrade keeps the week whole); none without it.
+    const summaryFrom = (from?: string) => summaryWith(from ? [{ from: '2026-01-01T00:00:00.000Z', plan: 'max20', source: 'manual' }, { from, plan: 'max5', source: 'manual' }] : []);
 
-    it('starts at the current plan period', () => {
+    it('starts at the latest plan change', () => {
       const current = summaryFrom(new Date(NOW - 5 * DAY_MS).toISOString()).current!;
       expect(current.estimatedNow).toBeCloseTo(30);
       // The week's own pace sets the centre (30 % over 5⅔ days); the $60 days alone have no spread.
@@ -325,11 +320,15 @@ describe('buildSummary', () => {
       expect(current.forecast?.high).toBeCloseTo(current.forecast!.median);
     });
 
-    it('keeps the last 28 days when the plan period has under 3 days', () => {
+    it('keeps the last 28 days when the latest change is under 3 days old', () => {
       const short = summaryFrom(new Date(NOW - 1.5 * DAY_MS).toISOString()).current!;
-      expect(short.forecast).toEqual(summaryFrom().current!.forecast);
-      // The $20 and $60 days mixed spread the band.
+      // The $20 and $60 days mixed spread the band; the $60 days alone have none (above).
       expect(short.forecast!.high - short.forecast!.low).toBeGreaterThan(0.1);
+    });
+
+    it('is no change when a period keeps the plan, as the collector\'s first detected one does', () => {
+      const detected = summaryWith([{ from: new Date(NOW - 5 * DAY_MS).toISOString(), plan: 'pro', source: 'detected' }]).current!;
+      expect(detected.forecast).toEqual(summaryFrom().current!.forecast);
     });
   });
 

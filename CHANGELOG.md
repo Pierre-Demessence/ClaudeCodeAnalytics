@@ -52,6 +52,9 @@ Noteworthy changes for users. The format follows
 - The plan comparison no longer counts the week your oldest transcript falls in as
   a light week: its days before that transcript are filled at your typical pace,
   like the days before you subscribed, and the Weeks tab says why.
+- The weekly forecast's typical pace starts again only at a plan change. A plan
+  period that keeps the plan, such as the one recorded when you turn the usage
+  endpoint on, made it forget the days before it for the next four weeks.
 
 ## [0.2.0]
 

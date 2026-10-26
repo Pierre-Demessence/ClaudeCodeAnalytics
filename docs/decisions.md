@@ -192,8 +192,9 @@ value, the 5-hour side) keeps the pooled fit. A restarted week counts from its
 restart: its own fit takes the running part's readings on the current plan, the pace
 and the 3-day blend run from the restart, and the typical week is scaled to the
 share of the window left after it. The pace comes from the days under
-the current plan (at least 3, within the last 28), since the idle days before an
-upgrade say nothing about the usage after it. The forecast resamples the cost of
+the current plan (at least 3, within the last 28, since the latest period whose plan
+differs from the one before: the collector's first detected period changes nothing),
+since the idle days before an upgrade say nothing about the usage after it. The forecast resamples the cost of
 the days left as a sum of days drawn with replacement (seeded, 1000 draws), and
 low/median/high are the quartiles of those sums. Rejected: the median day × the
 days left, which is biased low for skewed usage with idle days (the median of a
