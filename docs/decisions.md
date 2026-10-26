@@ -447,6 +447,11 @@ session interleave their turns and records carry no agent id, so a subagent's
 first turn read as a flush (54 of the 80 flushes found on the local data were
 subagent turns, but only $3.60 of the $38.44).
 
+A flush's extra cost counts the tokens written again only: the previous turn's
+prompt, less what the turn still read from the cache, at the write price instead of
+the read price. The rest of the write is the turn's new tokens, which a live cache
+writes as well.
+
 ## Output split by tool: weighted by input size, per scan
 
 Claude Code writes one transcript line per content block, each with the whole

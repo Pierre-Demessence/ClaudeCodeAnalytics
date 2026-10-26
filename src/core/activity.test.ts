@@ -67,14 +67,14 @@ describe('cache', () => {
   });
 
   describe('flushes', () => {
-    /** Ten steady turns from `start`, then a turn after a 10-minute pause that rewrites 50k tokens. */
+    /** Ten steady turns from `start`, then a turn after a 10-minute pause that reads nothing and writes 50k tokens. */
     function flushAfterPause(start: string, sessionId: string): UsageRecord[] {
       const first = Date.parse(start);
       const steady = Array.from({ length: 10 }, (_, i) => rec(new Date(first + i * 30_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 200, sessionId }));
-      return [...steady, rec(new Date(first + 270_000 + 600_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 50_000, sessionId })];
+      return [...steady, rec(new Date(first + 270_000 + 600_000).toISOString(), { cacheWrite5m: 50_000, sessionId })];
     }
-    // 50k tokens written at $5/M instead of read at $0.2/M.
-    const EXTRA = 50_000 * 4.8 / 1_000_000;
+    // The previous 20.2k-token prompt written again at $5/M instead of read at $0.2/M.
+    const EXTRA = 20_200 * 4.8 / 1_000_000;
 
     it('counts the flushes of each local day', () => {
       const { cache } = activity([...flushAfterPause('2026-09-30T10:00:00Z', 's1'), ...flushAfterPause('2026-10-01T10:00:00Z', 's2'), ...flushAfterPause('2026-10-02T21:50:00Z', 's3')]);
@@ -89,7 +89,8 @@ describe('cache', () => {
     it('counts a day with only a read collapse separately from pauses', () => {
       const steady = Array.from({ length: 10 }, (_, i) => rec(new Date(Date.parse('2026-10-01T10:00:00Z') + i * 30_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 200 }));
       const { cache } = activity([...steady, rec('2026-10-01T10:05:00Z', { cacheRead: 4000, cacheWrite5m: 18_000 })]);
-      expect(cache.daily.find(d => d.day === '2026-10-01')!.flushes).toEqual({ extra: expect.closeTo(18_000 * 4.8 / 1_000_000, 6), idleGap: 0, noGap: 1 });
+      // 16.2k of the 18k written again: the previous 20.2k-token prompt less the 4k still read.
+      expect(cache.daily.find(d => d.day === '2026-10-01')!.flushes).toEqual({ extra: expect.closeTo(16_200 * 4.8 / 1_000_000, 6), idleGap: 0, noGap: 1 });
     });
 
     it('has none without flushes', () => {

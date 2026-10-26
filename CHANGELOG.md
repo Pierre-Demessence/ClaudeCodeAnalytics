@@ -73,6 +73,8 @@ Noteworthy changes for users. The format follows
 - The cache card's "saved" takes off what the cache writes cost beyond plain
   input (a quarter more for 5 minutes, double for an hour): it counted only what
   the cache reads saved.
+- A cache flush's extra cost counts only the tokens written again, the previous
+  prompt, and no longer the turn's new tokens, which a live cache writes too.
 
 ## [0.2.0]
 
