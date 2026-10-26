@@ -60,8 +60,15 @@ export interface WeekRow {
   percent?: number;
   /** Not a final reading: extended from an early one, estimated now, or from transcripts. */
   percentEstimated?: true;
+  /**
+   * The plan whose limit `planPercent` is a % of: the plan of the last reading (the current plan for the window in
+   * progress), or the plan a week estimated from transcripts started on. Absent for a restarted window: its parts have theirs.
+   */
+  plan?: Plan;
   /** A plan change started inside the window, which keeps its 7 days; shown as such (the % adds the parts up). */
   planChange?: true;
+  /** Final weekly %, on `plan`: what the Weeks tab shows, a Pro week at its limit as 100%. */
+  planPercent?: number;
   /** ISO; the first reading of the week at `PRESSURE_PERCENT`, or for a week estimated from transcripts the message at which `k × cost so far` reaches it. */
   pressureAt?: string;
   /** The weekly % at `pressureAt`, on the current plan. */
@@ -193,6 +200,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     let percent: number | undefined;
     // The final % on the plan the week was read on: what its limit is judged against.
     let planPercent: number | undefined;
+    let ownPlan: Plan | undefined;
     let percentEstimated = false;
     let source: WeekRow['source'] = 'reading';
     let pressure: { at: string; percent: number } | undefined;
@@ -203,6 +211,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     if (current && Date.parse(current.resetsAt) === end) {
       percent = current.estimatedNow ?? current.weekly;
       planPercent = percent;
+      ownPlan = plan;
       percentEstimated = current.estimatedNow !== undefined || current.withoutReading === true;
       partsOf = current.parts;
       if (current.parts)
@@ -213,6 +222,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     else if (share) {
       percent = convertPercent(share.percent, share.plan, plan);
       planPercent = share.percent;
+      ownPlan = share.plan;
       percentEstimated = share.estimated;
       partsOf = share.parts;
       completed = true;
@@ -226,7 +236,9 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       // plan it ran on. Without readings it has no parts: that is the plan it started on (`plan` without a history).
       const ranOn = planHistory.length > 0 ? planAt(planHistory, new Date(start).toISOString()) : plan;
       const k = convertPercent(calibrationK, plan, ranOn);
-      percent = convertPercent(Math.min(100, k * week.cost), ranOn, plan);
+      planPercent = Math.min(100, k * week.cost);
+      ownPlan = ranOn;
+      percent = convertPercent(planPercent, ranOn, plan);
       percentEstimated = true;
       source = 'estimated';
       const reached = pressureByCost(week.spend, k);
@@ -276,7 +288,9 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       parts,
       percent,
       percentEstimated: percentEstimated ? true : undefined,
+      plan: parts ? undefined : ownPlan,
       planChange: planChangeWithin(planHistory, start, end) || undefined,
+      planPercent: parts ? undefined : planPercent,
       pressureAt: pressure?.at,
       pressurePercent: pressure?.percent,
       projectCount: projects.length,

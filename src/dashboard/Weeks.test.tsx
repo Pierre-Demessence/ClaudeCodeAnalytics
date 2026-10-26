@@ -120,6 +120,31 @@ describe('weeks tab', () => {
     expect(rows[1]!.textContent).not.toContain('plan change');
   });
 
+  it('shows a week from an earlier plan on that plan: its bar, its peak, its estimate and the typical tick', () => {
+    const planHistory = [
+      { from: '2026-09-01T00:00:00Z', plan: 'pro', source: 'detected' },
+      { from: '2026-10-02T00:00:00Z', plan: 'max5', source: 'manual' },
+    ] as const;
+    const data: Summary = { ...buildSummary({ endpointEnabled: true, events: [], now: NOW, planHistory, records, snapshots, timeZone: 'UTC' }), status: {} };
+    // The week before the upgrade read 100% of Pro: 20% of Max 5×, and 42% of Max 5× without the limit.
+    const pro = data.weekHistory.weeks[1]!;
+    renderTab({ ...data, planFit: { ...data.planFit, weeks: [{ cost: 40, demand: 42, estimated: true, floor: 20, hiddenHours: 86.4, shift: 0, start: pro.start }] } });
+    const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
+    expect(lines[1]!.querySelector<HTMLElement>('.week-bar.hit')!.style.width).toBe('100%');
+    expect(lines[1]!.querySelector('.wk-peak')!.textContent).toBe('100% Pro');
+    expect(lines[1]!.querySelector('.wk-uncapped')!.textContent).toBe('≈ 210% Pro');
+    expect(tipOf(lines[1]!.querySelector('.wk-uncapped')!)).toContain('At least 100% of Pro: 3.6 days were hidden');
+    // The median peak, 20% of Max 5×, is the Pro limit.
+    expect(lines[1]!.querySelector<HTMLElement>('.week-typical')!.style.left).toBe('100%');
+    expect(card('Weekly usage, last 12 weeks').textContent).toContain('typical week (median 20% of Max 5×)');
+    // The week in progress restarted with the upgrade: its parts add up on Max 5×.
+    expect(lines[0]!.querySelector('.wk-peak')!.textContent).not.toContain('Pro');
+    expect(lines[0]!.querySelector<HTMLElement>('.week-typical')!.style.left).toBe('20%');
+    const rows = within(card('Week list')).getAllByRole('row').slice(1);
+    expect(rows[1]!.querySelectorAll('td')[4]!.textContent).toBe('100% Pro');
+    expect(rows[1]!.querySelectorAll('td')[5]!.textContent).toBe('≈ 210% Pro');
+  });
+
   it('flags a week whose usage reset without a plan change, with its own icon and badge', () => {
     const data = summary(records, [
       reading('2026-10-02T10:00:00Z', 60, '2026-10-08T07:00:00.000Z'),

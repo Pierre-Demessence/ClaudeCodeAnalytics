@@ -38,10 +38,13 @@ Noteworthy changes for users. The format follows
   ended before your oldest transcript: Claude Code deletes transcripts after 30
   days, so a subscription older than that set months of charges against one month
   of usage.
-- The Weeks tab judges whether a week hit the limit on the plan of that week. After
-  an upgrade, the weeks that reached the old plan's limit kept their percent on the
-  new plan (a fifth of it from Pro to Max 5×) and lost their mark; after a
-  downgrade, weeks far from their limit could gain one.
+- The Weeks tab shows each week on the plan it ran on, and judges on that plan
+  whether the week hit the limit. After the upgrade from Pro to Max 5×, a Pro week
+  at its limit read 20% on a fifth of a bar, without its mark; it reads "100% Pro"
+  on a full bar, and its estimate without the limit and the typical-week tick are
+  on Pro too. After a downgrade, weeks far from their limit could gain a mark. A
+  week whose usage restarted still adds its parts up on your current plan, like
+  the median peak.
 - The Sessions tab shows a 5-hour window without a reading on the plan it ran on,
   like the windows with one: after the upgrade from Pro to Max 5×, the estimated
   Pro windows read about a fifth of their %.

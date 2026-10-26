@@ -1,10 +1,12 @@
 import { ArrowRightLeft, RotateCcw, TriangleAlert } from 'lucide-react';
 
+import type { Plan } from '@/core/types';
 import type { WeekRow } from '@/core/weekHistory';
 import type { Summary } from '@/dashboard/api';
 import type { HistoryView } from '@/dashboard/history';
 
 import { dayKey } from '@/core/aggregate';
+import { PLAN_LABELS } from '@/core/plans';
 import { BlockedIcon } from '@/dashboard/BlockedIcon';
 import { formatDollars, formatInteger, formatPercent, formatUsd } from '@/dashboard/format';
 import { defaultView, rangeText } from '@/dashboard/history';
@@ -14,13 +16,26 @@ import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
 import { InfoTip } from '@/dashboard/Tip';
 import { usePage } from '@/dashboard/usePage';
 import { useTip } from '@/dashboard/useTip';
-import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, restartTip, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
+import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, otherPlan, percentText, projectsText, resetText, restartTip, typicalTick, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 const HitIcon = ({ size = 14 }: { size?: number }) => <TriangleAlert aria-hidden="true" className="icon-inline icon-critical" size={size} />;
 
 const PlanChangeIcon = ({ size = 14 }: { size?: number }) => <ArrowRightLeft aria-hidden="true" className="icon-inline" size={size} />;
 
 const ResetIcon = ({ size = 14 }: { size?: number }) => <RotateCcw aria-hidden="true" className="icon-inline" size={size} />;
+
+/** A % of a week, then the plan it is a % of when that is not the current plan (`otherPlan`). */
+function WithPlan({ plan, text }: { plan: Plan | undefined; text: string }) {
+  return plan
+    ? (
+        <>
+          {text}
+          {' '}
+          <span className="wk-plan">{PLAN_LABELS[plan]}</span>
+        </>
+      )
+    : text;
+}
 
 /** A week whose usage restarted: a plan change, or a reset without one. */
 const isRestarted = (week: WeekRow) => week.planChange || week.parts;
@@ -80,7 +95,7 @@ function Stats({ summary, view }: { summary: Summary; view: HistoryView }) {
           <InfoTip label="About median peak">
             {stats.medianPercent === undefined
               ? 'No finished week with a percent yet.'
-              : 'Median of the finished weeks\' peak weekly %, estimates included, on your current plan; a week whose usage restarted counts its parts added up. The tick on every bar marks it.'}
+              : 'Median of the finished weeks\' peak weekly %, estimates included, on your current plan; a week whose usage restarted counts its parts added up. The tick on every bar marks it, on the plan of that week.'}
           </InfoTip>
         </span>
         {uncapped !== undefined && <span className="wk-uncapped">{`${uncappedText(uncapped)} without the limit`}</span>}
@@ -104,14 +119,16 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
   const maxDay = Math.max(0, ...weeks.flatMap(w => w.days.map(cost => cost ?? 0)));
   const legend = heatLegend(bounds);
   const headers = weeks[0] ? dayHeaders(weeks[0].start, timeZone) : [];
+  // With weeks of another plan, the median names its plan: their ticks sit elsewhere.
+  const mixed = weeks.some(week => otherPlan(week, planFit.plan));
   return (
     <section className="card">
       <div className="card-head">
         <h2>{`Weekly usage, ${rangeText(view, 'last 12 weeks')}`}</h2>
         <InfoTip label="About the weekly timeline">
           {weeks[0]
-            ? `Each cell is the cost of 24 h from the weekly reset (${resetText(weeks[0].start, timeZone)}). The bar is the week's peak %.`
-            : 'Each cell is the cost of 24 h from the weekly reset. The bar is the week\'s peak %.'}
+            ? `Each cell is the cost of 24 h from the weekly reset (${resetText(weeks[0].start, timeZone)}). The bar is the week's peak %, of the limit of the plan it ran on; a week whose usage restarted adds its parts up on your current plan.`
+            : 'Each cell is the cost of 24 h from the weekly reset. The bar is the week\'s peak %, of the limit of the plan it ran on; a week whose usage restarted adds its parts up on your current plan.'}
         </InfoTip>
       </div>
       {weeks.length === 0
@@ -131,6 +148,9 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                 </div>
                 {weeks.map((week) => {
                   const uncapped = uncappedOf(planFit, week);
+                  const percent = week.planPercent ?? week.percent;
+                  const plan = otherPlan(week, planFit.plan);
+                  const tick = stats.medianPercent === undefined ? undefined : typicalTick(week, stats.medianPercent, planFit.plan);
                   return (
                     <div className="wk-row" key={week.start}>
                       <span className="wk-label" {...tip(weekTip(week, timeZone))}>
@@ -150,11 +170,11 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                       </p>
                       <div className="wk-percent">
                         <span className="week-track">
-                          {week.percent !== undefined && (
-                            <span className={week.hit ? 'week-bar hit' : week.percentEstimated ? 'week-bar estimated' : 'week-bar'} style={{ width: `${Math.min(week.percent, 100)}%` }} />
+                          {percent !== undefined && (
+                            <span className={week.hit ? 'week-bar hit' : week.percentEstimated ? 'week-bar estimated' : 'week-bar'} style={{ width: `${Math.min(percent, 100)}%` }} />
                           )}
-                          {stats.medianPercent !== undefined && (
-                            <span className="week-typical" style={{ left: `${Math.min(stats.medianPercent, 100)}%` }} {...tip(`Typical week: ${formatPercent(stats.medianPercent)}`, { focusable: false })} />
+                          {tick && (
+                            <span className="week-typical" style={{ left: `${tick.left}%` }} {...tip(tick.text, { focusable: false })} />
                           )}
                         </span>
                         <span className="wk-flags">
@@ -171,8 +191,8 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                             </span>
                           )}
                         </span>
-                        <strong className="wk-peak">{percentText(week)}</strong>
-                        {uncapped && <span className="wk-uncapped" {...tip(uncappedTip(week, uncapped, timeZone))}>{uncappedText(uncapped.demand)}</span>}
+                        <strong className="wk-peak"><WithPlan plan={plan} text={percentText(week)} /></strong>
+                        {uncapped && <span className="wk-uncapped" {...tip(uncappedTip(week, uncapped, planFit.plan, timeZone))}><WithPlan plan={plan} text={uncappedText(uncapped.demand)} /></span>}
                       </div>
                     </div>
                   );
@@ -188,7 +208,7 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                 {stats.medianPercent !== undefined && (
                   <li>
                     <span className="legend-typical" />
-                    {`typical week (median ${formatPercent(stats.medianPercent)})`}
+                    {`typical week (median ${formatPercent(stats.medianPercent)}${mixed ? ` of ${PLAN_LABELS[planFit.plan]}` : ''})`}
                   </li>
                 )}
                 <li>
@@ -259,7 +279,7 @@ function List({ summary, view }: { summary: Summary; view: HistoryView }) {
                       <th scope="col">Peak %</th>
                       <th scope="col">
                         Without the limit
-                        <InfoTip label="About without the limit">The peak % plus the days a limit or a missing subscription hid, filled at your typical pace. The same estimate as the Plans tab, on your current plan.</InfoTip>
+                        <InfoTip label="About without the limit">The peak % plus the days a limit or a missing subscription hid, filled at your typical pace. The same estimate as the Plans tab, on the plan of the week like its peak.</InfoTip>
                       </th>
                       <th scope="col">
                         Source
@@ -270,6 +290,7 @@ function List({ summary, view }: { summary: Summary; view: HistoryView }) {
                   <tbody>
                     {weeks.slice(start, end).map((week) => {
                       const uncapped = uncappedOf(planFit, week);
+                      const plan = otherPlan(week, planFit.plan);
                       return (
                         <tr key={week.start}>
                           <th scope="row">
@@ -300,8 +321,8 @@ function List({ summary, view }: { summary: Summary; view: HistoryView }) {
                           </td>
                           <td>{formatInteger(week.messages)}</td>
                           <td><strong>{formatUsd(week.cost)}</strong></td>
-                          <td><strong>{percentText(week)}</strong></td>
-                          <td {...(uncapped ? tip(uncappedTip(week, uncapped, timeZone)) : {})}>{uncapped ? uncappedText(uncapped.demand) : ''}</td>
+                          <td><strong><WithPlan plan={plan} text={percentText(week)} /></strong></td>
+                          <td {...(uncapped ? tip(uncappedTip(week, uncapped, planFit.plan, timeZone)) : {})}>{uncapped && <WithPlan plan={plan} text={uncappedText(uncapped.demand)} />}</td>
                           <td className="secondary">{week.source}</td>
                         </tr>
                       );

@@ -2697,6 +2697,24 @@ button.primary:hover:not(:disabled) {
   white-space: nowrap;
 }
 
+/* The plan of a week from another plan than the current one, after its %. */
+.wk-plan {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* Under the % in the timeline, whose columns are narrow; two lines still fit the height of a day cell. */
+.wk-percent .wk-plan {
+  display: block;
+  line-height: 1;
+}
+
+.wk-percent .wk-peak,
+.wk-percent .wk-uncapped {
+  line-height: 1.25;
+}
+
 .wk-blocked-mark {
   display: inline-flex;
   align-items: center;

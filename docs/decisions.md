@@ -329,12 +329,17 @@ touched.
 
 The Weeks tab lists the last 12 weekly windows, cut where `weekStartFor` cuts
 them (the first reset after a message), so its weeks match the Usage tab's
-weekly chart. A week's peak % is its last reading, converted to the current
-plan like the Overview did; a completed week without a reading gets `k × cost`
-(capped at the limit of the plan it ran on, its 90% pressure point read on that plan
-too, shown with "~"). A week "hit the limit" only from a final reading at
-the weekly threshold, read on the plan of that week rather than converted (a Pro week
-at its limit is 20% of Max 5×): a transcript estimate, or a reading extended from before the reset, never counts, as on the Sessions tab. The day cells
+weekly chart. A week's peak % is its last reading, shown on the plan of that week
+(`planPercent`): a Pro week at its limit reads "100% Pro" on a full bar beside the Max
+5× weeks, its estimate without the limit is on Pro too, and the typical-week tick sits
+where the median falls on Pro. The median peak, the typical week and the Plans tab stay
+on the current plan (`percent`). Rejected: every row converted to the current plan,
+even with the old plan's limit marked on the bar; the rows compare at a glance, but a
+week spent to its limit reads 20% on a fifth of a bar. A completed
+week without a reading gets `k × cost` (capped at the limit of the plan it ran on, its
+90% pressure point read on that plan too, shown with "~"). A week "hit the limit" only
+from a final reading at the weekly threshold of its plan: a transcript estimate, or a
+reading extended from before the reset, never counts, as on the Sessions tab. The day cells
 are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,
 and fixed blocks ignore DST. The Overview's "Past weeks" card was removed: the
 tab shows the same windows with more. A week whose usage restarted shows the
