@@ -73,7 +73,7 @@ describe('chartBars', () => {
     expect(capped).toMatchObject({ label: '≈190%', over: true });
     expect(capped!.height).toBe(100);
     expect(capped!.floorHeight).toBeCloseTo(71.5 / 150 * 100);
-    expect(capped!.tip).toBe('Week of 10 Jul: ≈ 190% of the Pro limit, over it. At least 72%: 5 days were hidden (by the limit or before you subscribed) and filled at your typical pace.');
+    expect(capped!.tip).toBe('Week of 10 Jul: ≈ 190% of the Pro limit, over it. At least 72%: 5 days were hidden (by the limit, before you subscribed or before the oldest transcript) and filled at your typical pace.');
     expect(plain!.floorHeight).toBeUndefined();
     expect(plain!.tip).not.toContain('hidden');
   });

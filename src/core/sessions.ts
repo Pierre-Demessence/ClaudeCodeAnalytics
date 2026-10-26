@@ -1,9 +1,10 @@
 import type { Range } from './range.ts';
-import type { ApiEvent, Snapshot, UsageRecord } from './types.ts';
+import type { ApiEvent, PlanPeriod, Snapshot, UsageRecord } from './types.ts';
 
 import { dayKey, startOfDay } from './aggregate.ts';
 import { sessionProjects } from './breakdown.ts';
 import { DAY_MS, FIVE_HOURS_MS, HOUR_MS } from './calibration.ts';
+import { convertPercent, planAt } from './plans.ts';
 import { messageCost, sonnetSaving } from './pricing.ts';
 import { median } from './stats.ts';
 
@@ -59,6 +60,8 @@ export interface SessionsInput {
   k?: number;
   limitThreshold: number;
   now: number;
+  /** Puts an estimated peak on the plan its window ran on, as a reading is; `k` is on the plan active at `now`. */
+  planHistory?: readonly PlanPeriod[];
   /** The span to list; the last 7 local days when absent. */
   range?: Range;
   records: readonly UsageRecord[];
@@ -100,7 +103,7 @@ function windowOfHit(windows: readonly Building[], hit: ApiEvent): Building | un
  * outside them open estimated windows (the first message after the previous window), cut short where
  * a reading window starts.
  */
-export function fiveHourWindows({ hits = [], k, limitThreshold, now, records, snapshots }: FiveHourWindowsInput): FiveHourWindow[] {
+export function fiveHourWindows({ hits = [], k, limitThreshold, now, planHistory = [], records, snapshots }: FiveHourWindowsInput): FiveHourWindow[] {
   const anchored = new Map<number, Building>();
   for (const snapshot of snapshots) {
     if (!snapshot.fiveHourResetsAt)
@@ -176,9 +179,12 @@ export function fiveHourWindows({ hits = [], k, limitThreshold, now, records, sn
     }
   }
 
+  // `k` reads a cost on the current plan; a window that ran on another plan reads its % on that one, up to its limit.
+  const kPlan = planAt(planHistory, new Date(now).toISOString());
+  const estimate = (w: Building) => k === undefined ? undefined : Math.min(100, convertPercent(k * w.cost, kPlan, planAt(planHistory, new Date(w.end - 1).toISOString())));
   return past
     .map((w): FiveHourWindow => {
-      const peak = w.source === 'reading' ? w.peak : k !== undefined ? Math.min(100, k * w.cost) : undefined;
+      const peak = w.source === 'reading' ? w.peak : estimate(w);
       return {
         capped: w.source === 'reading' && peak !== undefined && peak >= limitThreshold ? true : undefined,
         cappedAt: w.capAt === undefined ? undefined : new Date(w.capAt).toISOString(),

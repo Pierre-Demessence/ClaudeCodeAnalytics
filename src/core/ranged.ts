@@ -44,7 +44,7 @@ export function buildRanged(input: SummaryInput, range: Range): RangedSummary {
   return {
     breakdown: buildBreakdown(records, input.titles ?? {}, range.from, range.to),
     range,
-    sessions: buildSessions({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, range, records, snapshots, timeZone }),
+    sessions: buildSessions({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, planHistory: input.planHistory, range, records, snapshots, timeZone }),
     usage,
     activity: buildActivity({
       cache: range,

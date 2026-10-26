@@ -107,7 +107,9 @@ two inputs of its own. Its % per $ is fitted separately on the 5-hour readings,
 since the ratio between the 5-hour and weekly limits is not published; the
 endpoint gives no Claude Code share for that window, so claude.ai usage counts
 in the fit. Its pace is the average $/hour of each 5-hour session in the last
-4 weeks, idle time included, rebuilt from message times. Daily cost / 24 was
+4 weeks, idle time included, rebuilt from message times; after a plan change, of the
+sessions since it once there are 3, as for the weekly pace (a smaller plan's limit
+cut its sessions short). Daily cost / 24 was
 rejected: a session only exists while working, so it would understate the
 pace. Every reading gets the usage since it added back, not only stale ones:
 15 minutes is 5% of a 5-hour window.
@@ -123,14 +125,17 @@ sessions since they share the limits; longer gaps are pauses. Counting every
 clock hour with a message was rejected: a single message would count a full
 hour and understate the pace. The cost of a burst's first message has no
 active time before it, which overstates the pace slightly; that errs toward
-less time left. Without a calibration, a % cannot become dollars: no value.
+less time left. Without a calibration, a % cannot become dollars: no value. The
+value stops at the reset: the use after it counts toward the next window.
 
 ## Estimated weeks and stale readings
 
 A completed week whose last reading is more than 12 h before reset is extended
 with the calibrated cost since, marked "est." and capped at 100%. A current
-reading older than 30 minutes gets an estimated current % from transcripts, and
-the projection starts from it.
+reading older than 30 minutes gets an estimated current % from transcripts. The
+projection, the active use left and the room per day start from the reading plus
+the usage since it even before then: during a heavy half hour on a small plan, a
+reading shown as read trails by several points.
 
 ## Manual plan periods win over detection
 
@@ -192,8 +197,9 @@ value, the 5-hour side) keeps the pooled fit. A restarted week counts from its
 restart: its own fit takes the running part's readings on the current plan, the pace
 and the 3-day blend run from the restart, and the typical week is scaled to the
 share of the window left after it. The pace comes from the days under
-the current plan (at least 3, within the last 28), since the idle days before an
-upgrade say nothing about the usage after it. The forecast resamples the cost of
+the current plan (at least 3, within the last 28, since the latest period whose plan
+differs from the one before: the collector's first detected period changes nothing),
+since the idle days before an upgrade say nothing about the usage after it. The forecast resamples the cost of
 the days left as a sum of days drawn with replacement (seeded, 1000 draws), and
 low/median/high are the quartiles of those sums. Rejected: the median day × the
 days left, which is biased low for skewed usage with idle days (the median of a
@@ -289,7 +295,8 @@ the first message. An upgrade moves the 5-hour reset, so a reading window can st
 before the previous one ends: the previous one ends there, and the messages after
 the upgrade join the new window. A reading window's peak is the highest % read in it, never
 topped up with an estimate; an estimated window's peak is `k × cost` from the
-5-hour calibration, shown with "~". Rejected: the transcript-only rebuild alone.
+5-hour calibration, converted to the plan the window ran on like a reading (`k` is
+fitted on the current plan), and shown with "~". Rejected: the transcript-only rebuild alone.
 
 A window "hit the limit" when a reading reached the limit threshold (setting,
 95% by default, 50–100), not only 100%: close to the limit a new agent run
@@ -322,10 +329,19 @@ touched.
 
 The Weeks tab lists the last 12 weekly windows, cut where `weekStartFor` cuts
 them (the first reset after a message), so its weeks match the Usage tab's
-weekly chart. A week's peak % is its last reading, converted to the current
-plan like the Overview did; a completed week without a reading gets `k × cost`
-(capped at 100, shown with "~"). A week "hit the limit" only from a final reading at
-the weekly threshold: a transcript estimate, or a reading extended from before the reset, never counts, as on the Sessions tab. The day cells
+weekly chart. A week's peak % is its last reading, shown on the plan of that week
+(`planPercent`): a Pro week at its limit reads 100% on a full bar beside the Max 5×
+weeks, its estimate without the limit is on Pro too, and the typical-week tick sits
+where the median falls on Pro. No row names its plan, since a label on every row is
+too much: the plan-change mark flags the week of the change, and the tooltips of the
+estimate and of the tick name the plans. The median peak, the typical week and the
+Plans tab stay on the current plan (`percent`). Rejected: every row converted to the
+current plan, even with the old plan's limit marked on the bar; the rows compare at a
+glance, but a week spent to its limit reads 20% on a fifth of a bar. A completed
+week without a reading gets `k × cost` (capped at the limit of the plan it ran on, its
+90% pressure point read on that plan too, shown with "~"). A week "hit the limit" only
+from a final reading at the weekly threshold of its plan: a transcript estimate, or a
+reading extended from before the reset, never counts, as on the Sessions tab. The day cells
 are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,
 and fixed blocks ignore DST. The Overview's "Past weeks" card was removed: the
 tab shows the same windows with more. A week whose usage restarted shows the
@@ -381,7 +397,11 @@ demand is `max(reading, % at the cutoff + hidden hours × typical pace)`. The
 hidden time is what the limit, or a missing subscription, kept out of the
 readings: a week's tail after its pressure point (the first reading at 90%, or a
 weekly hit) and the rest of each capped 5-hour session inside its observed
-time; a week's time before the subscription; a session's tail after its cap.
+time; a week's time before the subscription; a session's tail after its cap. A
+week estimated from transcripts also hides its time before the oldest transcript
+(`transcriptsFrom`): Claude Code deletes old ones, so the first week of the data is
+otherwise a light week. A week with readings needs no such time: the endpoint saw
+all of it.
 The pace is pooled, Σ % at the cutoff over Σ observed hours across the
 comparison, so idle days count and one week cannot set it; under 72 h (weeks) or
 10 h (sessions) observed it is not used and the reading stands. The usage after
@@ -434,6 +454,11 @@ session interleave their turns and records carry no agent id, so a subagent's
 first turn read as a flush (54 of the 80 flushes found on the local data were
 subagent turns, but only $3.60 of the $38.44).
 
+A flush's extra cost counts the tokens written again only: the previous turn's
+prompt, less what the turn still read from the cache, at the write price instead of
+the read price. The rest of the write is the turn's new tokens, which a live cache
+writes as well.
+
 ## Output split by tool: weighted by input size, per scan
 
 Claude Code writes one transcript line per content block, each with the whole
@@ -483,6 +508,14 @@ list price on each billing date, the day of the month the subscription started,
 at the plan active then. Rejected: prorating the price over the days with data,
 which reads $6 for a $20 Pro plan ten days into a cycle; it remains the fallback
 without the date. Assumes monthly billing and list prices, in dollars before VAT.
+
+"All time" counts only the cycles that end after the first imported message:
+Claude Code deletes transcripts after `cleanupPeriodDays` (30 by default), so a
+subscription older than that would set every charge since it began against one
+month of usage. The cycle the first message falls in keeps its whole charge.
+Rejected: prorating that cycle from the first message, since nothing tells deleted
+transcripts from days without usage, and a new subscription's first cycle would
+lose the days before its first message.
 
 The start is the first plan period's when it was set by hand, else
 `oauthAccount.subscriptionCreatedAt` in `~/.claude.json`, which can predate the

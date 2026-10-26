@@ -31,7 +31,7 @@ import { modelRatios } from './modelRatio.ts';
 import { buildMultipliers } from './multipliers.ts';
 import { weekPacing } from './pacing.ts';
 import { buildPlanFitInput } from './planFit.ts';
-import { convertPercent, planAt, planFromSubscription } from './plans.ts';
+import { convertPercent, planAt, planChanges, planFromSubscription } from './plans.ts';
 import { priceFor } from './pricing.ts';
 import { endedPartPercent, partStartOf, windowParts } from './restarts.ts';
 import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
@@ -48,6 +48,8 @@ const DAILY_CHART_DAYS = 35;
 const STALE_READING_MS = 30 * 60_000;
 /** Fewer days than this under the current plan give no weekly pace of their own: the forecast keeps the full typical days. */
 const MIN_PLAN_DAYS = 3;
+/** Fewer finished 5-hour sessions than this under the current plan give no session pace of their own: the forecast keeps the last 28 days. */
+const MIN_PLAN_SESSIONS = 3;
 /** From this far into a week, its forecast rests on the week's own pace alone; before, past days steady it. */
 const OWN_PACE_AFTER_MS = 3 * DAY_MS;
 
@@ -253,8 +255,9 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     ? dailyCostSeries(records, timeZone, from, yesterday).map(d => d.cost)
     : [];
   // The weekly pace comes from the days under the current plan: a plan change moves the usage with it.
-  const planPeriod = planHistory.findLast(period => Date.parse(period.from) <= now);
-  const planFrom = planPeriod ? [typicalFrom, dayKey(Date.parse(planPeriod.from), timeZone)].sort().at(-1)! : typicalFrom;
+  // Only a change counts: a period that keeps the plan (the collector's first detected one) starts nothing.
+  const latestChange = planChanges(planHistory).findLast(change => change.at <= now);
+  const planFrom = latestChange ? [typicalFrom, dayKey(latestChange.at, timeZone)].sort().at(-1)! : typicalFrom;
   const planDays = dailyCostsFrom(planFrom);
   const dailyCosts = planDays.length >= MIN_PLAN_DAYS ? planDays : dailyCostsFrom(typicalFrom);
   const limitThreshold = input.limitThreshold ?? DEFAULT_LIMIT_THRESHOLD;
@@ -262,8 +265,10 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
   const hits = dedupeHits(input.events ?? []).filter(event => event.kind === 'limit');
   const sessionHits = hits.filter(hit => hitScope(hit) === 'session');
   const weekHits = hits.filter(hit => hitScope(hit) === 'week');
-  const sessionWindows = fiveHourWindows({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots });
-  const paceSamples = sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
+  const sessionWindows = fiveHourWindows({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, planHistory, records, snapshots });
+  // The session pace comes from the sessions under the current plan too: a smaller plan's limit cut its sessions short.
+  const planSessions = sessionPaces(sessionWindows, Math.max(now - TYPICAL_DAYS * DAY_MS, latestChange?.at ?? -Infinity));
+  const paceSamples = planSessions.length >= MIN_PLAN_SESSIONS ? planSessions : sessionPaces(sessionWindows, now - TYPICAL_DAYS * DAY_MS);
   const activePace = activeHourlyPace(records, now - TYPICAL_DAYS * DAY_MS, now);
   const paceByFamily = familyPaces(records, now - TYPICAL_DAYS * DAY_MS, now);
 
@@ -294,8 +299,10 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
         });
       }
       const fiveHourUsed = fiveHourSession.estimatedNow ?? fiveHour;
-      fiveHourSession.activeLeftMs = activeTimeLeft({ k: fiveHourCalibration?.k, pace: activePace, used: fiveHourUsed });
-      fiveHourSession.activeLeftByFamily = activeLeftByFamily({ k: fiveHourCalibration?.k, paces: paceByFamily, used: fiveHourUsed });
+      // Without a reset time (manual readings), the window ends within 5 hours of the reading.
+      const fiveHourUntil = (latest.fiveHourResetsAt ? Date.parse(latest.fiveHourResetsAt) : readAt + FIVE_HOURS_MS) - now;
+      fiveHourSession.activeLeftMs = activeTimeLeft({ k: fiveHourCalibration?.k, pace: activePace, until: fiveHourUntil, used: fiveHourUsed });
+      fiveHourSession.activeLeftByFamily = activeLeftByFamily({ k: fiveHourCalibration?.k, paces: paceByFamily, until: fiveHourUntil, used: fiveHourUsed });
     }
 
     const latestReset = Date.parse(latest.weeklyResetsAt);
@@ -316,12 +323,16 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
 
     let used: number | undefined;
     let estimatedNow: number | undefined;
+    // Where the projections start: the reading plus the usage since it, shown as an estimate only once the reading is stale.
+    let projectedFrom: number | undefined;
     if (!withoutReading) {
       used = latest.weekly;
       // A stale reading misses the usage since; with a calibration, add it back from transcripts.
       const sinceReading = weekK !== undefined ? weekK * costBetween(readAt, now) : 0;
-      if (now - readAt > STALE_READING_MS && sinceReading > 0)
-        estimatedNow = Math.min(100, latest.weekly + sinceReading);
+      if (sinceReading > 0)
+        projectedFrom = Math.min(100, latest.weekly + sinceReading);
+      if (now - readAt > STALE_READING_MS)
+        estimatedNow = projectedFrom;
     }
     else {
       // No Claude Code usage this week is a known 0 %; other usage needs a calibration to become a %.
@@ -333,6 +344,7 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     }
 
     if (used !== undefined) {
+      const from = estimatedNow ?? projectedFrom ?? used;
       const week = {
         k: weekK,
         ownPaceAfterMs: OWN_PACE_AFTER_MS,
@@ -347,12 +359,12 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
       const forecast = estimatedNow !== undefined || withoutReading
         // Uncalibrated, a week without a reading has no pace of its own (claude.ai use is unseen): project it from its start, i.e. the typical week.
         ? forecastWindow({ ...week, asOf: calibration || !withoutReading ? now : windowFrom, used: estimatedNow ?? used })
-        : forecastWindow({ ...week, asOf: calibration ? now : readAt, used });
+        : forecastWindow({ ...week, asOf: calibration ? now : readAt, used: from });
 
       const resetsAtIso = new Date(resetsAt).toISOString();
       current = {
-        activeLeftByFamily: activeLeftByFamily({ k: weekK, paces: paceByFamily, used: estimatedNow ?? used }),
-        activeLeftMs: activeTimeLeft({ k: weekK, pace: activePace, used: estimatedNow ?? used }),
+        activeLeftByFamily: activeLeftByFamily({ k: weekK, paces: paceByFamily, until: resetsAt - now, used: from }),
+        activeLeftMs: activeTimeLeft({ k: weekK, pace: activePace, until: resetsAt - now, used: from }),
         estimatedNow,
         forecast,
         readAt: latest.ts,
@@ -367,6 +379,7 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
           now,
           parts: weekParts,
           resetsAt,
+          roomFrom: from,
           usedNow: estimatedNow ?? used,
           windowMs: WEEK_MS,
         }),
@@ -427,7 +440,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const unknownModels = [...new Set(records.map(r => r.model))].filter(model => !priceFor(model)).sort();
 
   const activity = buildActivity({ chartFrom, events: input.events, now, records, timeZone, weekStart });
-  const sessions = buildSessions({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, records, snapshots, timeZone });
+  const sessions = buildSessions({ hits: sessionHits, k: fiveHourCalibration?.k, limitThreshold, now, planHistory, records, snapshots, timeZone });
   const weekHistory = buildWeekHistory({
     calibrationK: calibration?.k,
     current,

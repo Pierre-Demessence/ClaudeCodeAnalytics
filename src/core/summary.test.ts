@@ -306,16 +306,11 @@ describe('buildSummary', () => {
     const pooled = [...records.slice(5), ...recent];
     const windowStart = Date.parse(RESET) - 7 * DAY_MS;
     const snapshots = [1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 6, RESET));
-    const summaryFrom = (from?: string) => buildSummary({
-      endpointEnabled: true,
-      now: NOW,
-      planHistory: from ? [{ from, plan: 'max5', source: 'manual' }] : [],
-      records: pooled,
-      snapshots,
-      timeZone: 'UTC',
-    });
+    const summaryWith = (planHistory: PlanPeriod[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory, records: pooled, snapshots, timeZone: 'UTC' });
+    // A change to Max 5× at `from` (from Max 20×: a downgrade keeps the week whole); none without it.
+    const summaryFrom = (from?: string) => summaryWith(from ? [{ from: '2026-01-01T00:00:00.000Z', plan: 'max20', source: 'manual' }, { from, plan: 'max5', source: 'manual' }] : []);
 
-    it('starts at the current plan period', () => {
+    it('starts at the latest plan change', () => {
       const current = summaryFrom(new Date(NOW - 5 * DAY_MS).toISOString()).current!;
       expect(current.estimatedNow).toBeCloseTo(30);
       // The week's own pace sets the centre (30 % over 5⅔ days); the $60 days alone have no spread.
@@ -325,11 +320,15 @@ describe('buildSummary', () => {
       expect(current.forecast?.high).toBeCloseTo(current.forecast!.median);
     });
 
-    it('keeps the last 28 days when the plan period has under 3 days', () => {
+    it('keeps the last 28 days when the latest change is under 3 days old', () => {
       const short = summaryFrom(new Date(NOW - 1.5 * DAY_MS).toISOString()).current!;
-      expect(short.forecast).toEqual(summaryFrom().current!.forecast);
-      // The $20 and $60 days mixed spread the band.
+      // The $20 and $60 days mixed spread the band; the $60 days alone have none (above).
       expect(short.forecast!.high - short.forecast!.low).toBeGreaterThan(0.1);
+    });
+
+    it('is no change when a period keeps the plan, as the collector\'s first detected one does', () => {
+      const detected = summaryWith([{ from: new Date(NOW - 5 * DAY_MS).toISOString(), plan: 'pro', source: 'detected' }]).current!;
+      expect(detected.forecast).toEqual(summaryFrom().current!.forecast);
     });
   });
 
@@ -345,6 +344,22 @@ describe('buildSummary', () => {
     expect(current.forecast?.median).toBeCloseTo(50 + 50 / (17 / 3) * 4 / 3);
     expect(current.forecast!.low).toBeLessThanOrEqual(current.forecast!.median);
     expect(current.forecast!.median).toBeLessThanOrEqual(current.forecast!.high);
+  });
+
+  it('projects from the usage since a reading too recent to show as an estimate', () => {
+    const windowStart = Date.parse(RESET) - 7 * DAY_MS;
+    // As above, $100 a day at 0.1 %/$, and a reading 10 minutes ago: 50 % for $500.
+    const heavy = [1, 2, 3, 4, 5].flatMap(d => [1, 2, 3, 4].map(m => rec(NOW - d * DAY_MS + m * 60_000)));
+    const snapshots = [...[1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET)), snap(NOW - 10 * 60_000, 50, RESET)];
+    const run = (extra: UsageRecord[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [...records, ...heavy, ...extra], snapshots, timeZone: 'UTC' }).current!;
+    const quiet = run([]);
+    // $20 since the reading: 2 % the card does not show yet, but the projections start from.
+    const busy = run([rec(NOW - 5 * 60_000)]);
+    expect(busy).toMatchObject({ estimatedNow: undefined, weekly: 50 });
+    // The week's own pace carries the 2 % on over the 1⅓ days left, as it does the 50 % over 5⅔ days.
+    expect(busy.forecast!.median - quiet.forecast!.median).toBeCloseTo(2 * (1 + (4 / 3) / (17 / 3)));
+    expect(quiet.pacing.roomPerDay! - busy.pacing.roomPerDay!).toBeCloseTo(20 / (4 / 3));
+    expect(busy.activeLeftMs!).toBeLessThan(quiet.activeLeftMs!);
   });
 
   it('forecasts the 5-hour window from the calibrated session pace', () => {
@@ -365,6 +380,22 @@ describe('buildSummary', () => {
     expect(summary.fiveHourSession?.forecast?.median).toBeCloseTo(36);
   });
 
+  it('takes the 5-hour session pace from the sessions under the current plan, once there are 3', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    const today = [at('10:00'), at('11:00'), at('11:55')].map(ts => rec(ts));
+    const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';
+    const snapshots = [['10:30', 10], ['11:30', 20], ['11:50', 20]].map(([time, fiveHour]) =>
+      snap(at(time as string), 30, RESET, { fiveHour: fiveHour as number, fiveHourResetsAt }));
+    // The last 4 days' sessions run at $80 each ($16/hour) against $20 before.
+    const heavy = [1, 2, 3, 4].flatMap(d => [1, 2, 3].map(m => rec(NOW - d * DAY_MS + m * 10 * 60_000)));
+    const upgradeAt = (ms: number): PlanPeriod[] => [{ from: '2026-01-01T00:00:00.000Z', plan: 'pro', source: 'manual' }, { from: new Date(ms).toISOString(), plan: 'max5', source: 'manual' }];
+    const median = (planHistory: PlanPeriod[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory, records: [...records, ...heavy, ...today], snapshots, timeZone: 'UTC' }).fiveHourSession?.forecast?.median;
+    // Upgraded 4½ days ago: $16/hour × 0.5 %/$ × 3 hours left = 24 points.
+    expect(median(upgradeAt(NOW - 4.5 * DAY_MS))).toBeCloseTo(30 + 24);
+    // Two sessions since a change are too few: the last 28 days stand, mostly $4/hour.
+    expect(median(upgradeAt(NOW - 2.5 * DAY_MS))).toBeCloseTo(36);
+  });
+
   it('gives the active use left at the usual active pace', () => {
     const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
     // $60 over 20 active minutes: $180 per active hour.
@@ -383,6 +414,18 @@ describe('buildSummary', () => {
     const weeklyK = summary.calibration?.k;
     expect(weeklyK).toBeDefined();
     expect(summary.current?.activeLeftMs).toBeCloseTo((100 - 30) / weeklyK! / 180 * HOUR_MS);
+  });
+
+  it('stops the active use left at the reset when the window resets first', () => {
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    const today = [at('10:00'), at('10:10'), at('10:20')].map(ts => rec(ts));
+    // The same 47 minutes of active use left, in a window that resets in 30.
+    const fiveHourResetsAt = '2026-10-20T12:30:00.000Z';
+    const snapshots = [['10:05', 10], ['10:15', 20], ['10:25', 30]].map(([time, percent]) =>
+      snap(at(time as string), percent as number, RESET, { fiveHour: percent as number, fiveHourResetsAt }));
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records: [rec(NOW - 40 * DAY_MS), ...today], snapshots, timeZone: 'UTC' });
+    expect(summary.fiveHourSession?.activeLeftMs).toBe(30 * 60_000);
+    expect(summary.fiveHourSession?.activeLeftByFamily).toEqual([{ family: 'opus', lowConfidence: true, ms: 30 * 60_000 }]);
   });
 
   it('gives the active use left per model family and names the family in use', () => {

@@ -27,6 +27,58 @@ Noteworthy changes for users. The format follows
 - The 5-hour window from before an upgrade now ends where the new one starts, so
   the usage after an upgrade no longer lands in the old window, and the Plans tab
   no longer counts the estimated sessions of an earlier plan too small.
+- Sonnet 5.5 cache reads are priced at their list price, $0.10 per million tokens
+  instead of $0.20. Sonnet 5.5 usage costs less in every dollar figure, and moving
+  Opus 5.5 work to Sonnet 5.5 on the Plans tab saves half of its cost, as the list
+  prices say.
+- Claude Haiku 5.5 is priced: its messages counted as $0 and the model was listed
+  as unknown. A request whose prompt is over 100,000 tokens, cache included, pays
+  its higher prices.
+- "All time" on the Subscription card no longer counts the billing cycles that
+  ended before your oldest transcript: Claude Code deletes transcripts after 30
+  days, so a subscription older than that set months of charges against one month
+  of usage.
+- The Weeks tab shows each week on the plan it ran on, and judges on that plan
+  whether the week hit the limit. After the upgrade from Pro to Max 5×, a Pro week
+  at its limit read 20% on a fifth of a bar, without its mark; it reads 100% on a
+  full bar, and its estimate without the limit and the typical-week tick are on Pro
+  too, as their tooltips say. After a downgrade, weeks far from their limit could
+  gain a mark. A week whose usage restarted still adds its parts up on your current
+  plan, like the median peak. The legend no longer repeats the median, which the
+  median peak card shows.
+- The Sessions tab shows a 5-hour window without a reading on the plan it ran on,
+  like the windows with one: after the upgrade from Pro to Max 5×, the estimated
+  Pro windows read about a fifth of their %.
+- A week without readings, estimated from transcripts, stops at the limit of the
+  plan it ran on and finds the point where its limit got close (90%) on that plan.
+  After an upgrade, a Pro week estimated this way never reached 90% of Max 5×, so
+  the plan comparison never filled the time its limit hid.
+- The plan comparison no longer counts the week your oldest transcript falls in as
+  a light week: its days before that transcript are filled at your typical pace,
+  like the days before you subscribed, and the Weeks tab says why.
+- The weekly forecast's typical pace starts again only at a plan change. A plan
+  period that keeps the plan, such as the one recorded when you turn the usage
+  endpoint on, made it forget the days before it for the next four weeks.
+- The weekly projection, the active use left and the room per day count the usage
+  since the last reading even while that reading is under 30 minutes old (the card
+  still shows it as read). They left out up to half an hour of usage.
+- After a plan change, the 5-hour forecast takes its typical session pace from
+  the sessions under the new plan once there are 3, as the weekly forecast does:
+  the sessions a smaller plan's limit cut short held it down.
+- The Usage tab's costliest messages say "after a pause" when the main
+  conversation waited while a subagent worked: the subagent's messages hid the
+  pause, though it keeps a cache of its own.
+- The active use left for a model you use too little to measure prices your usual
+  tokens on that model. It scaled by the output price alone, while cache reads are
+  most of the cost and their price differs: Fable 5.1 output costs 2.5 times Opus
+  5.5's, its cache reads 1.25 times.
+- The active use left on the limit cards stops at the reset: a 5-hour window
+  resetting in 30 minutes could show more active use left than it has time.
+- The cache card's "saved" takes off what the cache writes cost beyond plain
+  input (a quarter more for 5 minutes, double for an hour): it counted only what
+  the cache reads saved.
+- A cache flush's extra cost counts only the tokens written again, the previous
+  prompt, and no longer the turn's new tokens, which a live cache writes too.
 
 ## [0.2.0]
 

@@ -32,11 +32,25 @@ const compaction = (seconds: number): ApiEvent => ({ key: `c${seconds}`, kind: '
 
 describe('detectFlushes', () => {
   it('flags a big cache write after a gap longer than the 5-minute cache', () => {
-    const flushes = detectFlushes([...steady(), turn(270 + 600, { write5m: 50_000 })], []);
+    const flushes = detectFlushes([...steady(), turn(270 + 600, { read: 0, write5m: 50_000 })], []);
     expect(flushes).toHaveLength(1);
     expect(flushes[0]).toMatchObject({ kind: 'idleGap', sessionId: 's1', tokens: 50_000, ts: new Date(START + 870_000).toISOString() });
-    // 50k tokens written at 1.25 × $4/M instead of read at $0.2/M.
-    expect(flushes[0]!.extra).toBeCloseTo(50_000 * (5 - 0.2) / 1_000_000, 6);
+  });
+
+  it('charges the extra for the tokens written again only: the previous prompt, not the turn\'s new tokens', () => {
+    // The previous turn's prompt (1 + 20k read + 200 written) is written again at 1.25 × $4/M instead of read at $0.2/M;
+    // the rest of the 50k is new and would be written with a live cache too.
+    const [flush] = detectFlushes([...steady(), turn(270 + 600, { read: 0, write5m: 50_000 })], []);
+    expect(flush!.extra).toBeCloseTo(20_201 * (5 - 0.2) / 1_000_000, 6);
+    // What the turn still read from the cache was not written again.
+    const [partial] = detectFlushes([...steady(), turn(270 + 600, { read: 15_000, write5m: 30_000 })], []);
+    expect(partial!.extra).toBeCloseTo(5_201 * (5 - 0.2) / 1_000_000, 6);
+  });
+
+  it('prices the extra at the rates the turn was billed at, a long Haiku 5.5 prompt included', () => {
+    const flush = { ...turn(270 + 600, { read: 0, write5m: 110_000 }), model: 'claude-haiku-5-5' };
+    // A 110k-token prompt pays Haiku 5.5's higher prices: written at $0.625/M instead of read at $0.05/M.
+    expect(detectFlushes([...steady(), flush], [])[0]!.extra).toBeCloseTo(20_201 * (0.625 - 0.05) / 1_000_000, 6);
   });
 
   it('does not flag a write within the cache lifetime when the reads hold', () => {

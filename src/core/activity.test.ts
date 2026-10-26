@@ -50,8 +50,8 @@ describe('cache', () => {
       rec('2026-10-02T10:00:00Z', { cacheWrite5m: 1_000_000 }),
     ]);
     expect(cache.week!.readShare).toBeCloseTo(0.45);
-    // 0.9 M tokens at $4 instead of $0.2.
-    expect(cache.week!.saved).toBeCloseTo(3.42);
+    // 0.9 M tokens read at $0.2 instead of $4, less the $1 more that writing 1 M tokens costs ($5 instead of $4).
+    expect(cache.week!.saved).toBeCloseTo(3.42 - 1);
     expect(cache.week!.writeCostShare).toBeCloseTo(5 / 5.58);
   });
 
@@ -67,14 +67,14 @@ describe('cache', () => {
   });
 
   describe('flushes', () => {
-    /** Ten steady turns from `start`, then a turn after a 10-minute pause that rewrites 50k tokens. */
+    /** Ten steady turns from `start`, then a turn after a 10-minute pause that reads nothing and writes 50k tokens. */
     function flushAfterPause(start: string, sessionId: string): UsageRecord[] {
       const first = Date.parse(start);
       const steady = Array.from({ length: 10 }, (_, i) => rec(new Date(first + i * 30_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 200, sessionId }));
-      return [...steady, rec(new Date(first + 270_000 + 600_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 50_000, sessionId })];
+      return [...steady, rec(new Date(first + 270_000 + 600_000).toISOString(), { cacheWrite5m: 50_000, sessionId })];
     }
-    // 50k tokens written at $5/M instead of read at $0.2/M.
-    const EXTRA = 50_000 * 4.8 / 1_000_000;
+    // The previous 20.2k-token prompt written again at $5/M instead of read at $0.2/M.
+    const EXTRA = 20_200 * 4.8 / 1_000_000;
 
     it('counts the flushes of each local day', () => {
       const { cache } = activity([...flushAfterPause('2026-09-30T10:00:00Z', 's1'), ...flushAfterPause('2026-10-01T10:00:00Z', 's2'), ...flushAfterPause('2026-10-02T21:50:00Z', 's3')]);
@@ -89,7 +89,8 @@ describe('cache', () => {
     it('counts a day with only a read collapse separately from pauses', () => {
       const steady = Array.from({ length: 10 }, (_, i) => rec(new Date(Date.parse('2026-10-01T10:00:00Z') + i * 30_000).toISOString(), { cacheRead: 20_000, cacheWrite5m: 200 }));
       const { cache } = activity([...steady, rec('2026-10-01T10:05:00Z', { cacheRead: 4000, cacheWrite5m: 18_000 })]);
-      expect(cache.daily.find(d => d.day === '2026-10-01')!.flushes).toEqual({ extra: expect.closeTo(18_000 * 4.8 / 1_000_000, 6), idleGap: 0, noGap: 1 });
+      // 16.2k of the 18k written again: the previous 20.2k-token prompt less the 4k still read.
+      expect(cache.daily.find(d => d.day === '2026-10-01')!.flushes).toEqual({ extra: expect.closeTo(16_200 * 4.8 / 1_000_000, 6), idleGap: 0, noGap: 1 });
     });
 
     it('has none without flushes', () => {
@@ -141,6 +142,17 @@ describe('messageCost', () => {
     expect(messageCost.outliers[0]).toMatchObject({ name: 'app', cause: 'cacheWrite1h', pauseMs: 3.5 * 3_600_000, tokens: 500_000 });
     // A new conversation has no previous message; 2 minutes is within the 5-minute cache.
     expect(messageCost.outliers.slice(1).map(o => [o.cause, o.pauseMs])).toEqual([['cacheWrite1h', undefined], ['cacheWrite5m', undefined]]);
+  });
+
+  it('measures the pause on the main conversation alone: its subagents keep their own caches', () => {
+    // A subagent worked from 10:05 to 11:55 while the main conversation, whose cache lives an hour, waited.
+    const subagent = [5, 35, 65, 95, 115].map(minutes => rec(new Date(Date.parse('2026-10-01T10:00:00Z') + minutes * 60_000).toISOString(), { model: 'claude-haiku-4-5', output: 100, sidechain: true }));
+    const { messageCost } = activity([
+      rec('2026-10-01T10:00:00Z'),
+      ...subagent,
+      rec('2026-10-01T12:00:00Z', { cacheWrite1h: 500_000 }),
+    ]);
+    expect(messageCost.outliers[0]).toMatchObject({ cause: 'cacheWrite1h', pauseMs: 2 * 3_600_000 });
   });
 });
 

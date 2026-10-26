@@ -79,6 +79,10 @@ describe('activeLeftByFamily', () => {
     expect(left).toContainEqual({ family: 'sonnet', lowConfidence: true, ms: 2 * HOUR_MS });
   });
 
+  it('stops at the reset, like the time left of the usual pace', () => {
+    expect(activeLeftByFamily({ k: 2, paces, until: 1.5 * HOUR_MS, used: 80 })).toEqual([{ family: 'opus', ms: HOUR_MS }, { family: 'sonnet', lowConfidence: true, ms: 1.5 * HOUR_MS }]);
+  });
+
   it('is empty at the limit or without a calibration', () => {
     expect(activeLeftByFamily({ k: 2, paces, used: 100 })).toEqual([]);
     expect(activeLeftByFamily({ k: undefined, paces, used: 50 })).toEqual([]);
@@ -89,6 +93,11 @@ describe('activeTimeLeft', () => {
   it('turns the % left into active time at the given pace', () => {
     // 20 % left at 2 %/$ is $10; at $5/hour, 2 hours.
     expect(activeTimeLeft({ k: 2, pace: 5, used: 80 })).toBe(2 * HOUR_MS);
+  });
+
+  it('is never more than the time to the reset: the use after it is the next window\'s', () => {
+    expect(activeTimeLeft({ k: 2, pace: 5, until: 30 * MINUTE_MS, used: 80 })).toBe(30 * MINUTE_MS);
+    expect(activeTimeLeft({ k: 2, pace: 5, until: 3 * HOUR_MS, used: 80 })).toBe(2 * HOUR_MS);
   });
 
   it('is undefined at the limit or without a calibration or pace', () => {

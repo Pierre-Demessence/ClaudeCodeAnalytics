@@ -1,6 +1,6 @@
 import type { ApiEvent, UsageRecord } from './types.ts';
 
-import { costParts } from './pricing.ts';
+import { costParts, priceOf } from './pricing.ts';
 import { median } from './stats.ts';
 
 /** How long each prompt cache lives without a hit. */
@@ -20,7 +20,7 @@ const COMPACTION_MARGIN_MS = 120_000;
 
 /** A turn that rebuilt the prompt cache instead of reading it. */
 export interface Flush {
-  /** USD the rewrite cost beyond reading the same tokens from the cache. */
+  /** USD the rewrite cost beyond reading the same tokens from the cache: the tokens written again, not the turn's new ones. */
   extra: number;
   /** `idleGap`: after a pause longer than the cache lifetime; `noGap`: within it, yet the cache read collapsed. */
   kind: 'idleGap' | 'noGap';
@@ -33,11 +33,18 @@ export interface Flush {
 
 const writtenBy = (record: UsageRecord) => record.cacheWrite5m + record.cacheWrite1h;
 
-/** What the turn's cache writes cost beyond reading the same tokens; 0 for an unpriced model. */
-function extraCost(record: UsageRecord): number {
-  const written = costParts(record);
-  const asRead = costParts({ ...record, cacheRead: writtenBy(record), cacheWrite1h: 0, cacheWrite5m: 0, input: 0, output: 0 });
-  return written && asRead ? written.cacheWrite5m + written.cacheWrite1h - asRead.cacheRead : 0;
+/**
+ * What the turn's cache writes cost beyond reading the same tokens, at the price the turn was billed at;
+ * 0 for an unpriced model. Only the tokens written again count: the previous turn's prompt, less what this
+ * turn still read. The rest of the write is the turn's new tokens, which a live cache writes too.
+ */
+function extraCost(record: UsageRecord, previous: UsageRecord): number {
+  const tokens = writtenBy(record);
+  const rewritten = Math.min(tokens, Math.max(0, previous.input + previous.cacheRead + writtenBy(previous) - record.cacheRead));
+  const price = priceOf(record);
+  const written = costParts(record, price);
+  const asRead = costParts({ ...record, cacheRead: tokens, cacheWrite1h: 0, cacheWrite5m: 0, input: 0, output: 0 }, price);
+  return written && asRead && tokens > 0 ? (written.cacheWrite5m + written.cacheWrite1h - asRead.cacheRead) * rewritten / tokens : 0;
 }
 
 /**
@@ -86,7 +93,7 @@ export function detectFlushes(records: readonly UsageRecord[], events: readonly 
         kind = 'noGap';
       }
       if (kind)
-        flushes.push({ extra: extraCost(record), kind, sessionId, tokens, ts: record.ts });
+        flushes.push({ extra: extraCost(record, previous), kind, sessionId, tokens, ts: record.ts });
       if (record.cacheWrite1h > 0)
         writesOneHour = true;
     }

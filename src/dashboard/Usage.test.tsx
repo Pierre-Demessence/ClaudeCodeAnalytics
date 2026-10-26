@@ -79,16 +79,16 @@ describe('usage tab', () => {
   });
 
   it('marks the days that flushed the cache, and totals the 14 days', () => {
-    // Ten steady turns three days ago, then one after a 10-minute pause that rewrites 50k tokens: $0.24 more than reading them.
+    // Ten steady turns three days ago, then one after a 10-minute pause that writes their 20.2k-token prompt again: $0.10 more than reading it.
     const steady = Array.from({ length: 10 }, (_, i) => rec(3 * DAY_MS - i * 30_000, { cacheRead: 20_000, cacheWrite5m: 200, output: 0 }));
-    const flush = rec(3 * DAY_MS - 270_000 - 600_000, { cacheRead: 20_000, cacheWrite5m: 50_000, output: 0 });
+    const flush = rec(3 * DAY_MS - 270_000 - 600_000, { cacheRead: 0, cacheWrite5m: 50_000, output: 0 });
     render(<Usage summary={summary([...steady, flush])} />, { wrapper: TipProvider });
     const cache = card('Cache efficiency');
     const marks = [...cache.querySelectorAll('.flush-marks .flush-mark')];
     expect(marks).toHaveLength(1);
     expect(marks[0]!.textContent).toBe('1');
-    expect(tipOf(marks[0]!)).toMatch(/: 1 flush after a pause longer than the cache lifetime · \$0\.24 extra$/);
-    expect(within(cache).getByText(/cache flush: a turn that rewrote the cache instead of reading it, counted per day\. 1 in these 14 days, \$0\.24 extra\.$/)).toBeTruthy();
+    expect(tipOf(marks[0]!)).toMatch(/: 1 flush after a pause longer than the cache lifetime · \$0\.10 extra$/);
+    expect(within(cache).getByText(/cache flush: a turn that rewrote the cache instead of reading it, counted per day\. 1 in these 14 days, \$0\.10 extra\.$/)).toBeTruthy();
   });
 
   it('shows no flush marks without flushes', () => {

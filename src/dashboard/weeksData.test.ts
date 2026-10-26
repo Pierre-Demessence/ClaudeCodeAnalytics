@@ -4,7 +4,7 @@ import type { FitWeek, PlanFitInput } from '@/core/planFit';
 import type { WeekPart, WeekRow } from '@/core/weekHistory';
 
 import { chartBars } from '@/dashboard/plansData';
-import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, restartTip, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
+import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, restartTip, typicalTick, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 function week(extra: Partial<WeekRow> = {}): WeekRow {
   return { blockedSessions: 0, cappedSessions: 0, cost: 0, days: [], end: '2026-10-08T05:00:00.000Z', messages: 0, projectCount: 0, projects: [], sessions: 0, source: 'reading', start: '2026-10-01T05:00:00.000Z', ...extra };
@@ -51,6 +51,15 @@ describe('labels', () => {
     expect(percentText(week())).toBe('–');
   });
 
+  it('shows a week\'s % on its own plan', () => {
+    // A Pro week at its limit, now on Max 5×.
+    const pro = week({ percent: 20, plan: 'pro', planPercent: 100 });
+    expect(percentText(pro)).toBe('100%');
+    expect(percentText({ ...pro, percentEstimated: true })).toBe('~100%');
+    // A restarted week has no plan of its own: its parts add up on the current plan.
+    expect(percentText(week({ percent: 29 }))).toBe('29%');
+  });
+
   it('shows up to two project names, then how many more', () => {
     const p = (name: string) => ({ name, cost: 1, path: `S:\\${name}` });
     expect(projectsText(week())).toBe('–');
@@ -84,9 +93,23 @@ describe('estimate without the limit', () => {
 
   it('says how many days were hidden and why', () => {
     const limited = week({ blockedSessions: 2, percent: 99, pressureAt: '2026-10-03T10:00:00.000Z' });
-    expect(uncappedTip(limited, fitWeek(), 'UTC')).toBe('At least 99%: 3.6 days were hidden (the limit was close by Sat 3 Oct 10:00, 2 sessions blocked by a 5-hour limit) and filled at your typical pace.');
-    expect(uncappedTip(week({ percent: 99 }), fitWeek(), 'UTC')).toContain('(before you subscribed)');
-    expect(uncappedTip(week({ limitHits: ['2026-10-04T08:00:00.000Z'], percent: 99 }), fitWeek(), 'UTC')).toContain('the weekly limit was hit on Sun 4 Oct 08:00');
+    expect(uncappedTip(limited, fitWeek(), 'pro', 'UTC')).toBe('At least 99%: 3.6 days were hidden (the limit was close by Sat 3 Oct 10:00, 2 sessions blocked by a 5-hour limit) and filled at your typical pace.');
+    expect(uncappedTip(week({ percent: 99 }), fitWeek(), 'pro', 'UTC')).toContain('(before you subscribed)');
+    expect(uncappedTip(week({ limitHits: ['2026-10-04T08:00:00.000Z'], percent: 99 }), fitWeek(), 'pro', 'UTC')).toContain('the weekly limit was hit on Sun 4 Oct 08:00');
+    expect(uncappedTip(week({ percent: 10, source: 'estimated', transcriptsFrom: '2026-10-03T10:00:00.000Z' }), fitWeek(), 'pro', 'UTC')).toContain('(before the oldest transcript, from Sat 3 Oct 10:00)');
+  });
+
+  it('shows the estimate of a week from another plan on that plan, like its peak', () => {
+    // On Max 5×, a Pro week at its limit reads 20% and is estimated at 42% without it: 210% of Pro.
+    const planFit = { ...input([fitWeek({ demand: 42, floor: 20 })]), plan: 'max5' as const };
+    const pro = week({ percent: 20, plan: 'pro', planPercent: 100 });
+    const uncapped = uncappedOf(planFit, pro)!;
+    expect(uncapped).toMatchObject({ demand: 210, floor: 100 });
+    expect(uncappedTip(pro, uncapped, planFit.plan, 'UTC')).toMatch(/^At least 100% of Pro: 3\.6 days were hidden/);
+    // A week on the current plan keeps the Plans tab's numbers.
+    const max5 = week({ percent: 20, plan: 'max5', planPercent: 20 });
+    expect(uncappedOf(planFit, max5)).toMatchObject({ demand: 42, floor: 20 });
+    expect(uncappedTip(max5, uncappedOf(planFit, max5)!, planFit.plan, 'UTC')).toMatch(/^At least 20%: /);
   });
 
   it('equals the Plans chart bar of the same week and the Typical week of the current plan', () => {
@@ -102,6 +125,20 @@ describe('estimate without the limit', () => {
         expect(bars[i]!.label).toBe(`${Math.round(fit.demand)}%`);
     });
     expect(uncappedMedian(planFit, 60)).toBe(150);
+  });
+});
+
+describe('typical tick', () => {
+  it('sits at the median on a week of the current plan or a restarted one', () => {
+    expect(typicalTick(week({ percent: 30, plan: 'max5', planPercent: 30 }), 15, 'max5')).toEqual({ left: 15, text: 'Typical week: 15%' });
+    expect(typicalTick(week({ percent: 29 }), 15, 'max5')).toEqual({ left: 15, text: 'Typical week: 15%' });
+    expect(typicalTick(week({ percent: 30 }), 140, 'max5').left).toBe(100);
+  });
+
+  it('moves to where the median falls on the plan of a week from another plan, up to the end of its bar', () => {
+    const pro = week({ percent: 20, plan: 'pro', planPercent: 100 });
+    expect(typicalTick(pro, 15, 'max5')).toEqual({ left: 75, text: 'Typical week: 75% of Pro (15% of Max 5×)' });
+    expect(typicalTick(pro, 40, 'max5')).toEqual({ left: 100, text: 'Typical week: 200% of Pro (40% of Max 5×)' });
   });
 });
 

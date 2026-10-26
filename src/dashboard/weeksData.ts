@@ -5,7 +5,7 @@ import type { WeekPart, WeekRow } from '@/core/weekHistory';
 import { dayKey } from '@/core/aggregate';
 import { DAY_MS } from '@/core/calibration';
 import { evaluatePlans } from '@/core/planFit';
-import { PLAN_LABELS } from '@/core/plans';
+import { convertPercent, PLAN_LABELS } from '@/core/plans';
 import { formatDollars, formatPercent } from '@/dashboard/format';
 import { daysText, differs } from '@/dashboard/plansData';
 import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
@@ -61,23 +61,46 @@ export function dayHeaders(startIso: string, timeZone: string): string[] {
   return Array.from({ length: 7 }, (_, i) => weekdayOf(start + i * DAY_MS, timeZone));
 }
 
-/** "47%", "~47%" when estimated, "–" without a percent. */
+/**
+ * The plan a week's peak is shown on when it is not `plan`, the current one: a week shows on the plan it was read on,
+ * and a restarted one adds its parts up on `plan`.
+ */
+const otherPlan = (week: WeekRow, plan: Plan): Plan | undefined => (week.plan !== undefined && week.plan !== plan ? week.plan : undefined);
+
+/** "47%", "~47%" when estimated, "–" without a percent; on the week's own plan. */
 export function percentText(week: WeekRow): string {
-  if (week.percent === undefined)
+  const percent = week.planPercent ?? week.percent;
+  if (percent === undefined)
     return '–';
-  return `${week.percentEstimated ? '~' : ''}${formatPercent(week.percent)}`;
+  return `${week.percentEstimated ? '~' : ''}${formatPercent(percent)}`;
 }
 
-/** The Plans tab's estimate for a finished week, when it exceeds the reading at the displayed precision; the same numbers as the Plans chart on the current plan. */
+/**
+ * The Plans tab's estimate for a finished week, when it exceeds the reading at the displayed precision. On the week's
+ * own plan like its peak: a week of the current plan has the same numbers as the Plans chart.
+ */
 export function uncappedOf(planFit: PlanFitInput, week: WeekRow): FitWeek | undefined {
   if (week.inProgress || week.percent === undefined)
     return undefined;
   const fit = planFit.weeks.find(w => w.start === week.start);
-  return fit && differs(fit.demand, week.percent) ? fit : undefined;
+  if (!fit)
+    return undefined;
+  const plan = week.plan ?? planFit.plan;
+  const shown = { ...fit, demand: convertPercent(fit.demand, planFit.plan, plan), floor: convertPercent(fit.floor, planFit.plan, plan) };
+  return differs(shown.demand, week.planPercent ?? week.percent) ? shown : undefined;
 }
 
 /** "≈ 212%". */
 export const uncappedText = (percent: number) => `≈ ${formatPercent(percent)}`;
+
+/** Where the typical week (`median`, on `plan`) falls on a week's bar, which shows the week's own plan; capped at the bar's end. */
+export function typicalTick(week: WeekRow, median: number, plan: Plan): { left: number; text: string } {
+  const other = otherPlan(week, plan);
+  if (!other)
+    return { left: Math.min(median, 100), text: `Typical week: ${formatPercent(median)}` };
+  const onOther = convertPercent(median, plan, other);
+  return { left: Math.min(onOther, 100), text: `Typical week: ${formatPercent(onOther)} of ${PLAN_LABELS[other]} (${formatPercent(median)} of ${PLAN_LABELS[plan]})` };
+}
 
 /** The median of the finished weeks' estimates on the current plan, when it exceeds `medianPercent`; the Plans tab's "Typical week". */
 export function uncappedMedian(planFit: PlanFitInput, medianPercent: number | undefined): number | undefined {
@@ -87,16 +110,18 @@ export function uncappedMedian(planFit: PlanFitInput, medianPercent: number | un
   return typical !== undefined && differs(typical, medianPercent) ? typical : undefined;
 }
 
-/** Why a week's estimate is above its reading: how long was hidden, and by what. */
-export function uncappedTip(week: WeekRow, fit: FitWeek, timeZone: string): string {
+/** Why a week's estimate (from `uncappedOf`) is above its reading: how long was hidden, and by what. */
+export function uncappedTip(week: WeekRow, fit: FitWeek, plan: Plan, timeZone: string): string {
   const when = (iso: string) => `${formatSessionDay(dayKey(Date.parse(iso), timeZone))} ${formatTime(iso, timeZone)}`;
   const firstHit = week.limitHits?.[0];
   const reasons = [
     week.pressureAt ? `the limit was close by ${when(week.pressureAt)}` : firstHit && `the weekly limit was hit on ${when(firstHit)}`,
     week.blockedSessions > 0 && `${week.blockedSessions} ${week.blockedSessions === 1 ? 'session' : 'sessions'} blocked by a 5-hour limit`,
+    week.transcriptsFrom && `before the oldest transcript, from ${when(week.transcriptsFrom)}`,
   ].filter(Boolean);
   const why = reasons.length > 0 ? reasons.join(', ') : 'before you subscribed';
-  return `At least ${formatPercent(fit.floor)}: ${daysText(fit.hiddenHours)} were hidden (${why}) and filled at your typical pace.`;
+  const other = otherPlan(week, plan);
+  return `At least ${formatPercent(fit.floor)}${other ? ` of ${PLAN_LABELS[other]}` : ''}: ${daysText(fit.hiddenHours)} were hidden (${why}) and filled at your typical pace.`;
 }
 
 /**

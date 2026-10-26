@@ -6,7 +6,7 @@ import { startOfDay } from './aggregate.ts';
 import { sessionProjects } from './breakdown.ts';
 import { detectFlushes } from './cacheAnomalies.ts';
 import { DAY_MS, WEEK_MS } from './calibration.ts';
-import { costParts, messageCost, priceFor } from './pricing.ts';
+import { costParts, messageCost, priceOf } from './pricing.ts';
 import { addDays, DAILY_RANGE_MAX_DAYS, rangeDays } from './range.ts';
 import { compareVersions } from './versions.ts';
 import { weekStarter } from './weekWindows.ts';
@@ -51,7 +51,7 @@ export interface DayFlushes {
 export interface CacheWeek {
   /** Share of input tokens read from the cache, 0–1. */
   readShare: number;
-  /** What the cache reads would have cost as fresh input, minus what they cost. */
+  /** What the cached input would have cost as fresh input, minus what reading it and writing it to the cache cost. */
   saved: number;
   /** Share of the cost spent writing the cache, 0–1. */
   writeCostShare: number;
@@ -176,11 +176,13 @@ function cacheOf(week: readonly UsageRecord[], records: readonly UsageRecord[], 
   for (const record of week) {
     read += record.cacheRead;
     input += inputTokens(record);
-    const parts = costParts(record);
-    const price = priceFor(record.model);
-    if (!parts || !price)
+    const price = priceOf(record);
+    const parts = costParts(record, price);
+    // The same tokens as plain input, at the price the message was billed at: no cache read, no cache write.
+    const uncached = costParts({ ...record, cacheRead: 0, cacheWrite1h: 0, cacheWrite5m: 0, input: inputTokens(record) }, price);
+    if (!parts || !uncached)
       continue;
-    saved += parts.cacheRead * (price.input / price.cacheRead - 1);
+    saved += uncached.input - (parts.input + parts.cacheRead + parts.cacheWrite5m + parts.cacheWrite1h);
     writeCost += parts.cacheWrite5m + parts.cacheWrite1h;
     cost += parts.input + parts.output + parts.cacheWrite5m + parts.cacheWrite1h + parts.cacheRead;
   }
@@ -255,10 +257,11 @@ function messageCostOf(week: readonly UsageRecord[], records: readonly UsageReco
     const outlier: Outlier = { ...projectFor(record), cause, cost, tokens: record[cause], ts: record.ts };
     if ((cause === 'cacheWrite5m' || cause === 'cacheWrite1h') && record.sessionId) {
       const ms = Date.parse(record.ts);
+      // The main conversation and its subagents each have their own cache: a subagent at work does not keep the main one alive.
       let previous = -Infinity;
       for (const other of records) {
         const otherMs = Date.parse(other.ts);
-        if (other.sessionId === record.sessionId && otherMs < ms && otherMs > previous)
+        if (other.sessionId === record.sessionId && Boolean(other.sidechain) === Boolean(record.sidechain) && otherMs < ms && otherMs > previous)
           previous = otherMs;
       }
       if (ms - previous > CACHE_LIFETIME_MS[cause] && previous > -Infinity)

@@ -100,6 +100,13 @@ describe('final percent', () => {
     expect(rows[0]!.percentEstimated).toBeUndefined();
   });
 
+  it('keeps the % on the plan the week was read on, for the Weeks tab to show', () => {
+    // A Pro week at its limit is 20% of Max 5×; the window in progress is read on the current plan.
+    const { weeks: rows } = weeks({ current: { resetsAt: iso(START + WEEK_MS), weekly: 38 }, shares: [share(1, 100, { plan: 'pro' })], snapshots: [snap(1, 100)] });
+    expect(rows[1]).toMatchObject({ percent: 20, plan: 'pro', planPercent: 100 });
+    expect(rows[0]).toMatchObject({ percent: 38, plan: 'max5', planPercent: 38 });
+  });
+
   it('marks a reading extended from before the reset as estimated', () => {
     const { weeks: rows } = weeks({ shares: [share(1, 90, { estimated: true })], snapshots: [snap(1)] });
     expect(rows[0]).toMatchObject({ percent: 90, percentEstimated: true, source: 'reading' });
@@ -111,6 +118,18 @@ describe('final percent', () => {
     expect(rows.map(w => w.percent)).toEqual([60, 60]);
     expect(rows[0]).toMatchObject({ percentEstimated: true, source: 'estimated' });
     expect(weeks({ calibrationK: 10, records }).weeks[0]!.percent).toBe(100);
+  });
+
+  it('marks an estimated window that started before the oldest transcript with where the transcripts start', () => {
+    // The transcripts start on day 3 of the window 2 weeks back; the window after it is seen whole.
+    const first = weekStart(2) + 3 * DAY_MS;
+    const records = [rec(first), rec(weekStart(1) + DAY_MS)];
+    const { weeks: rows } = weeks({ calibrationK: 1, records });
+    expect(rows.find(w => w.start === iso(weekStart(2)))!.transcriptsFrom).toBe(iso(first));
+    expect(rows.find(w => w.start === iso(weekStart(1)))!.transcriptsFrom).toBeUndefined();
+    // A reading sees the whole window, whatever the transcripts kept.
+    const share = { estimated: false, percent: 40, plan: 'max5' as const, resetsAt: iso(weekStart(1)) };
+    expect(weeks({ calibrationK: 1, records, shares: [share], snapshots: [snap(2)] }).weeks.find(w => w.start === iso(weekStart(2)))!.transcriptsFrom).toBeUndefined();
   });
 
   it('has no percent without a reading or a calibration', () => {
@@ -165,6 +184,15 @@ describe('pressure point', () => {
   it('is absent for an estimated week that stays under it', () => {
     expect(weeks({ calibrationK: 2.4, records: [rec(weekStart(1) + DAY_MS)] }).weeks[0]!.pressureAt).toBeUndefined();
   });
+
+  it('reads an estimated week on its own plan: its limit and its 90%', () => {
+    // 0.5 % of Max 5× per dollar is 2.5 % of Pro: the $20 messages of a Pro week are 50% of Pro each.
+    const planHistory = [{ from: iso(weekStart(5)), plan: 'pro' as const, source: 'manual' as const }, { from: iso(START), plan: 'max5' as const, source: 'manual' as const }];
+    const records = [rec(weekStart(1) + DAY_MS), rec(weekStart(1) + 2 * DAY_MS), rec(weekStart(1) + 3 * DAY_MS)];
+    const row = weeks({ calibrationK: 0.5, planHistory, records }).weeks.find(w => w.start === iso(weekStart(1)))!;
+    // The second message crosses 90% of Pro; the third would pass the Pro limit, where usage stops.
+    expect(row).toMatchObject({ percent: 20, plan: 'pro', planPercent: 100, pressureAt: iso(weekStart(1) + 2 * DAY_MS), pressurePercent: 20, source: 'estimated' });
+  });
 });
 
 describe('hit', () => {
@@ -175,6 +203,15 @@ describe('hit', () => {
     expect(weeks({ shares: [share(98)], snapshots: [snap(1)] }).weeks[0]!.hit).toBe(true);
     expect(weeks({ shares: [share(97)], snapshots: [snap(1)] }).weeks[0]!.hit).toBeUndefined();
     expect(weeks({ shares: [share(97)], snapshots: [snap(1)], weekLimitThreshold: 90 }).weeks[0]!.hit).toBe(true);
+  });
+
+  it('reads the threshold on the plan of the week, not on the current plan', () => {
+    // A Pro week at its limit reads 20% of Max 5×; a Max 20× week at 30% reads 600% of Pro.
+    const pro = weeks({ shares: [{ ...share(100), plan: 'pro' }], snapshots: [snap(1, 100)] }).weeks[0]!;
+    expect(pro).toMatchObject({ hit: true, percent: 20 });
+    const max20 = weeks({ plan: 'pro', shares: [{ ...share(30), plan: 'max20' }], snapshots: [snap(1, 30)] }).weeks[0]!;
+    expect(max20.percent).toBe(600);
+    expect(max20.hit).toBeUndefined();
   });
 
   it('never counts a reading extended from before the reset, nor the running estimate', () => {
@@ -284,7 +321,11 @@ describe('plan change', () => {
       { end: iso(weekStart(2) + 3 * DAY_MS), percent: 20, plan: 'pro', planPercent: 100, start: iso(weekStart(2)) },
       { end: iso(weekStart(1)), percent: 20, plan: 'max5', planPercent: 20, start: iso(weekStart(2) + 3 * DAY_MS) },
     ]);
+    // Each part has its plan; the row's % adds them up on the current plan, so it has no plan of its own.
+    expect(rows[1]!.plan).toBeUndefined();
+    expect(rows[1]!.planPercent).toBeUndefined();
     expect(rows[0]!.parts).toBeUndefined();
+    expect(rows[0]).toMatchObject({ plan: 'max5', planPercent: 60 });
   });
 
   it('marks nothing without a change in the history', () => {
@@ -334,6 +375,7 @@ describe('plan change', () => {
     const { weeks: rows } = weeks({ current, planHistory: [{ from: iso(START - 9 * DAY_MS), plan: 'pro', source: 'manual' }, { from: iso(START + DAY_MS), plan: 'max5', source: 'manual' }] });
     expect(rows[0]).toMatchObject({ inProgress: true, percent: 28, percentEstimated: true });
     expect(rows[0]!.parts).toHaveLength(2);
+    expect(rows[0]!.plan).toBeUndefined();
     // The Pro part is a final reading at its limit.
     expect(rows[0]!.hit).toBe(true);
   });

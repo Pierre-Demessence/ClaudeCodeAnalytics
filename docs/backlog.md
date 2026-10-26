@@ -7,7 +7,7 @@ orders the ones that are scheduled.
 ## Bugs
 
 - Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
-- Sessions tab: an estimated 5-hour window gets `k × cost` from the current plan's 5-hour fit (`src/core/sessions.ts:181`), so after the Pro to Max 5× change an estimated Pro window shows about a fifth of its Pro estimate, while reading windows keep their own plan's %.
+- Weeks tab on a phone: the median peak card's "≈ 26% without the limit" runs past the card's edge (`src/dashboard/Weeks.tsx:91`), since `.wk-uncapped` never wraps (`src/dashboard/styles.css:2695`).
 - A plan change without a drop in the readings leaves readings of two plans in one window part (`windowParts`, `src/core/restarts.ts:61`), whose plan is its last reading's: `weekHistory.ts` then reads an earlier reading's pressure on the wrong scale. Only reachable for a downgrade or an upgrade the readings do not show as a restart.
 - `windowParts` and `weeklyShares` key a window by its exact reset time (`src/core/restarts.ts:35`, `src/core/share.ts:51`): a reset time that differs by a minute of rounding makes two windows, and a drop between them is not seen (`backtest.ts` tolerates 2 minutes).
 
@@ -28,6 +28,7 @@ Improvements to something that exists.
 - `[forensics]` Skill or command per conversation: a column in "Most expensive conversations" or the skills a conversation ran. `UsageRecord.skill` already holds it.
 - Cost per git branch (`UsageRecord.gitBranch`); the Breakdown tab only shows each conversation's main branch.
 - `[forensics]` Carrying cost per tool ("where input goes"). Every API call is billed for the whole context, so a tool's input cost is an attribution, not a measurement: assume each result stays in the context for the rest of the conversation, so cost = tokens added × later turns × cache-read price, cut short by compaction. A dollar figure per tool, but a model, not an observation. The sizes per result are stored (`UsageRecord.context`, shown in "Where context grows"); the later turns and compactions are not tied to a result yet.
+- Calibrate `CHARS_PER_TOKEN` (`src/core/contextAdded.ts:4`): 4 is the older tokenizer's rule of thumb, and Anthropic documents about 30% more tokens for the same text from Claude Opus 4.7 on, so "Where context grows" likely reads a quarter low. Measure it on the data: a tool result's characters against the growth of the next main-thread prompt (input, cache reads and writes), per model if the two tokenizers differ.
 
 ### History ranges
 
@@ -41,6 +42,13 @@ Improvements to something that exists.
 - `[forecast]` Say which limit binds first (5-hour or weekly) and show a probability of hitting each, once the scheduled forecast exists.
 - `[forecast]` Show the current week's own ratio (`CurrentWeek.weekCalibration`) on the Fit card, which shows only the pooled one while the week's forecast, pacing and active time use the week's own.
 - `[forecast]` Check whether the usage endpoint's answer holds per-model weekly windows (`seven_day_opus`, `seven_day_sonnet`) that `src/collector/endpoint.ts:76` ignores: it reads only `seven_day` and its breakdown. A per-model limit would explain weeks of one plan disagreeing on the % per dollar.
+- `[forecast]` The projections leave out future claude.ai usage: `k` is fitted on Claude Code's share of the weekly % (`src/core/calibration.ts:54`), so the typical pace (`k × cost`) projects Claude Code alone until the own-pace blend takes over on day 3, and the active use left and the room per day count all the room as Claude Code's. Check `claudeCodeShare` in `snapshots.jsonl` first: near 100, nothing to do; often under 90, scale the typical rate by the week's share, or project claude.ai on its own.
+- `[forecast]` The 5-hour forecast (`src/core/forecast.ts:119`) blends nothing toward the window's own pace, and its samples are whole-window averages, idle tail included, applied to the hours left wherever the window stands. Backtest two variants on the 5-hour windows: the weekly blend toward the own pace, and samples taken from each past window's cost after the same elapsed time, over the hours left.
+- `[forecast]` Active time per family (`activeByFamily`, `src/core/activeTime.ts:41`) gives each gap to the message that ends it, so subagent bursts (Explore on Haiku) take active time from the Opus main thread: the Opus-only pace reads high, the Haiku one low, and the model ratios inherit it. Measure the share of active time credited to subagent messages; if it is large, build the timeline from main-thread messages and give each subagent's cost to the main thread's family.
+
+### Weeks
+
+- Show which plan the bar and % of a week from an earlier plan are on, without a label on every row: only the plan-change mark (on the week of the change) and the tooltips of its estimate and of the typical-week tick say so (`src/dashboard/Weeks.tsx`).
 
 ### Plans and what-if
 
@@ -62,6 +70,9 @@ estimates of when the result becomes judgeable, not limits in the code.
 ### 4 weeks
 
 - Uncapped demand on real data: cut uncapped weeks at 90% after the fact and check how close the typical-pace estimate gets to their real final %. Needs at least 3 weeks that never reached the pressure point, so 4 weeks if one of them was capped.
+- `[forecast]` Backtest the week's own ratio (`weekCalibration`, `src/core/summary.ts:319`), used from the week's 3rd reading of 5% or more: a whole-percent reading at 5% is worth ±10%, and the endpoint takes 3 readings within half an hour. Compare it with the pooled ratio and with a blend that leans on the own ratio as the week's cost grows.
+- `[forecast]` The fits (`fitRatio`, `src/core/calibration.ts:84`) take every reading as a point: the endpoint reads every 15 minutes, idle nights included while the widget polls, so a week weighs by how long the PC was on, identical (%, cost) points repeat, and the RMSE runs over cumulative, correlated points. Compare the fit and the backtest with distinct readings only, or one point per window.
+- `[forecast]` Check the forecast band with the backtest: low and high are quartiles, so about half of the final values should land inside ("final in range", `src/core/backtest.ts:190`); far from half, the band is too narrow or too wide.
 
 ### 6 weeks
 
@@ -70,12 +81,12 @@ estimates of when the result becomes judgeable, not limits in the code.
 - `[forensics]` Calibration cross-check from observed limit hits: the median cost of limit-hit windows is a capacity estimate, floored by the highest cost of a window that did not hit the limit; compare with the demand estimates of limit-hit weeks. Server overloads are stored (`events.jsonl`) but not shown anywhere.
 - `[forensics]` Test the credit scheme cached in `~/.claude.json` (`tengu_amber_tally`: 5-hour credits 10000 / 50000 / 200000 for Pro / Max 5× / Max 20×, and credits per million tokens per model) against the readings: replay the usage under it with the backtest and compare its error with the API-price model. Unverified: units, which token types count, whether the flag is live. Opus 5.5 : Sonnet 5.5 : Haiku 4.5 is 1833 : 1250 : 833 there, against 4 : 2 : 1 by API output price.
 
-- `[forecast]` Fit the limit per token kind (output, cache read, cache write) instead of one `k` on the total API price; effort, model and subagents act on the limit through this mix. Seen on 2026-10-19: the first High-effort week (from 2026-10-14) used 40.7% of the weekly limit per $100 against 35.2 and 33.5 on Medium. 5-hour windows agree (median 325 vs 285 % per $100, 5 vs 19 windows). A least-squares fit on 25 windows gave cache writes about twice the weight of cache reads per API dollar, output in between. All High windows come after the Medium ones, so a limit change on 2026-10-14 cannot be ruled out; needs weeks that mix both efforts.
+- `[forecast]` Fit the limit per token kind (output, cache read, cache write) instead of one `k` on the total API price; effort, model and subagents act on the limit through this mix. Seen on 2026-10-19: the first High-effort week (from 2026-10-14) used 40.7% of the weekly limit per $100 against 35.2 and 33.5 on Medium. 5-hour windows agree (median 325 vs 285 % per $100, 5 vs 19 windows). A least-squares fit on 25 windows gave cache writes about twice the weight of cache reads per API dollar, output in between. All High windows come after the Medium ones, so a limit change on 2026-10-14 cannot be ruled out; needs weeks that mix both efforts. These figures price Sonnet 5.5 cache reads at $0.20 per million tokens, twice the list price the price table holds: re-measure.
 
 ### 12 weeks
 
 - A model of how pace slows as a week nears its limit, to replace the fixed 90% pressure point. Needs many weeks to tell slowing down from a quiet week.
-- `[forecast]` A per-family weekly calibration (% per dollar by model family) instead of assuming limits scale with API price, once enough weeks with different mixes exist to tell model mix from a change in the limits. Two weeks of one plan measured 0.028 and 0.099 % per $; the current week's own fit covers it meanwhile.
+- `[forecast]` A per-family weekly calibration (% per dollar by model family) instead of assuming limits scale with API price, once enough weeks with different mixes exist to tell model mix from a change in the limits. Two weeks of one plan measured 0.028 and 0.099 % per $; the current week's own fit covers it meanwhile. Both figures price Sonnet 5.5 cache reads at twice the list price: re-measure them before reading the gap as the model mix.
 - `[forecast]` Pace by effort level and fast mode (`UsageRecord.effort`, `speed`), once the per-model pace shows how much the model alone explains.
 
 ### Needs a second plan
@@ -101,3 +112,5 @@ estimates of when the result becomes judgeable, not limits in the code.
 - The Docker dashboard shares the `proxy` network with other containers, which can reach its API by IP (Vite always allows IP hosts, and a request without `Origin` passes the POST check). A dedicated network joined only by Traefik would close this; it needs a change in `S:\Dev\DockerInfra\compose.yml`.
 - `GET /api/summary` has no Origin/Host check: it relies on Vite's default `allowedHosts` and localhost-only CORS. Add an explicit check before ever exposing the server beyond loopback.
 - `subscriptionStartedAt` (the billing day) is read from `~/.claude.json` only by host runs (`npm run dev`, `collect`, a host `npm run dashboard`): the container cannot see that file and the hook runs the collector there, so a Docker-only setup keeps the stored value or none (`collect.ts:73`). Mounting the file read-only would fix it, but Claude Code replaces it by rename, which a single-file bind mount may not follow, and it holds the email and account ids.
+- `[forensics]` Check that no transcript line splits its cache writes (`cache_creation.ephemeral_5m_input_tokens` and `ephemeral_1h_input_tokens`) into less than its `cache_creation_input_tokens`: `parseTranscriptLine` trusts the split when present (`src/core/transcript.ts:164`), so the rest would go uncounted. One scan of the transcripts tells.
+- Five dashboard tests (`Breakdown.test.tsx`, `Usage.test.tsx`, `usageData.test.ts`) expect en-GB compact numbers in lower case ("3m", "554k"), which depends on the ICU data: Node 22.22 (ICU 77, CLDR 47) writes "3M" and "554K" (`src/dashboard/format.ts:10`), so `npm test` fails there, and CI may once it picks up that Node. Fix one case in `formatTokens`, or test against the formatter's own output.
