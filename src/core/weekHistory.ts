@@ -6,7 +6,7 @@ import type { ApiEvent, Plan, PlanPeriod, Snapshot, UsageRecord } from './types.
 
 import { sessionProjects } from './breakdown.ts';
 import { DAY_MS, WEEK_MS } from './calibration.ts';
-import { convertPercent, planChangeWithin } from './plans.ts';
+import { convertPercent, planAt, planChangeWithin } from './plans.ts';
 import { messageCost, sonnetSaving } from './pricing.ts';
 import { median } from './stats.ts';
 
@@ -214,10 +214,15 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       pressure = reached && { at: reached.ts, percent: convertPercent(reached.weekly, share.plan, plan) };
     }
     else if (calibrationK !== undefined && week.cost > 0) {
-      percent = Math.min(100, calibrationK * week.cost);
+      // `calibrationK` is a % of the current plan per dollar; the week's limit and its pressure point are on the
+      // plan it ran on. Without readings it has no parts: that is the plan it started on (`plan` without a history).
+      const ranOn = planHistory.length > 0 ? planAt(planHistory, new Date(start).toISOString()) : plan;
+      const k = convertPercent(calibrationK, plan, ranOn);
+      percent = convertPercent(Math.min(100, k * week.cost), ranOn, plan);
       percentEstimated = true;
       source = 'estimated';
-      pressure = pressureByCost(week.spend, calibrationK);
+      const reached = pressureByCost(week.spend, k);
+      pressure = reached && { at: reached.at, percent: convertPercent(reached.percent, ranOn, plan) };
     }
 
     const parts = partsOf?.map((part, i): WeekPart => {

@@ -45,6 +45,10 @@ Noteworthy changes for users. The format follows
 - The Sessions tab shows a 5-hour window without a reading on the plan it ran on,
   like the windows with one: after the upgrade from Pro to Max 5×, the estimated
   Pro windows read about a fifth of their %.
+- A week without readings, estimated from transcripts, stops at the limit of the
+  plan it ran on and finds the point where its limit got close (90%) on that plan.
+  After an upgrade, a Pro week estimated this way never reached 90% of Max 5×, so
+  the plan comparison never filled the time its limit hid.
 
 ## [0.2.0]
 

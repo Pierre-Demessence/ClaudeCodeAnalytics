@@ -325,7 +325,8 @@ The Weeks tab lists the last 12 weekly windows, cut where `weekStartFor` cuts
 them (the first reset after a message), so its weeks match the Usage tab's
 weekly chart. A week's peak % is its last reading, converted to the current
 plan like the Overview did; a completed week without a reading gets `k × cost`
-(capped at 100, shown with "~"). A week "hit the limit" only from a final reading at
+(capped at the limit of the plan it ran on, its 90% pressure point read on that plan
+too, shown with "~"). A week "hit the limit" only from a final reading at
 the weekly threshold, read on the plan of that week rather than converted (a Pro week
 at its limit is 20% of Max 5×): a transcript estimate, or a reading extended from before the reset, never counts, as on the Sessions tab. The day cells
 are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,

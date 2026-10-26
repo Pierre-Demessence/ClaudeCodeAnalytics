@@ -165,6 +165,15 @@ describe('pressure point', () => {
   it('is absent for an estimated week that stays under it', () => {
     expect(weeks({ calibrationK: 2.4, records: [rec(weekStart(1) + DAY_MS)] }).weeks[0]!.pressureAt).toBeUndefined();
   });
+
+  it('reads an estimated week on its own plan: its limit and its 90%', () => {
+    // 0.5 % of Max 5× per dollar is 2.5 % of Pro: the $20 messages of a Pro week are 50% of Pro each.
+    const planHistory = [{ from: iso(weekStart(5)), plan: 'pro' as const, source: 'manual' as const }, { from: iso(START), plan: 'max5' as const, source: 'manual' as const }];
+    const records = [rec(weekStart(1) + DAY_MS), rec(weekStart(1) + 2 * DAY_MS), rec(weekStart(1) + 3 * DAY_MS)];
+    const row = weeks({ calibrationK: 0.5, planHistory, records }).weeks.find(w => w.start === iso(weekStart(1)))!;
+    // The second message crosses 90% of Pro; the third would pass the Pro limit, where usage stops.
+    expect(row).toMatchObject({ percent: 20, pressureAt: iso(weekStart(1) + 2 * DAY_MS), pressurePercent: 20, source: 'estimated' });
+  });
 });
 
 describe('hit', () => {
