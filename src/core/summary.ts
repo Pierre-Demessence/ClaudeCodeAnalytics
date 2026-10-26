@@ -280,8 +280,10 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     const windowFrom = resetsAt - WEEK_MS;
     // Weeks of one plan can burn the limit at very different rates per dollar (model mix):
     // with enough readings of its own, the week uses its own ratio rather than the pooled one.
+    // A plan change inside the week restarts its % but not its cost: neither its ratio nor its pace holds.
     const weekReadings = snapshots.filter(s => Date.parse(s.weeklyResetsAt) === resetsAt);
-    const weekCalibration = withoutReading
+    const planChanged = planChangeWithin(planHistory, windowFrom, resetsAt);
+    const weekCalibration = withoutReading || planChanged
       ? undefined
       : fitRatio(calibrationPoints(planSnapshots.filter(s => Date.parse(s.weeklyResetsAt) === resetsAt), costBetween, first), now);
     const weekK = (weekCalibration ?? calibration)?.k;
@@ -307,7 +309,7 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     if (used !== undefined) {
       const week = {
         k: weekK,
-        ownPaceAfterMs: OWN_PACE_AFTER_MS,
+        ownPaceAfterMs: planChanged ? undefined : OWN_PACE_AFTER_MS,
         paceSamples: dailyCosts,
         resampleSum: true,
         resetsAt,

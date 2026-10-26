@@ -225,6 +225,25 @@ describe('buildSummary', () => {
       expect(summary.current?.weekCalibration).toBeUndefined();
       expect(summary.current?.estimatedNow).toBeCloseTo(30 + k * 40);
     });
+
+    it('keeps the pooled ratio and the typical pace in a week holding a plan change', () => {
+      // Last week ran whole on Max 5× at 1 %/$; this week starts on Pro and goes back to Max 5× a day in.
+      const planHistory: PlanPeriod[] = [
+        { from: '2026-09-01T00:00:00.000Z', plan: 'max5', source: 'manual' },
+        { from: new Date(windowStart).toISOString(), plan: 'pro', source: 'manual' },
+        { from: new Date(windowStart + DAY_MS).toISOString(), plan: 'max5', source: 'manual' },
+      ];
+      // The % restarts at the change: 5 points a day from then on, against a cost counted from the window start.
+      const thisWeek = [2, 3, 4].map(d => snap(windowStart + d * DAY_MS, (d - 1) * 5, RESET));
+      const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory, records, snapshots: [...lastWeek, ...thisWeek], timeZone: 'UTC' });
+      const current = summary.current!;
+      expect(summary.calibration?.k).toBeCloseTo(1);
+      expect(current.weekCalibration).toBeUndefined();
+      // 15 % at the last reading, $20 since at 1 %/$.
+      expect(current.estimatedNow).toBeCloseTo(35);
+      // The used % covers only part of the elapsed week, so it gives no pace: the $20 days at 1 %/$ do, for the 1⅓ days left.
+      expect(current.forecast?.median).toBeCloseTo(35 + 20 * 4 / 3);
+    });
   });
 
   describe('the weekly pace pool', () => {

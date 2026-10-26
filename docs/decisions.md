@@ -181,7 +181,9 @@ plan can burn the limit at very different rates per dollar (two weeks measured
 understates a heavy week. So the current week uses its own fit (`weekCalibration`)
 once it has 3 readings of 5% or more, for its estimate since a stale reading, its
 forecast, its pacing and its active time; everything else (past weeks, Plans,
-value, the 5-hour side) keeps the pooled fit. The pace comes from the days under
+value, the 5-hour side) keeps the pooled fit. A week holding a plan change gets
+neither its own fit nor its own pace (below): its % restarts at the change while
+its cost and elapsed time count from the window start. The pace comes from the days under
 the current plan (at least 3, within the last 28), since the idle days before an
 upgrade say nothing about the usage after it. The forecast resamples the cost of
 the days left as a sum of days drawn with replacement (seeded, 1000 draws), and
