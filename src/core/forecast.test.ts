@@ -167,4 +167,39 @@ describe('forecastWindow', () => {
       expect(forecastWindow({ ...input, ownPaceAfterMs })).toEqual(forecastWindow(input));
     });
   });
+
+  describe('after a restart inside the window', () => {
+    const windowStart = resetsAt - WEEK_MS;
+    const startsAt = windowStart + 5 * DAY_MS;
+
+    it('counts the trend from the restart', () => {
+      // 10 % in the day since the restart: 10 points a day for the day left.
+      const forecast = forecastWindow({ ...week, asOf: startsAt + DAY_MS, paceSamples: [], startsAt, used: 10 })!;
+      expect(forecast.method).toBe('trend');
+      expect(forecast.median).toBeCloseTo(20);
+    });
+
+    it('counts the blend of the own pace from the restart', () => {
+      const input = { ...week, k: 1, ownPaceAfterMs: 3 * DAY_MS, paceSamples: [0, 5, 10, 20, 40], resampleSum: true, used: 30 };
+      // Without the start, 30 % in 6 days is a pace of 5 a day; from the restart, 30 % in 1 day is 30 a day.
+      const whole = forecastWindow({ ...input, asOf: startsAt + DAY_MS })!;
+      const restarted = forecastWindow({ ...input, asOf: startsAt + DAY_MS, startsAt })!;
+      expect(restarted.median).toBeGreaterThan(whole.median);
+    });
+
+    it('scales the typical week to the share of the window left after the restart', () => {
+      const typical = { high: 80, low: 60, median: 70 };
+      const forecast = forecastWindow({ ...week, asOf: startsAt + HOUR_MS, paceSamples: [], startsAt, typical, used: 1 })!;
+      // 2 of 7 days left.
+      expect(forecast.method).toBe('typical');
+      expect([forecast.low, forecast.median, forecast.high]).toEqual([60 * 2 / 7, 70 * 2 / 7, 80 * 2 / 7].map(value => expect.closeTo(value)));
+    });
+
+    it('is unchanged when it starts with the window', () => {
+      const input = { ...week, asOf: resetsAt - 5 * DAY_MS, paceSamples: [], used: 20 };
+      expect(forecastWindow({ ...input, startsAt: windowStart })).toEqual(forecastWindow(input));
+      const typicalInput = { ...week, asOf: windowStart + HOUR_MS, paceSamples: [], typical: { high: 80, low: 60, median: 70 }, used: 2 };
+      expect(forecastWindow({ ...typicalInput, startsAt: windowStart })).toEqual(forecastWindow(typicalInput));
+    });
+  });
 });

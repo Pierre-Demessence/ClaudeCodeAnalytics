@@ -109,11 +109,32 @@ describe('weeks tab', () => {
     renderTab({ ...buildSummary({ endpointEnabled: true, events: [], now: NOW, planHistory, records, snapshots, timeZone: 'UTC' }), status: {} });
     const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
     const mark = lines[0]!.querySelector('.wk-plan-change')!;
-    expect(tipOf(mark)).toContain('left out of the median peak, the calibration');
+    const text = tipOf(mark);
+    expect(text).toContain('Usage restarted with the change to Max 5× on Fri 2 Oct 00:00.');
+    expect(text).toContain('Pro until Fri 2 Oct 00:00: ~0% of Pro');
+    expect(text).toContain('Max 5× from Fri 2 Oct 00:00: 40% of Max 5×');
+    expect(text).toContain('The peak adds the parts up, on Max 5×.');
     expect(lines[1]!.querySelector('.wk-plan-change')).toBeNull();
     const rows = within(card('Week list')).getAllByRole('row').slice(1);
     expect(rows[0]!.textContent).toContain('plan change');
     expect(rows[1]!.textContent).not.toContain('plan change');
+  });
+
+  it('flags a week whose usage reset without a plan change, with its own icon and badge', () => {
+    const data = summary(records, [
+      reading('2026-10-02T10:00:00Z', 60, '2026-10-08T07:00:00.000Z'),
+      reading('2026-10-03T11:00:00Z', 20, '2026-10-08T07:00:00.000Z'),
+    ]);
+    renderTab(data);
+    const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
+    const mark = lines[0]!.querySelector('.wk-plan-change')!;
+    expect(mark.getAttribute('aria-label')).toBe('Usage reset in this week');
+    const text = tipOf(mark);
+    expect(text).toContain('Usage reset on Sat 3 Oct 11:00, without a plan change.');
+    expect(text).toContain('Pro until Sat 3 Oct 11:00: 60% of Pro');
+    expect(text).toContain('The peak adds the parts up, on Pro.');
+    expect(within(card('Week list')).getAllByRole('row')[1]!.textContent).toContain('usage reset');
+    expect(card('Weekly usage, last 12 weeks').textContent).toContain('usage reset in the week');
   });
 
   it('marks a week ended by an early reading as estimated, without a hit', () => {

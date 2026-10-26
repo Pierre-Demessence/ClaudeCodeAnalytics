@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { FitSession, FitWeek, PlanFitInput } from './planFit.ts';
 import type { FiveHourWindow } from './sessions.ts';
+import type { PlanPeriod } from './types.ts';
 import type { WeekRow } from './weekHistory.ts';
 
 import { DAY_MS, HOUR_MS, WEEK_MS } from './calibration.ts';
@@ -186,14 +187,43 @@ describe('buildPlanFitInput', () => {
     expect(input.weeks[0]).toEqual({ cost: 100, demand: 30, estimated: false, floor: 30, hiddenHours: 0, shift: 0, start: iso(START) });
   });
 
-  it('leaves out a week holding a plan change, and the sessions that started in it', () => {
+  it('keeps a restarted week and the sessions that started in it', () => {
     const input = buildPlanFitInput({
       ...base,
       sessionWindows: [window(START + 2 * HOUR), window(START + WEEK_MS + 2 * HOUR), window(START + 2 * WEEK_MS + 2 * HOUR)],
       weekHistory: history([row(2), row(1, { planChange: true }), row(0)]),
     });
-    expect(input.weeks.map(w => w.start)).toEqual([iso(START), iso(START + 2 * WEEK_MS)]);
-    expect(input.sessions).toHaveLength(2);
+    expect(input.weeks.map(w => w.start)).toEqual([iso(START), iso(START + WEEK_MS), iso(START + 2 * WEEK_MS)]);
+    expect(input.sessions).toHaveLength(3);
+  });
+
+  it('stops each part of a restarted week at its own pressure point, and adds the parts up', () => {
+    const restart = START + WEEK_MS + 3 * DAY_MS;
+    const parts = [
+      { end: iso(restart), percent: 20, plan: 'pro' as const, planPercent: 100, pressureAt: iso(START + WEEK_MS + DAY_MS), pressurePercent: 18, start: iso(START + WEEK_MS) },
+      { end: iso(START + 2 * WEEK_MS), percent: 10, plan: 'max5' as const, planPercent: 10, start: iso(restart) },
+    ];
+    const input = buildPlanFitInput({ ...base, weekHistory: history([row(2), row(1, { parts, percent: 30, planChange: true }), row(0)]) });
+    const restarted = input.weeks[1]!;
+    // The first part is read for 1 day then hidden for 2; the second is whole.
+    expect(restarted.hiddenHours).toBeCloseTo(48);
+    // The pace pools the two plain weeks (50% over 168 h each) and the parts' cutoffs (18% + 10% over 24 h + 96 h).
+    const pace = (50 + 50 + 28) / (168 + 168 + 120);
+    expect(restarted.demand).toBeCloseTo(28 + 48 * pace);
+    expect(restarted).toMatchObject({ estimated: true, floor: 30 });
+  });
+
+  it('leaves a part before the subscription out of the pace, and counts it hidden', () => {
+    const restart = START + 3 * DAY_MS;
+    const parts = [
+      { end: iso(restart), percent: 20, plan: 'pro' as const, planPercent: 100, start: iso(START) },
+      { end: iso(START + WEEK_MS), percent: 10, plan: 'max5' as const, planPercent: 10, start: iso(restart) },
+    ];
+    const input = buildPlanFitInput({ ...base, subscriptionStart: restart, weekHistory: history([row(2), row(1), row(0, { parts, percent: 30 })]) });
+    // The first part's 3 days precede the subscription: hidden, and its 20% is not in the pace.
+    expect(input.weeks[0]!.hiddenHours).toBeCloseTo(72);
+    const pace = (50 + 50 + 10) / (168 + 168 + 96);
+    expect(input.weeks[0]!.demand).toBeCloseTo(Math.max(30, 30 + 72 * pace));
   });
 
   it('marks a week without a final reading as estimated', () => {
@@ -298,6 +328,20 @@ describe('buildPlanFitInput', () => {
     });
     // 50% on Pro is 10% on Max 5×.
     expect(input.sessions.map(s => s.demand)).toEqual([10, 50]);
+  });
+
+  describe('a window around an upgrade', () => {
+    const planHistory: PlanPeriod[] = [{ from: iso(START - 2 * WEEK_MS), plan: 'pro', source: 'manual' }, { from: iso(START + 3 * DAY_MS), plan: 'max5', source: 'manual' }];
+    const sessions = (windows: FiveHourWindow[]) => buildPlanFitInput({ ...base, planHistory, sessionWindows: windows, weekHistory: history([row(0)]) }).sessions;
+
+    it('takes the plan the window ended on, although it started before the change', () => {
+      // Starts 10 minutes before the upgrade: the usage it read is on Max 5×.
+      expect(sessions([window(START + 3 * DAY_MS - 10 * 60_000, { peak: 50 })]).map(s => s.demand)).toEqual([50]);
+    });
+
+    it('does not convert the peak of an estimated window, which is on the current plan already', () => {
+      expect(sessions([window(START + DAY_MS, { peak: 50, peakEstimated: true })]).map(s => s.demand)).toEqual([50]);
+    });
   });
 
   describe('capped sessions', () => {

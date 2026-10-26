@@ -1,7 +1,7 @@
 import type { Plan, PlanPeriod, Snapshot } from './types.ts';
 
-import { WEEK_MS, windowStart } from './calibration.ts';
-import { planAt, planChangeWithin } from './plans.ts';
+import { WEEK_MS } from './calibration.ts';
+import { windowParts } from './restarts.ts';
 import { median } from './stats.ts';
 
 /** Weekly windows drawn in the drift chart. */
@@ -22,6 +22,8 @@ export interface DriftWindow {
   cost: number;
   /** Set on the weekly window still running. */
   current?: true;
+  /** ISO start of the first part counted, when the window restarted and it is not the window's own start. */
+  from?: string;
   /** % of the weekly limit per $100 of Claude Code usage. */
   ratio: number;
   resetsAt: string;
@@ -58,25 +60,33 @@ export interface LimitsInput {
 
 export const isOff = (ratio: number, usual: number): boolean => Math.abs(ratio - usual) / usual > OFF_THRESHOLD;
 
-/** The last 12 windows taken on `plan` (the current one by default), oldest first. A window holding a plan change is left out: its cost since the start includes the other plan's usage. */
+/**
+ * The last 12 windows taken on `plan` (the current one by default), oldest first.
+ * A window whose usage restarted counts its parts on that plan: their % added up
+ * over their cost added up, each cost from its own part's start.
+ */
 export function driftWindows({ costBetween, dataStart, now, plan, planHistory, snapshots }: LimitsInput, onPlan: Plan = plan): DriftWindow[] {
-  const lastByWindow = new Map<string, Snapshot>();
-  for (const snapshot of snapshots) {
-    const last = lastByWindow.get(snapshot.weeklyResetsAt);
-    if (!last || Date.parse(snapshot.ts) > Date.parse(last.ts))
-      lastByWindow.set(snapshot.weeklyResetsAt, snapshot);
-  }
-  return [...lastByWindow.values()]
-    .filter(last => last.weekly >= MIN_PERCENT_FOR_DRIFT && planAt(planHistory, last.ts) === onPlan && windowStart(last) >= dataStart && !planChangeWithin(planHistory, windowStart(last), Date.parse(last.weeklyResetsAt)))
-    .sort((a, b) => Date.parse(a.weeklyResetsAt) - Date.parse(b.weeklyResetsAt))
-    .flatMap((last): DriftWindow[] => {
-      const cost = costBetween(windowStart(last), Date.parse(last.ts));
+  return [...windowParts(snapshots, planHistory)]
+    .sort(([a], [b]) => a - b)
+    .flatMap(([reset, parts]): DriftWindow[] => {
+      const counted = parts.filter(part => part.plan === onPlan && part.readings.length > 0 && part.start >= dataStart);
+      let weekly = 0;
+      let usage = 0;
+      let cost = 0;
+      for (const part of counted) {
+        const last = part.readings.at(-1)!;
+        weekly += last.weekly;
+        usage += last.weekly * (last.claudeCodeShare ?? 100) / 100;
+        cost += costBetween(part.start, Date.parse(last.ts));
+      }
       // All claude.ai usage: Claude Code's cost says nothing about the limit.
-      if (cost <= 0)
+      if (weekly < MIN_PERCENT_FOR_DRIFT || cost <= 0)
         return [];
-      const claudeCode = last.claudeCodeShare ?? 100;
-      const window: DriftWindow = { claudeCode, cost, ratio: last.weekly * claudeCode / 100 / cost * 100, resetsAt: last.weeklyResetsAt };
-      if (Date.parse(last.weeklyResetsAt) > now)
+      const window: DriftWindow = { claudeCode: usage / weekly * 100, cost, ratio: usage / cost * 100, resetsAt: counted[0]!.readings[0]!.weeklyResetsAt };
+      const from = counted[0]!.start;
+      if (from > reset - WEEK_MS)
+        window.from = new Date(from).toISOString();
+      if (reset > now)
         window.current = true;
       return [window];
     })

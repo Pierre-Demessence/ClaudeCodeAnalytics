@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlanPeriod } from './types.ts';
 
-import { convertPercent, planAt, planChangeWithin, planFromSubscription, withDetectedPlan } from './plans.ts';
+import { convertPercent, planAt, planChanges, planChangeWithin, planFromSubscription, withDetectedPlan } from './plans.ts';
 
 const history: PlanPeriod[] = [
   { from: '2026-09-01T00:00:00Z', plan: 'pro', source: 'detected' },
@@ -18,6 +18,19 @@ describe('planAt', () => {
   it('uses the first plan before history starts, and Pro without history', () => {
     expect(planAt(history, '2026-01-01T00:00:00Z')).toBe('pro');
     expect(planAt([], '2026-01-01T00:00:00Z')).toBe('pro');
+  });
+});
+
+describe('planChanges', () => {
+  it('lists the periods whose plan differs from the one before', () => {
+    expect(planChanges(history)).toEqual([{ at: Date.parse('2026-10-10T00:00:00Z'), from: 'pro', to: 'max5' }]);
+  });
+
+  it('counts neither the first period nor a period that keeps the plan', () => {
+    const same: PlanPeriod[] = [...history, { from: '2026-10-20T00:00:00Z', plan: 'max5', source: 'detected' }];
+    expect(planChanges(same)).toHaveLength(1);
+    expect(planChanges(history.slice(0, 1))).toEqual([]);
+    expect(planChanges([])).toEqual([]);
   });
 });
 

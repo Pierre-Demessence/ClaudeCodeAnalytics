@@ -42,14 +42,18 @@ describe('buildSummary', () => {
     const windowStart = Date.parse(RESET) - 7 * DAY_MS;
     const readings = [1, 2, 3, 4].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET));
 
-    it('calibrates only on readings of windows that began on their plan', () => {
-      const run = (planHistory: PlanPeriod[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory, records, snapshots: readings, timeZone: 'UTC' });
-      // Every reading is on Max 5×, but the window began on Pro: its cost since the start includes Pro usage.
-      expect(run(upgradeTo(windowStart + DAY_MS / 2)).calibration).toBeUndefined();
-      expect(run(upgradeTo(windowStart - DAY_MS)).calibration?.k).toBeCloseTo(0.5, 1);
+    it('calibrates the readings after an upgrade from the upgrade on', () => {
+      const run = (extra: UsageRecord[], planHistory: PlanPeriod[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory, records: [...records, ...extra], snapshots: readings, timeZone: 'UTC' });
+      const upgrade = upgradeTo(windowStart + DAY_MS / 2);
+      // A record between the window start and the upgrade belongs to the Pro part: it must not count.
+      const before = rec(windowStart + 2 * HOUR_MS);
+      expect(run([], upgrade).calibration?.k).toBeCloseTo(0.5, 1);
+      expect(run([before], upgrade).calibration?.k).toBe(run([], upgrade).calibration?.k);
+      // An upgrade before the window leaves its cost whole.
+      expect(run([before], upgradeTo(windowStart - DAY_MS)).calibration?.k).not.toBe(run([], upgradeTo(windowStart - DAY_MS)).calibration?.k);
     });
 
-    it('flags the week, and keeps it out of the typical week and the plan fit', () => {
+    it('flags the week and keeps it in the typical week and the plan fit', () => {
       const snapshots = [
         snap(Date.parse('2026-10-07T19:00:00Z'), 40, '2026-10-07T20:00:00.000Z'),
         snap(Date.parse('2026-10-14T19:00:00Z'), 5, '2026-10-14T20:00:00.000Z'),
@@ -57,7 +61,10 @@ describe('buildSummary', () => {
       const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: upgradeTo(Date.parse('2026-10-10T00:00:00Z')), records, snapshots, timeZone: 'UTC' });
       expect(summary.weeks.map(w => w.planChange)).toEqual([undefined, true]);
       expect(summary.weekHistory.weeks.filter(w => w.planChange).map(w => w.end)).toEqual(['2026-10-14T20:00:00.000Z']);
-      expect(summary.planFit.weeks.map(w => w.start)).toEqual(['2026-09-30T20:00:00.000Z']);
+      expect(summary.planFit.weeks.map(w => w.start)).toEqual(['2026-09-30T20:00:00.000Z', '2026-10-07T20:00:00.000Z']);
+      expect(summary.weekHistory.weeks.find(w => w.planChange)?.parts?.map(part => part.plan)).toEqual(['pro', 'max5']);
+      // The restarted week: no Pro reading (an estimated 0) and 5% on Max 5×.
+      expect(summary.weeks.map(w => w.percent)).toEqual([40, 5]);
     });
   });
 
@@ -226,23 +233,70 @@ describe('buildSummary', () => {
       expect(summary.current?.estimatedNow).toBeCloseTo(30 + k * 40);
     });
 
-    it('keeps the pooled ratio and the typical pace in a week holding a plan change', () => {
+    it('uses the own ratio and pace of the week from the restart', () => {
       // Last week ran whole on Max 5× at 1 %/$; this week starts on Pro and goes back to Max 5× a day in.
       const planHistory: PlanPeriod[] = [
         { from: '2026-09-01T00:00:00.000Z', plan: 'max5', source: 'manual' },
         { from: new Date(windowStart).toISOString(), plan: 'pro', source: 'manual' },
         { from: new Date(windowStart + DAY_MS).toISOString(), plan: 'max5', source: 'manual' },
       ];
-      // The % restarts at the change: 5 points a day from then on, against a cost counted from the window start.
+      // The % restarts at the change: 5 points a day from then on, against $20 a day counted from the restart.
       const thisWeek = [2, 3, 4].map(d => snap(windowStart + d * DAY_MS, (d - 1) * 5, RESET));
       const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory, records, snapshots: [...lastWeek, ...thisWeek], timeZone: 'UTC' });
       const current = summary.current!;
-      expect(summary.calibration?.k).toBeCloseTo(1);
-      expect(current.weekCalibration).toBeUndefined();
-      // 15 % at the last reading, $20 since at 1 %/$.
-      expect(current.estimatedNow).toBeCloseTo(35);
-      // The used % covers only part of the elapsed week, so it gives no pace: the $20 days at 1 %/$ do, for the 1⅓ days left.
-      expect(current.forecast?.median).toBeCloseTo(35 + 20 * 4 / 3);
+      expect(current.weekCalibration?.k).toBeCloseTo(0.25);
+      expect(current.weekCalibration?.n).toBe(3);
+      // 15 % at the last reading, $20 since at 0.25 %/$.
+      expect(current.estimatedNow).toBeCloseTo(20);
+      // 20 % over the 4⅔ days since the restart, kept for the 1⅓ days left.
+      expect(current.forecast?.median).toBeCloseTo(20 + 20 / (14 / 3) * 4 / 3);
+      expect(current.parts).toHaveLength(2);
+      expect(current.parts![0]).toMatchObject({ estimated: true, plan: 'pro' });
+      expect(current.parts![1]).toMatchObject({ estimated: true, plan: 'max5', start: new Date(windowStart + DAY_MS).toISOString() });
+      expect(current.parts![1]!.percent).toBeCloseTo(20);
+      expect(current.pacing.restart).toMatchObject({ at: windowStart + DAY_MS, plan: 'max5', previousPlan: 'pro' });
+    });
+
+    it('has no parts in a week that never restarted', () => {
+      const thisWeek = [1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET));
+      const current = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots: [...lastWeek, ...thisWeek], timeZone: 'UTC' }).current!;
+      expect(current.parts).toBeUndefined();
+      expect(current.pacing.restart).toBeUndefined();
+    });
+  });
+
+  describe('right after a plan change', () => {
+    const windowStart = Date.parse(RESET) - 7 * DAY_MS;
+    const history: PlanPeriod[] = [
+      { from: '2026-09-01T00:00:00.000Z', plan: 'pro', source: 'manual' },
+      { from: new Date(NOW - 2 * HOUR_MS).toISOString(), plan: 'max5', source: 'manual' },
+    ];
+    // Pro readings at 0.5 %/$, each with a 5-hour window (11:00 to 16:00) holding the day's $20, all before the change.
+    const proReadings = [1, 2, 3, 4].map(d => snap(windowStart + d * DAY_MS, d * 10, RESET, {
+      fiveHour: 20,
+      fiveHourResetsAt: new Date(windowStart + d * DAY_MS - 4 * HOUR_MS).toISOString(),
+    }));
+    const run = (snapshots: Snapshot[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory: history, records, snapshots, timeZone: 'UTC' });
+
+    it('borrows the fits of the previous plan, converted at the advertised multipliers', () => {
+      const summary = run(proReadings);
+      expect(summary.calibration).toMatchObject({ borrowedFrom: 'pro' });
+      expect(summary.calibration!.k).toBeCloseTo(0.5 / 5, 1);
+      expect(summary.fiveHourCalibration?.borrowedFrom).toBe('pro');
+      expect(summary.current?.forecast?.method).toBe('calibrated');
+    });
+
+    it('uses the own fit of the plan once it has 3 readings of 5% or more', () => {
+      const own = [90, 60, 30].map((minutes, i) => snap(NOW - minutes * 60_000, 41 + i, RESET));
+      const summary = run([...proReadings, ...own]);
+      expect(summary.calibration?.borrowedFrom).toBeUndefined();
+      expect(summary.calibration!.n).toBe(3);
+    });
+
+    it('has no fit when no plan has one', () => {
+      const summary = run([proReadings[0]!]);
+      expect(summary.calibration).toBeUndefined();
+      expect(summary.fiveHourCalibration).toBeUndefined();
     });
   });
 

@@ -56,6 +56,13 @@ claude.ai chat usage does not distort it. The fit is a weighted least squares
 through the origin, half-life 14 days, current plan only; readings under 5%
 and windows older than the first imported message are skipped.
 
+Right after a plan change the current plan has no fit of its own yet (3 readings of
+5% or more): the weekly and the 5-hour fits borrow the most recent other plan's,
+converted at the advertised multipliers (`borrowedFrom`, said so on the Fit card),
+until the plan has its own. Rejected: waiting, which leaves no projection for up to a
+day after an upgrade; converting with the measured multipliers, which needs 3
+completed weeks on both plans.
+
 ## Server-side summary in a Vite plugin
 
 The browser cannot read `~/.claude`, and a year of message records is around
@@ -181,9 +188,10 @@ plan can burn the limit at very different rates per dollar (two weeks measured
 understates a heavy week. So the current week uses its own fit (`weekCalibration`)
 once it has 3 readings of 5% or more, for its estimate since a stale reading, its
 forecast, its pacing and its active time; everything else (past weeks, Plans,
-value, the 5-hour side) keeps the pooled fit. A week holding a plan change gets
-neither its own fit nor its own pace (below): its % restarts at the change while
-its cost and elapsed time count from the window start. The pace comes from the days under
+value, the 5-hour side) keeps the pooled fit. A restarted week counts from its
+restart: its own fit takes the running part's readings on the current plan, the pace
+and the 3-day blend run from the restart, and the typical week is scaled to the
+share of the window left after it. The pace comes from the days under
 the current plan (at least 3, within the last 28), since the idle days before an
 upgrade say nothing about the usage after it. The forecast resamples the cost of
 the days left as a sum of days drawn with replacement (seeded, 1000 draws), and
@@ -277,7 +285,9 @@ A reading's `fiveHourResetsAt` places its 5-hour window exactly; messages
 outside every reading window open estimated windows (first message + 5 h), cut
 short where a reading window starts. Real data showed why: readings put windows
 at 07:50, 12:50… UTC back to back, while the transcript rebuild starts them at
-the first message. A reading window's peak is the highest % read in it, never
+the first message. An upgrade moves the 5-hour reset, so a reading window can start
+before the previous one ends: the previous one ends there, and the messages after
+the upgrade join the new window. A reading window's peak is the highest % read in it, never
 topped up with an estimate; an estimated window's peak is `k × cost` from the
 5-hour calibration, shown with "~". Rejected: the transcript-only rebuild alone.
 
@@ -318,20 +328,34 @@ plan like the Overview did; a completed week without a reading gets `k × cost`
 the weekly threshold: a transcript estimate, or a reading extended from before the reset, never counts, as on the Sessions tab. The day cells
 are fixed 24 h blocks from the reset, not calendar days: the reset is mid-day,
 and fixed blocks ignore DST. The Overview's "Past weeks" card was removed: the
-tab shows the same windows with more.
+tab shows the same windows with more. A week whose usage restarted shows the
+parts' % added up on the current plan, flagged with a tooltip listing each part
+(the median peak and the typical week include it).
 
-## A week holding a plan change keeps its 7 days and is left out of the fits
+## A weekly window splits where its usage restarts, and its parts add up
 
-Anthropic resets the usage on an upgrade, so the window's readings go from the old
-plan's % to the new plan's from about 0: its final % covers the new plan's part only,
-and its cost since the window start includes the old plan's usage. Such a week is
-flagged (`planChange`), shown on the Weeks tab, and left out of the calibration, the
-drift, the typical week, the median peak and the plan comparison. A downgrade is
-flagged the same way: the limit the % is read against changes inside the window
-either way. Rejected: cutting
-the window at the upgrade, because the plan comparison treats a week as 7 days and
-fills the time it did not observe at the typical pace (`weekSpan` in `planFit.ts`), so
-a shortened window reads as a mostly hidden week.
+Anthropic restarts the weekly usage before the reset time: on an upgrade (the Pro to
+Max 5× switch read 100% then 0%, with the same reset time, and restarted the 5-hour
+window too) and, as the backlog notes, perhaps as a free reset. Read as one block, the
+window's final % covers the new part only while its cost includes the old part's, so
+such a week misleads every statistic read as one block. `windowParts` (`restarts.ts`)
+splits a window into parts, recomputed from the readings and the plan history on every
+summary (nothing stored, so weeks already stored come back). A reading 2 points or more
+below the previous one of its window marks a restart, at the latest plan change between
+the two readings, else at the later reading; an upgrade (a larger advertised limit)
+before the window's first reading splits there, since the first reading already reads
+the new part. A plan change without a drop (a downgrade, or one made before a
+reading that shows no restart) keeps the window whole. Each reading's cost counts from
+its part's start, and a week's % is the sum of its parts' final %, converted to one
+plan: only the last part is extended to the reset, the ended ones come from their last
+reading, else from the cost on the calibration. The threshold of 2 points is above the
+rounding of one reading and well below any real restart (the one drop seen was 100 to
+0). Rejected: leaving the week out, which drops one week in every upgrade from the
+typical week, the median peak and the plan comparison; cutting it into separate
+windows, since `weekSpan` (`planFit.ts`) fills the time it did not observe at the typical
+pace and reads a short window as mostly hidden (so the parts stay in one week, each
+with its own observed and hidden time); converting the earlier part on the pacing chart,
+which would draw a Pro week at a fifth of its height instead of what the Pro limit read.
 
 ## Plans tab: best plan by verdict, Opus as Sonnet at today's price
 

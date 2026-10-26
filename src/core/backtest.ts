@@ -3,6 +3,7 @@ import type { DashboardSummary, SummaryInput } from './summary.ts';
 import type { PlanPeriod, Snapshot, UsageRecord } from './types.ts';
 
 import { FIVE_HOURS_MS, HOUR_MS, WEEK_MS } from './calibration.ts';
+import { windowParts } from './restarts.ts';
 import { FINAL_READING_MS } from './share.ts';
 import { median } from './stats.ts';
 import { buildSummary } from './summary.ts';
@@ -215,6 +216,9 @@ export function runBacktest(input: BacktestInput): BacktestReport {
   const snapshotTimes = snapshots.map(s => Date.parse(s.ts));
   const weeklyTruth = weeklyFinals(snapshots, now);
   const fiveHourTruth = fiveHourFinals(snapshots, records, now);
+  const restartStarts = [...windowParts(snapshots, planHistory)].map(([resetsAt, parts]) => ({ resetsAt, starts: parts.slice(1).map(part => part.start) }));
+  // A forecast made before a later restart of its window predicted a part that ended early.
+  const restartedAfter = (resetsAt: number, at: number) => restartStarts.some(w => Math.abs(w.resetsAt - resetsAt) <= RESET_TOLERANCE_MS && w.starts.some(start => start > at));
 
   const samples: BacktestSample[] = [];
   const unresolved = { fiveHour: new Set<number>(), weekly: new Set<number>() };
@@ -254,7 +258,7 @@ export function runBacktest(input: BacktestInput): BacktestReport {
       weekLimitThreshold: input.weekLimitThreshold,
     });
     const { current, fiveHourSession } = summary;
-    if (current)
+    if (current && !restartedAfter(Date.parse(current.resetsAt), at))
       record('weekly', at, Date.parse(current.resetsAt), WEEK_MS, current.forecast);
     if (fiveHourSession?.resetsAt)
       record('fiveHour', at, Date.parse(fiveHourSession.resetsAt), FIVE_HOURS_MS, fiveHourSession.forecast);

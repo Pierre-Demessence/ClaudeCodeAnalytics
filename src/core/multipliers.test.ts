@@ -55,9 +55,17 @@ describe('buildMultipliers', () => {
     expect(multipliers([...pro, ...max5.slice(0, 2)])[0]!.measured).toBeUndefined();
   });
 
-  it('leaves out the window holding the switch, taken on Max 5× but begun on Pro', () => {
+  it('counts the window holding the switch on both plans, each from its own part', () => {
+    // Week 5: Pro to 50% at day 3, the switch at day 5, then 12% on Max 5× at day 6.
+    const start = FIRST_RESET + 5 * WEEK_MS - WEEK_MS;
+    const onPro: Snapshot = { source: 'endpoint', ts: new Date(start + 3 * DAY_MS).toISOString(), weekly: 50, weeklyResetsAt: reset(5) };
+    const [proToMax5] = multipliers([...pro, onPro, ...max5], switchTo(switchedAt(5, 2 * DAY_MS)));
+    expect(proToMax5!.measured).toMatchObject({ fromWeeks: 6, toWeeks: 5 });
+  });
+
+  it('counts a window holding the switch on the new plan alone when it has no reading before it', () => {
     const [proToMax5] = multipliers([...pro, ...max5], switchTo(switchedAt(5, 2 * DAY_MS)));
-    expect(proToMax5!.measured).toMatchObject({ fromWeeks: 5, toWeeks: 4 });
+    expect(proToMax5!.measured).toMatchObject({ fromWeeks: 5, toWeeks: 5 });
   });
 
   it('leaves out the window still running', () => {

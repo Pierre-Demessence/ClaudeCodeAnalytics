@@ -742,6 +742,20 @@ small {
   stroke-linejoin: round;
 }
 
+.pacing-earlier {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.pacing-restart {
+  stroke: var(--text-secondary);
+  stroke-width: 2;
+  stroke-dasharray: 1 4;
+  stroke-linecap: round;
+}
+
 .pacing-projection {
   stroke: var(--accent);
   stroke-width: 2.5;
@@ -777,6 +791,10 @@ small {
   display: inline-block;
   width: 22px;
   border-top: 3px solid var(--accent);
+}
+
+.legend-earlier {
+  border-top: 2px solid var(--text-secondary);
 }
 
 .legend-projection {

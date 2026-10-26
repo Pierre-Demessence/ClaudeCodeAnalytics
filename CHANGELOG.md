@@ -6,6 +6,12 @@ Noteworthy changes for users. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Right after a plan change, the projections borrow the previous plan's ratio,
+  converted with the advertised limits, until the new plan has 3 readings of its
+  own; the Calibration tab says so.
+
 ### Fixed
 
 - The weekly forecast and "Room left" no longer understate a heavy week. The
@@ -13,10 +19,14 @@ Noteworthy changes for users. The format follows
   comes from the days under your current plan, the days left are projected as a
   resampled total instead of the median day times the days left, and over the
   week's first 3 days the projection moves to the week's own pace.
-- A week in which you change plans no longer skews the forecasts and the plan
-  comparison: its peak % covers only the new plan's part of the week. Such a week
-  is marked on the Weeks tab and left out of the calibration, the typical week,
-  the median peak and the plan comparison.
+- A week in which your usage restarts (a plan change, a free reset) is no longer
+  left out. It is split where the usage restarted: the forecast, the pacing and
+  the fits count from the restart, the earlier part is drawn on the pacing chart,
+  and the week's peak adds its parts up in the typical week, the median peak and
+  the plan comparison. The Weeks tab marks such a week and lists its parts.
+- The 5-hour window from before an upgrade now ends where the new one starts, so
+  the usage after an upgrade no longer lands in the old window, and the Plans tab
+  no longer counts the estimated sessions of an earlier plan too small.
 
 ## [0.2.0]
 

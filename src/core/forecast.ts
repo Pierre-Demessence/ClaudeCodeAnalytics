@@ -34,6 +34,12 @@ export interface ForecastInput {
   resampleSum?: boolean;
   resetsAt: number;
   sampleMs: number;
+  /**
+   * Where the usage counted in `used` began, when it restarted inside the window
+   * (an upgrade, a free reset); the window start by default. The window's own pace and trend
+   * count from it, and the typical % is scaled to the share of the window left after it.
+   */
+  startsAt?: number;
   /** Final % of past windows (25th, 50th, 75th percentile), for the `typical` method. */
   typical?: { high: number; low: number; median: number };
   /** Used % at `asOf`. */
@@ -82,11 +88,11 @@ function blendOwnPace(typical: [number, number, number], used: number, elapsed: 
 }
 
 /** A past window's final %, never below what is already used. No cap time: past weeks give no pace. */
-function typicalForecast(typical: NonNullable<ForecastInput['typical']>, used: number, asOf: number): WindowForecast {
+function typicalForecast(typical: NonNullable<ForecastInput['typical']>, used: number, asOf: number, scale: number): WindowForecast {
   const forecast: WindowForecast = {
-    high: Math.max(used, typical.high),
-    low: Math.max(used, typical.low),
-    median: Math.max(used, typical.median),
+    high: Math.max(used, typical.high * scale),
+    low: Math.max(used, typical.low * scale),
+    median: Math.max(used, typical.median * scale),
     method: 'typical',
   };
   if (used >= 100)
@@ -95,7 +101,8 @@ function typicalForecast(typical: NonNullable<ForecastInput['typical']>, used: n
 }
 
 /** Projects a limit window (weekly or 5-hour) to its reset. */
-export function forecastWindow({ asOf, k, ownPaceAfterMs, paceSamples, resampleSum, resetsAt, sampleMs, typical, used, windowMs }: ForecastInput): WindowForecast | undefined {
+export function forecastWindow({ asOf, k, ownPaceAfterMs, paceSamples, resampleSum, resetsAt, sampleMs, startsAt: restartedAt, typical, used, windowMs }: ForecastInput): WindowForecast | undefined {
+  const startsAt = restartedAt ?? resetsAt - windowMs;
   const periodsLeft = Math.max(0, (resetsAt - asOf) / sampleMs);
   let method: WindowForecast['method'];
   let rates: [number, number, number];
@@ -107,16 +114,16 @@ export function forecastWindow({ asOf, k, ownPaceAfterMs, paceSamples, resampleS
       ? resampledSums(paceSamples, periodsLeft).map(sum => sum / periodsLeft * k) as [number, number, number]
       : [0, 0, 0];
     if (ownPaceAfterMs !== undefined && periodsLeft > 0)
-      rates = blendOwnPace(rates, used, Math.max(0, asOf - (resetsAt - windowMs)) / sampleMs, ownPaceAfterMs / sampleMs);
+      rates = blendOwnPace(rates, used, Math.max(0, asOf - startsAt) / sampleMs, ownPaceAfterMs / sampleMs);
   }
   else if (k !== undefined && paceSamples.length > 0) {
     method = 'calibrated';
     rates = [0.25, 0.5, 0.75].map(q => quantile(paceSamples, q)! * k) as [number, number, number];
   }
   else {
-    const elapsed = asOf - (resetsAt - windowMs);
+    const elapsed = asOf - startsAt;
     if (elapsed < windowMs * MIN_TREND_SHARE)
-      return typical && typicalForecast(typical, used, asOf);
+      return typical && typicalForecast(typical, used, asOf, (resetsAt - startsAt) / windowMs);
     method = 'trend';
     const rate = used / (elapsed / sampleMs);
     rates = [rate, rate, rate];

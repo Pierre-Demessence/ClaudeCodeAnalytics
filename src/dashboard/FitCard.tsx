@@ -1,15 +1,25 @@
 import { CircleAlert } from 'lucide-react';
 
+import type { Plan } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
 
 import { WEEK_MS } from '@/core/calibration';
+import { PLAN_LABELS, PLAN_MULTIPLIERS } from '@/core/plans';
 import { InfoTip } from '@/dashboard/Tip';
 
 const per100 = (k: number) => `${(k * 100).toFixed(1)}%`;
 
+/** "Max 5× is 5× Pro", or "Pro is 1/5 of Max 5×". */
+function multiplierSentence(plan: Plan, from: Plan): string {
+  const ratio = PLAN_MULTIPLIERS[plan] / PLAN_MULTIPLIERS[from];
+  return ratio >= 1
+    ? `${PLAN_LABELS[plan]} is ${ratio}× ${PLAN_LABELS[from]}`
+    : `${PLAN_LABELS[plan]} is 1/${1 / ratio} of ${PLAN_LABELS[from]}`;
+}
+
 /** The fit that turns API-equivalent cost into a % of the limit. */
 export function FitCard({ summary }: { summary: Summary }) {
-  const { calibration, fiveHourCalibration, generatedAt, unknownModels } = summary;
+  const { calibration, fiveHourCalibration, generatedAt, plan, unknownModels } = summary;
   const weeks = calibration ? Math.ceil((Date.parse(generatedAt) - Date.parse(calibration.from)) / WEEK_MS) : 0;
   return (
     <section className="card cal-card cal-narrow">
@@ -35,10 +45,13 @@ export function FitCard({ summary }: { summary: Summary }) {
                       5-hour fit
                       <InfoTip label="About the 5-hour fit">The same fit on the 5-hour limit, from readings of 5% or more. The endpoint gives no Claude Code share there, so claude.ai use counts as Claude Code.</InfoTip>
                     </dt>
-                    <dd>{`${per100(fiveHourCalibration.k)} per $100, ±${fiveHourCalibration.rmse.toFixed(1)} pts`}</dd>
+                    <dd>{`${per100(fiveHourCalibration.k)} per $100, ±${fiveHourCalibration.rmse.toFixed(1)} pts${fiveHourCalibration.borrowedFrom ? ` (from ${PLAN_LABELS[fiveHourCalibration.borrowedFrom]})` : ''}`}</dd>
                   </>
                 )}
               </dl>
+              {calibration.borrowedFrom && (
+                <p className="note">{`Borrowed from your ${PLAN_LABELS[calibration.borrowedFrom]} readings and converted with the advertised limits (${multiplierSentence(plan, calibration.borrowedFrom)}) until ${PLAN_LABELS[plan]} has 3 readings of 5% or more, so the projections are rough.`}</p>
+              )}
               <p className="note">Fitted on your readings of 5% or more on the current plan, recent ones weighted more. A large typical error means the projections are rough.</p>
             </>
           )

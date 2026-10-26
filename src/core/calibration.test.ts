@@ -22,6 +22,22 @@ describe('calibrationPoints', () => {
     expect(points).toEqual([]);
   });
 
+  it('counts the cost of a reading from where its part started', () => {
+    const costBetween = (from: number, to: number) => (to - from) / DAY * 10;
+    const startOf = () => Date.parse('2026-10-01T00:00:00Z');
+    const points = calibrationPoints([snap('2026-10-02T00:00:00Z', 30)], costBetween, 0, startOf);
+    expect(points).toEqual([{ cost: 10, ts: Date.parse('2026-10-02T00:00:00Z'), usage: 30 }]);
+  });
+
+  it('keeps a part that started after the first message although its window started before', () => {
+    const startOf = () => Date.parse('2026-10-01T12:00:00Z');
+    const dataStart = Date.parse('2026-10-01T00:00:00Z');
+    // The window began 30 Sep 20:00, before the data; the part began after it.
+    const reading = { ...snap('2026-10-02T00:00:00Z', 30), weeklyResetsAt: '2026-10-07T20:00:00.000Z' };
+    expect(calibrationPoints([reading], () => 5, dataStart)).toEqual([]);
+    expect(calibrationPoints([reading], () => 5, dataStart, startOf)).toHaveLength(1);
+  });
+
   it('uses the whole reading when the share is unknown, and skips coarse readings', () => {
     const costBetween = () => 5;
     const points = calibrationPoints([snap('2026-10-02T00:00:00Z', 30), snap('2026-10-01T00:00:00Z', 4)], costBetween);

@@ -130,6 +130,9 @@ conversation titles, for sharing screenshots like the ones above.
   too; otherwise it is counted as Claude Code.
 - Other plans' figures are approximate, from Anthropic's advertised 5× and 20×
   multipliers; the Plans tab shows how well your own weeks match them.
+- When your usage restarts inside a week (an upgrade, a free reset), the week is
+  split there: the projection and the pacing start again from the restart, and the
+  week's peak adds the parts up.
 - When a reading is old, the dashboard says so and estimates the usage since
   from transcripts.
 

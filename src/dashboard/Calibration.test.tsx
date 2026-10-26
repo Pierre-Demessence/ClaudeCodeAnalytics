@@ -83,6 +83,20 @@ describe('calibration tab', () => {
     });
   });
 
+  describe('fit', () => {
+    const fit = { from: new Date(NOW - 5 * DAY).toISOString(), k: 0.1, n: 6, rmse: 1 };
+
+    it('says where a borrowed fit comes from, and keeps quiet about an own one', () => {
+      renderTab(summary({ calibration: { ...fit, borrowedFrom: 'pro' }, fiveHourCalibration: { ...fit, borrowedFrom: 'pro' }, plan: 'max5' }));
+      expect(screen.getByText(/Borrowed from your Pro readings.*\(Max 5× is 5× Pro\).*until Max 5× has 3 readings of 5% or more, so the projections are rough/)).toBeTruthy();
+      expect(screen.getByText(/per \$100, ±1\.0 pts \(from Pro\)/)).toBeTruthy();
+      cleanup();
+      renderTab(summary({ calibration: fit, fiveHourCalibration: fit }));
+      expect(screen.queryByText(/Borrowed from/)).toBeNull();
+      expect(screen.queryByText(/\(from /)).toBeNull();
+    });
+  });
+
   describe('limit drift', () => {
     it('hatches a bar far from the usual ratio, names the line and warns of a shift', () => {
       // 6 completed weeks at 10% per $100, the last 2 at 20%.
@@ -92,6 +106,18 @@ describe('calibration tab', () => {
       expect(screen.getByText(/usual 10\.0%/)).toBeTruthy();
       expect(screen.getByText(/costs 100% more of the limit/)).toBeTruthy();
       expect(screen.getByText('more than 15% off')).toBeTruthy();
+    });
+
+    it('says in the tip of a week that restarted where its count begins', () => {
+      const data = driftSummary(() => 10, 2);
+      const drift = data.limits.drift.map((w, i) => (i === 1 ? { ...w, from: new Date(NOW - DAY).toISOString() } : w));
+      const { container } = render(<TipProvider><Calibration {...{ busy: false, onAddReading: vi.fn(), onDeleteReading: vi.fn(), onSaveSettings: vi.fn(), summary: { ...data, limits: { ...data.limits, drift } } }} /></TipProvider>);
+      const bars = container.querySelectorAll('.drift-bar');
+      fireEvent.focus(bars[0]!);
+      expect(screen.getByRole('tooltip').textContent).not.toContain('Counted from');
+      fireEvent.blur(bars[0]!);
+      fireEvent.focus(bars[1]!);
+      expect(screen.getByRole('tooltip').textContent).toMatch(/Counted from .*: the week restarted/);
     });
 
     it('draws the bars without a usual line while there are fewer than 3 completed weeks', () => {

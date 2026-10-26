@@ -38,7 +38,7 @@ Run lint, test and build before considering work done.
 - `src/core/` — pure logic, no Node or DOM APIs: transcript parsing, events
   (rate-limit hits, overloads, compactions), output split by tool, context added per tool, pricing,
   aggregation, calibration, forecast, active pace, weekly share, week history,
-  cache anomalies, plans, plan fit, value for money, multipliers, breakdown, `buildSummary`,
+  cache anomalies, plans, restarts (a weekly window split where its usage restarted), plan fit, value for money, multipliers, breakdown, `buildSummary`,
   history ranges (`range.ts` resolves the picker's choice, `ranged.ts` builds the history
   tabs' views over one; both go through `prepareSummary` like `buildSummary`).
 - `src/collector/` — Node: transcript scan, usage endpoint client, data-dir

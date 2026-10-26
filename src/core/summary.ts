@@ -10,6 +10,7 @@ import type { ModelRatio } from './modelRatio.ts';
 import type { MultiplierCheck } from './multipliers.ts';
 import type { WeekPacing } from './pacing.ts';
 import type { PlanFitInput } from './planFit.ts';
+import type { PartPercent } from './restarts.ts';
 import type { FiveHourWindow, Sessions } from './sessions.ts';
 import type { WeekShare } from './share.ts';
 import type { ApiEvent, Plan, PlanPeriod, SessionInfo, Snapshot, UsageRecord } from './types.ts';
@@ -21,7 +22,7 @@ import { familyPaces } from './activeTime.ts';
 import { buildActivity } from './activity.ts';
 import { aggregate, createCostIndex, dailyCostSeries, dayKey } from './aggregate.ts';
 import { buildBreakdown } from './breakdown.ts';
-import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS, windowStart } from './calibration.ts';
+import { calibrationPoints, DAY_MS, fitRatio, FIVE_HOURS_MS, fiveHourCalibrationPoints, HOUR_MS, WEEK_MS } from './calibration.ts';
 import { dedupeHits, hitScope } from './events.ts';
 import { familyOf } from './family.ts';
 import { forecastWindow } from './forecast.ts';
@@ -30,8 +31,9 @@ import { modelRatios } from './modelRatio.ts';
 import { buildMultipliers } from './multipliers.ts';
 import { weekPacing } from './pacing.ts';
 import { buildPlanFitInput } from './planFit.ts';
-import { planAt, planChangeWithin, planFromSubscription } from './plans.ts';
+import { convertPercent, planAt, planFromSubscription } from './plans.ts';
 import { priceFor } from './pricing.ts';
+import { endedPartPercent, partStartOf, windowParts } from './restarts.ts';
 import { buildSessions, DEFAULT_LIMIT_THRESHOLD, fiveHourWindows, sessionPaces } from './sessions.ts';
 import { typicalWeek, weeklyShares } from './share.ts';
 import { subscriptionStartOf, valueForMoney } from './valueForMoney.ts';
@@ -97,6 +99,8 @@ export interface CurrentWeek {
   forecast?: WindowForecast;
   /** How the weekly % built up this week, and the daily budget left. */
   pacing: WeekPacing;
+  /** When the usage restarted inside the window: each part's % on its own plan, the running one last. */
+  parts?: PartPercent[];
   /** ISO time of the last reading; from an earlier week when `withoutReading`. */
   readAt: string;
   resetsAt: string;
@@ -202,6 +206,24 @@ export interface PreparedSummary {
   weeks: WeekShare[];
 }
 
+/**
+ * Right after a plan change the new plan has no fit yet: the most recent other plan
+ * that has one stands in, converted at the advertised multipliers (`k` is a % per
+ * dollar, so it scales like a %). Rough, since the multipliers are approximate.
+ */
+function borrowedFit(fitOn: (plan: Plan) => Calibration | undefined, plan: Plan, planHistory: readonly PlanPeriod[]): Calibration | undefined {
+  const tried = new Set<Plan>([plan]);
+  for (const period of planHistory.toReversed()) {
+    if (tried.has(period.plan))
+      continue;
+    tried.add(period.plan);
+    const fit = fitOn(period.plan);
+    if (fit)
+      return { ...fit, borrowedFrom: period.plan, k: convertPercent(fit.k, period.plan, plan), rmse: convertPercent(fit.rmse, period.plan, plan) };
+  }
+  return undefined;
+}
+
 /** The part of the summary that does not depend on a range. */
 export function prepareSummary(input: SummaryInput): PreparedSummary {
   const { now, planHistory, records, timeZone } = input;
@@ -217,11 +239,14 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     first = Math.min(first, Date.parse(record.ts));
   const firstDay = dayKey(first, timeZone);
 
-  // Calibrate only on readings taken under the current plan. The weekly one also skips windows holding a plan change: their cost since the start includes the other plan's usage.
-  const planSnapshots = snapshots.filter(s => planAt(planHistory, s.ts) === plan);
-  const wholeWeekSnapshots = planSnapshots.filter(s => !planChangeWithin(planHistory, windowStart(s), Date.parse(s.weeklyResetsAt)));
-  const calibration = fitRatio(calibrationPoints(wholeWeekSnapshots, costBetween, first), now);
-  const fiveHourCalibration = fitRatio(fiveHourCalibrationPoints(planSnapshots, costBetween, first), now);
+  // Calibrate only on readings taken under the current plan. A reading's cost counts from the start of its part: a restart inside the window (an upgrade, a free reset) empties the % but not the cost since the window start.
+  const parts = windowParts(snapshots, planHistory);
+  const startOf = partStartOf(parts);
+  const onPlan = (which: Plan) => snapshots.filter(s => planAt(planHistory, s.ts) === which);
+  const fitOn = (which: Plan) => fitRatio(calibrationPoints(onPlan(which), costBetween, first, startOf), now);
+  const fiveHourFitOn = (which: Plan) => fitRatio(fiveHourCalibrationPoints(onPlan(which), costBetween, first), now);
+  const calibration = fitOn(plan) ?? borrowedFit(fitOn, plan, planHistory);
+  const fiveHourCalibration = fiveHourFitOn(plan) ?? borrowedFit(fiveHourFitOn, plan, planHistory);
   const yesterday = dayKey(now - DAY_MS, timeZone);
   const typicalFrom = [firstDay, dayKey(now - TYPICAL_DAYS * DAY_MS, timeZone)].sort().at(-1)!;
   const dailyCostsFrom = (from: string) => from <= yesterday
@@ -278,14 +303,15 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     // Weekly windows are fixed 7-day blocks: a week without a reading yet follows the last known reset.
     const resetsAt = withoutReading ? windowStartOf(now, latestReset) + WEEK_MS : latestReset;
     const windowFrom = resetsAt - WEEK_MS;
+    // The window's parts: a restart (an upgrade, a free reset) empties the % but not the cost since the window start, so the week is counted from its running part.
+    const weekParts = parts.get(resetsAt) ?? [{ end: resetsAt, plan, readings: [], start: windowFrom }];
+    const running = weekParts.at(-1)!;
+    const restarted = weekParts.length > 1;
     // Weeks of one plan can burn the limit at very different rates per dollar (model mix):
     // with enough readings of its own, the week uses its own ratio rather than the pooled one.
-    // A plan change inside the week restarts its % but not its cost: neither its ratio nor its pace holds.
-    const weekReadings = snapshots.filter(s => Date.parse(s.weeklyResetsAt) === resetsAt);
-    const planChanged = planChangeWithin(planHistory, windowFrom, resetsAt);
-    const weekCalibration = withoutReading || planChanged
+    const weekCalibration = withoutReading
       ? undefined
-      : fitRatio(calibrationPoints(planSnapshots.filter(s => Date.parse(s.weeklyResetsAt) === resetsAt), costBetween, first), now);
+      : fitRatio(calibrationPoints(running.readings.filter(s => planAt(planHistory, s.ts) === plan), costBetween, first, startOf), now);
     const weekK = (weekCalibration ?? calibration)?.k;
 
     let used: number | undefined;
@@ -309,11 +335,12 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     if (used !== undefined) {
       const week = {
         k: weekK,
-        ownPaceAfterMs: planChanged ? undefined : OWN_PACE_AFTER_MS,
+        ownPaceAfterMs: OWN_PACE_AFTER_MS,
         paceSamples: dailyCosts,
         resampleSum: true,
         resetsAt,
         sampleMs: DAY_MS,
+        startsAt: running.start,
         typical: typicalBase && { high: typicalBase.high, low: typicalBase.low, median: typicalBase.median },
         windowMs: WEEK_MS,
       };
@@ -338,11 +365,17 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
           costBetween,
           k: weekK,
           now,
-          readings: weekReadings,
+          parts: weekParts,
           resetsAt,
           usedNow: estimatedNow ?? used,
           windowMs: WEEK_MS,
         }),
+        parts: restarted
+          ? [
+              ...weekParts.slice(0, -1).map(part => endedPartPercent(part, costBetween, calibration && { k: calibration.k, plan })),
+              { ...(estimatedNow !== undefined && { estimated: true as const }), percent: estimatedNow ?? used, plan: running.plan, start: new Date(running.start).toISOString() },
+            ]
+          : undefined,
       };
     }
   }

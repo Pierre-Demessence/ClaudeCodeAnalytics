@@ -2,7 +2,8 @@ import type { WindowForecast } from '@/core/forecast';
 import type { WeekPacing } from '@/core/pacing';
 
 import { DAY_MS } from '@/core/calibration';
-import { formatDateTime, formatDollars, formatPercent, formatWeekday } from '@/dashboard/format';
+import { PLAN_LABELS } from '@/core/plans';
+import { formatDateTime, formatDollars, formatPercent, formatWeekday, formatWeekdayTime } from '@/dashboard/format';
 import { scaleMax } from '@/dashboard/scale';
 import { InfoTip } from '@/dashboard/Tip';
 
@@ -23,11 +24,13 @@ interface Props {
 /**
  * Weekly % so far (solid), an even pace to 100 % (dashed), the projection to
  * reset (dotted) with its likely range (band), the limit and now. Each line is
- * labelled on the chart and has its own line style, not only a color.
+ * labelled on the chart and has its own line style, not only a color. After a
+ * restart (an upgrade, a free reset), the earlier part stays as a thinner grey line
+ * on its own plan's %, and the actual line, the even pace and the projection start at 0 there.
  */
 export function PacingChart({ forecast, now, pacing, usedNow }: Props) {
-  const { from, points, roomPerDay, spentPerDay, to } = pacing;
-  const top = scaleMax([100, usedNow, forecast?.high ?? 0]);
+  const { earlier, from, points, restart, roomPerDay, spentPerDay, to } = pacing;
+  const top = scaleMax([100, usedNow, forecast?.high ?? 0, ...(earlier ?? []).flatMap(part => part.points.map(p => p.percent))]);
   const x = (at: number) => LEFT + (Math.min(Math.max(at, from), to) - from) / (to - from) * (RIGHT - LEFT);
   const y = (percent: number) => BOTTOM - Math.min(percent, top) / top * (BOTTOM - TOP);
   const grid = [0, 25, 50, 75, 100, ...(top > 100 ? [top] : [])];
@@ -43,7 +46,17 @@ export function PacingChart({ forecast, now, pacing, usedNow }: Props) {
   const labelY = limitAboveDot > 2 && limitAboveDot < 26 ? y(100) - 6 : nowY - 8;
   const actual = points.map(p => `${x(p.at)},${y(p.percent)}`).join(' ');
   // "even pace" sits under its line three quarters of the way, clear of the limit line above.
+  const evenFrom = restart?.at ?? from;
   const evenAt = 0.75;
+  const evenLabelAt = evenFrom + evenAt * (to - evenFrom);
+  // The restart label sits right of its line under the limit line, or left of it near the right edge.
+  const restartX = restart && x(restart.at);
+  const restartLeft = restartX !== undefined && restartX > RIGHT - 170;
+  const restartLabel = restart && (restart.plan === restart.previousPlan
+    ? `usage reset ${formatWeekdayTime(restart.at)}`
+    : `${PLAN_LABELS[restart.plan]} from ${formatWeekdayTime(restart.at)}`);
+  const spentSince = restart ? `Since the ${restart.plan === restart.previousPlan ? 'reset' : 'plan change'}` : 'So far this week';
+  const earlierLegend = restart?.plan === restart?.previousPlan ? 'before the reset' : 'before the plan change';
 
   return (
     <section className="card">
@@ -59,7 +72,7 @@ export function PacingChart({ forecast, now, pacing, usedNow }: Props) {
             {' '}
             to reach 100% at reset
             <InfoTip label="About room left">
-              {`API-equivalent dollars per day you can use from now on and still end the week at 100%.${spentPerDay === undefined ? '' : ` So far this week you used ${formatDollars(spentPerDay)}/day.`}`}
+              {`API-equivalent dollars per day you can use from now on and still end the week at 100%.${spentPerDay === undefined ? '' : ` ${spentSince} you used ${formatDollars(spentPerDay)}/day.`}`}
             </InfoTip>
           </span>
         )}
@@ -80,8 +93,18 @@ export function PacingChart({ forecast, now, pacing, usedNow }: Props) {
           {forecast && (
             <polygon className="pacing-band" points={`${nowX},${nowY} ${x(to)},${y(forecast.high)} ${x(to)},${y(forecast.low)}`} />
           )}
-          <line className="pacing-even" x1={x(from)} x2={x(to)} y1={y(0)} y2={y(100)} />
-          <text className="pacing-label" x={x(from + evenAt * (to - from))} y={y(100 * evenAt) + 18}>even pace</text>
+          {earlier?.map((part, i) => (
+            // eslint-disable-next-line react/no-array-index-key -- parts are a fixed ordered list
+            <polyline className="pacing-earlier" key={i} points={part.points.map(p => `${x(p.at)},${y(p.percent)}`).join(' ')} />
+          ))}
+          {restartX !== undefined && (
+            <>
+              <line className="pacing-restart" x1={restartX} x2={restartX} y1={TOP + 4} y2={BOTTOM} />
+              <text className="pacing-label" textAnchor={restartLeft ? 'end' : 'start'} x={restartLeft ? restartX - 6 : restartX + 6} y={y(100) + 16}>{restartLabel}</text>
+            </>
+          )}
+          <line className="pacing-even" x1={x(evenFrom)} x2={x(to)} y1={y(0)} y2={y(100)} />
+          <text className="pacing-label" x={x(evenLabelAt)} y={y(100 * evenAt) + 18}>even pace</text>
           <polyline className="pacing-actual" points={actual} />
           {forecast && <line className="pacing-projection" x1={nowX} x2={x(to)} y1={nowY} y2={y(forecast.median)} />}
           <line className="pacing-now" x1={nowX} x2={nowX} y1={TOP + 4} y2={BOTTOM} />
@@ -96,6 +119,12 @@ export function PacingChart({ forecast, now, pacing, usedNow }: Props) {
           <span className="legend-line legend-actual" />
           actual
         </li>
+        {earlier && earlier.length > 0 && (
+          <li>
+            <span className="legend-line legend-earlier" />
+            {earlierLegend}
+          </li>
+        )}
         {forecast && (
           <li>
             <span className="legend-line legend-projection" />

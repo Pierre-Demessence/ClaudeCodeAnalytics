@@ -261,15 +261,30 @@ describe('plan change', () => {
     { from: iso(weekStart(5)), plan: 'pro' as const, source: 'detected' as const },
     { from: iso(weekStart(2) + 3 * DAY_MS), plan: 'max5' as const, source: 'manual' as const },
   ];
+  /** Week 2: Pro to 100%, then Max 5× from day 3 to 20%: 40% of Max 5× in all. */
+  const restartedShare = {
+    ...share(2, 40),
+    planChange: true as const,
+    parts: [
+      { percent: 100, plan: 'pro' as const, start: iso(weekStart(2)) },
+      { percent: 20, plan: 'max5' as const, start: iso(weekStart(2) + 3 * DAY_MS) },
+    ],
+  };
+  const reading = (ms: number, weekly: number): Snapshot => ({ source: 'endpoint', ts: iso(ms), weekly, weeklyResetsAt: iso(weekStart(2) + WEEK_MS) });
 
-  it('marks the window the new plan started in, with its full length', () => {
-    const { weeks: rows } = weeks({ planHistory, shares: [share(1, 60), share(2, 20), share(3, 50)], snapshots: [snap(1), snap(2), snap(3)] });
+  it('marks the window the new plan started in, with its full length and its parts', () => {
+    const { weeks: rows } = weeks({ planHistory, shares: [share(1, 60), restartedShare, share(3, 50)], snapshots: [snap(1), snap(2), snap(3)] });
     expect(rows.map(w => [w.start, w.planChange])).toEqual([
       [iso(weekStart(1)), undefined],
       [iso(weekStart(2)), true],
       [iso(weekStart(3)), undefined],
     ]);
-    expect(rows[1]).toMatchObject({ end: iso(weekStart(1)), start: iso(weekStart(2)) });
+    expect(rows[1]).toMatchObject({ end: iso(weekStart(1)), percent: 40, start: iso(weekStart(2)) });
+    expect(rows[1]!.parts).toEqual([
+      { end: iso(weekStart(2) + 3 * DAY_MS), percent: 20, plan: 'pro', planPercent: 100, start: iso(weekStart(2)) },
+      { end: iso(weekStart(1)), percent: 20, plan: 'max5', planPercent: 20, start: iso(weekStart(2) + 3 * DAY_MS) },
+    ]);
+    expect(rows[0]!.parts).toBeUndefined();
   });
 
   it('marks nothing without a change in the history', () => {
@@ -277,15 +292,58 @@ describe('plan change', () => {
     expect(rows.some(w => w.planChange)).toBe(false);
   });
 
-  it('leaves its percent out of the median peak, but keeps its cost in the median cost', () => {
+  it('keeps its percent in the median peak and its cost in the median cost', () => {
     const { stats } = weeks({
       planHistory,
-      // $20, $40 (the flagged week) and $60: dropping the flagged week would move the median cost to 40.
+      // $20, $40 (the restarted week) and $60.
       records: [rec(weekStart(1) + 1000), rec(weekStart(2) + 1000), rec(weekStart(2) + 2000), rec(weekStart(3) + 1000), rec(weekStart(3) + 2000), rec(weekStart(3) + 3000)],
-      shares: [share(1, 60), share(2, 20), share(3, 100)],
+      shares: [share(1, 60), restartedShare, share(3, 100)],
       snapshots: [snap(1), snap(2), snap(3)],
     });
-    expect(stats).toMatchObject({ medianCost: 40, medianPercent: 80 });
+    expect(stats).toMatchObject({ medianCost: 40, medianPercent: 60 });
+  });
+
+  it('counts a week as having hit the limit when a part ended at the threshold of its own plan', () => {
+    const { stats, weeks: rows } = weeks({ planHistory, shares: [restartedShare], snapshots: [snap(2)] });
+    // The Max 5× part ended at 20%, the Pro part at 100% of Pro.
+    expect(rows[0]!.hit).toBe(true);
+    expect(stats.hit).toBe(1);
+    const estimated = { ...restartedShare, estimated: true, parts: [{ ...restartedShare.parts[0], estimated: true as const }, restartedShare.parts[1]!] };
+    expect(weeks({ planHistory, shares: [estimated], snapshots: [snap(2)] }).weeks[0]!.hit).toBeUndefined();
+  });
+
+  it('gives each part its own pressure point, and the row the first one', () => {
+    const readings = [reading(weekStart(2) + DAY_MS, 92), reading(weekStart(2) + 2 * DAY_MS, 100), reading(weekStart(2) + 4 * DAY_MS, 20)];
+    const { weeks: rows } = weeks({ planHistory, shares: [restartedShare], snapshots: readings });
+    const [pro, max5] = rows[0]!.parts!;
+    expect(pro).toMatchObject({ pressureAt: iso(weekStart(2) + DAY_MS), pressurePercent: 92 / 5 });
+    expect(max5!.pressureAt).toBeUndefined();
+    expect(rows[0]).toMatchObject({ pressureAt: iso(weekStart(2) + DAY_MS), pressurePercent: 92 / 5 });
+  });
+
+  it('adds the earlier parts to the % of the window in progress', () => {
+    const current = {
+      estimatedNow: 8,
+      resetsAt: iso(START + WEEK_MS),
+      weekly: 5,
+      parts: [
+        { percent: 100, plan: 'pro' as const, start: iso(START) },
+        { estimated: true as const, percent: 8, plan: 'max5' as const, start: iso(START + DAY_MS) },
+      ],
+    };
+    const { weeks: rows } = weeks({ current, planHistory: [{ from: iso(START - 9 * DAY_MS), plan: 'pro', source: 'manual' }, { from: iso(START + DAY_MS), plan: 'max5', source: 'manual' }] });
+    expect(rows[0]).toMatchObject({ inProgress: true, percent: 28, percentEstimated: true });
+    expect(rows[0]!.parts).toHaveLength(2);
+    // The Pro part is a final reading at its limit.
+    expect(rows[0]!.hit).toBe(true);
+  });
+
+  it('shows a reset week on one plan as parts, without the plan-change flag', () => {
+    const reset = { ...share(2, 45), parts: [{ percent: 40, plan: 'max5' as const, start: iso(weekStart(2)) }, { percent: 5, plan: 'max5' as const, start: iso(weekStart(2) + 3 * DAY_MS) }] };
+    const { weeks: rows } = weeks({ shares: [reset], snapshots: [snap(2)] });
+    expect(rows[0]!.planChange).toBeUndefined();
+    expect(rows[0]!.parts!.map(part => part.percent)).toEqual([40, 5]);
+    expect(rows[0]!.percent).toBe(45);
   });
 });
 

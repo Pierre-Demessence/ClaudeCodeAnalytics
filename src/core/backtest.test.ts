@@ -207,6 +207,17 @@ describe('runBacktest', () => {
     expect(report.scores.find(s => s.kind === 'weekly' && s.lead === 'all')!.medianAbsError).toBe(0);
   });
 
+  it('does not score a weekly forecast made before a later restart of its window', () => {
+    const weeklySamples = (report: ReturnType<typeof run>['report']) => report.scores.find(s => s.kind === 'weekly' && s.lead === 'all')!.samples;
+    // Every 12 h in the 7 days before the reset, minus the one at the reset itself.
+    expect(weeklySamples(run().report)).toBe(14);
+    // The % drops from 60 to 5 two days before the reset: only the forecasts made from then on predict the part that ended.
+    const restarted = [snap(reset3 - 3 * DAY_MS, 60, reset3), snap(reset3 - 2 * DAY_MS, 5, reset3), ...snapshots];
+    const { report } = run({ snapshots: restarted });
+    expect(weeklySamples(report)).toBe(4);
+    expect(report.leftOut.weekly).toBe(0);
+  });
+
   it('orders readings by time when timestamps differ in format', () => {
     const mixed = [
       { ...snap(NOW - 3 * HOUR_MS, 10, T0 + 5 * WEEK_MS), ts: new Date(NOW - 3 * HOUR_MS + 500).toISOString() },

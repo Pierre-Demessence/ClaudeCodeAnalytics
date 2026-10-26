@@ -1,4 +1,5 @@
 import type { Range } from './range.ts';
+import type { PartPercent } from './restarts.ts';
 import type { FiveHourWindow } from './sessions.ts';
 import type { WeekShare } from './share.ts';
 import type { ApiEvent, Plan, PlanPeriod, Snapshot, UsageRecord } from './types.ts';
@@ -18,6 +19,25 @@ const HISTORY_WEEKS = 12;
 /** Projects kept per week; `projectCount` has the total. */
 const TOP_PROJECTS = 5;
 
+/** One part of a window whose usage restarted: the time between two restarts. */
+export interface WeekPart {
+  /** ISO. */
+  end: string;
+  /** The part's final %, on the current plan. */
+  percent: number;
+  /** Not a final reading: no reading in the part, extended from an early one, or estimated now. */
+  percentEstimated?: true;
+  plan: Plan;
+  /** The part's final %, on its own plan. */
+  planPercent: number;
+  /** ISO; the first reading of the part at `PRESSURE_PERCENT` of its own plan. Absent for the window in progress. */
+  pressureAt?: string;
+  /** The weekly % at `pressureAt`, on the current plan. */
+  pressurePercent?: number;
+  /** ISO. */
+  start: string;
+}
+
 export interface WeekRow {
   /** 5-hour sessions started in the week that a rate limit seen in the transcripts blocked. */
   blockedSessions: number;
@@ -34,11 +54,13 @@ export interface WeekRow {
   /** ISO times of the weekly-limit hits seen in the transcripts during the week; absent without any. */
   limitHits?: string[];
   messages: number;
-  /** Final weekly %, on the current plan. */
+  /** The parts of a window whose usage restarted (an upgrade, a free reset), oldest first; their % add up to `percent`. */
+  parts?: WeekPart[];
+  /** Final weekly %, on the current plan; for a restarted window, the parts added up. */
   percent?: number;
   /** Not a final reading: extended from an early one, estimated now, or from transcripts. */
   percentEstimated?: true;
-  /** A plan change started inside the window, which keeps its 7 days: the final % covers the new plan's part only, and the plan comparison, typical week and calibration leave it out. */
+  /** A plan change started inside the window, which keeps its 7 days; shown as such (the % adds the parts up). */
   planChange?: true;
   /** ISO; the first reading of the week at `PRESSURE_PERCENT`, or for a week estimated from transcripts the message at which `k × cost so far` reaches it. */
   pressureAt?: string;
@@ -57,7 +79,7 @@ export interface WeekRow {
 }
 
 export interface WeekHistory {
-  /** Medians leave out the window in progress; the % median also leaves out windows holding a plan change, the cost median windows without Claude Code messages. */
+  /** Medians leave out the window in progress; the cost median also leaves out windows without Claude Code messages. */
   stats: { blocked: number; hit: number; medianCost?: number; medianPercent?: number };
   /** The windows starting in the range, or the last 12 without one; newest first. */
   weeks: WeekRow[];
@@ -69,7 +91,7 @@ export interface WeekHistoryInput {
   /** % of the weekly limit per dollar, when calibrated. */
   calibrationK?: number;
   /** The weekly window now, as in `CurrentWeek`. */
-  current?: { estimatedNow?: number; resetsAt: string; weekly: number; withoutReading?: true };
+  current?: { estimatedNow?: number; parts?: readonly PartPercent[]; resetsAt: string; weekly: number; withoutReading?: true };
   now: number;
   /** The plan the percents are shown on. */
   plan: Plan;
@@ -108,6 +130,18 @@ function pressureByCost(spend: readonly { cost: number; ms: number }[], k: numbe
       return { at: new Date(ms).toISOString(), percent: Math.min(100, k * total) };
   }
   return undefined;
+}
+
+const sumOnPlan = (parts: readonly PartPercent[], plan: Plan) => parts.reduce((sum, part) => sum + convertPercent(part.percent, part.plan, plan), 0);
+
+/**
+ * Whether a week hit the limit: its final reading is not an estimate and reaches the threshold. A restarted
+ * window hits when any part ended on a reading at the threshold of its own plan.
+ */
+function hitOf(parts: readonly WeekPart[] | undefined, percent: number | undefined, estimated: boolean, threshold: number): boolean {
+  if (parts)
+    return parts.some(part => !part.percentEstimated && part.planPercent >= threshold);
+  return !estimated && percent !== undefined && percent >= threshold;
 }
 
 /** The weekly windows starting in a range, or the last 12: final %, cost per day, sessions and projects. */
@@ -153,16 +187,23 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
     let percentEstimated = false;
     let source: WeekRow['source'] = 'reading';
     let pressure: { at: string; percent: number } | undefined;
+    let partsOf: readonly PartPercent[] | undefined;
+    let completed = false;
     const share = shares.find(s => Date.parse(s.resetsAt) === end);
     if (current && Date.parse(current.resetsAt) === end) {
       percent = current.estimatedNow ?? current.weekly;
       percentEstimated = current.estimatedNow !== undefined || current.withoutReading === true;
+      partsOf = current.parts;
+      if (current.parts)
+        percent = sumOnPlan(current.parts, plan);
       if (current.withoutReading)
         source = 'estimated';
     }
     else if (share) {
       percent = convertPercent(share.percent, share.plan, plan);
       percentEstimated = share.estimated;
+      partsOf = share.parts;
+      completed = true;
       const reached = snapshots
         .filter(s => Date.parse(s.weeklyResetsAt) === end && s.weekly >= PRESSURE_PERCENT)
         .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))[0];
@@ -175,6 +216,32 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       pressure = pressureByCost(week.spend, calibrationK);
     }
 
+    const parts = partsOf?.map((part, i): WeekPart => {
+      const partStart = Date.parse(part.start);
+      const partEnd = partsOf[i + 1] ? Date.parse(partsOf[i + 1]!.start) : end;
+      // The window in progress has no pressure point: it is still going.
+      const reached = !completed
+        ? undefined
+        : snapshots
+          .filter(s => Date.parse(s.weeklyResetsAt) === end && Date.parse(s.ts) >= partStart && Date.parse(s.ts) < partEnd && s.weekly >= PRESSURE_PERCENT)
+          .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))[0];
+      return {
+        end: new Date(partEnd).toISOString(),
+        percent: convertPercent(part.percent, part.plan, plan),
+        percentEstimated: part.estimated,
+        plan: part.plan,
+        planPercent: part.percent,
+        pressureAt: reached?.ts,
+        pressurePercent: reached && convertPercent(reached.weekly, part.plan, plan),
+        start: part.start,
+      };
+    });
+    if (parts) {
+      const first = parts.find(part => part.pressureAt !== undefined);
+      pressure = first && { at: first.pressureAt!, percent: first.pressurePercent! };
+      percentEstimated ||= parts.some(part => part.percentEstimated);
+    }
+
     const weekHits = hits.map(hit => hit.ts).filter(ts => Date.parse(ts) >= start && Date.parse(ts) < end);
 
     return {
@@ -183,10 +250,11 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       cost: week.cost,
       days: week.days.map((cost, i) => (start + i * DAY_MS > now ? null : cost)),
       end: new Date(end).toISOString(),
-      hit: source === 'reading' && !percentEstimated && percent !== undefined && percent >= weekLimitThreshold ? true : undefined,
+      hit: source === 'reading' && hitOf(parts, percent, percentEstimated, weekLimitThreshold) ? true : undefined,
       inProgress: inProgress ? true : undefined,
       limitHits: weekHits.length > 0 ? weekHits : undefined,
       messages: week.messages,
+      parts,
       percent,
       percentEstimated: percentEstimated ? true : undefined,
       planChange: planChangeWithin(planHistory, start, end) || undefined,
@@ -208,7 +276,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       blocked: rows.filter(w => w.blockedSessions > 0 || w.limitHits).length,
       hit: rows.filter(w => w.hit).length,
       medianCost: median(done.filter(w => w.messages > 0).map(w => w.cost)),
-      medianPercent: median(done.filter(w => w.percent !== undefined && !w.planChange).map(w => w.percent!)),
+      medianPercent: median(done.filter(w => w.percent !== undefined).map(w => w.percent!)),
     },
   };
 }

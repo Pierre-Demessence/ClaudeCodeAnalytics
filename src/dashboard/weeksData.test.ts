@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { FitWeek, PlanFitInput } from '@/core/planFit';
-import type { WeekRow } from '@/core/weekHistory';
+import type { WeekPart, WeekRow } from '@/core/weekHistory';
 
 import { chartBars } from '@/dashboard/plansData';
-import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
+import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, restartTip, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 function week(extra: Partial<WeekRow> = {}): WeekRow {
   return { blockedSessions: 0, cappedSessions: 0, cost: 0, days: [], end: '2026-10-08T05:00:00.000Z', messages: 0, projectCount: 0, projects: [], sessions: 0, source: 'reading', start: '2026-10-01T05:00:00.000Z', ...extra };
@@ -102,5 +102,30 @@ describe('estimate without the limit', () => {
         expect(bars[i]!.label).toBe(`${Math.round(fit.demand)}%`);
     });
     expect(uncappedMedian(planFit, 60)).toBe(150);
+  });
+});
+
+describe('restartTip', () => {
+  const part = (extra: Partial<WeekPart>): WeekPart => ({ end: '2026-10-03T10:00:00.000Z', percent: 0, plan: 'pro', planPercent: 0, start: '2026-10-01T05:00:00.000Z', ...extra });
+
+  it('lists the parts of a plan change and says how the peak adds them up', () => {
+    const parts = [part({ planPercent: 100 }), part({ end: '2026-10-08T05:00:00.000Z', percent: 6, plan: 'max5', planPercent: 30, start: '2026-10-03T10:00:00.000Z' })];
+    expect(restartTip(week({ parts, planChange: true }), 'max5', 'UTC')).toBe([
+      'Usage restarted with the change to Max 5× on Sat 3 Oct 10:00.',
+      'Pro until Sat 3 Oct 10:00: 100% of Pro',
+      'Max 5× from Sat 3 Oct 10:00: 30% of Max 5×',
+      'The peak adds the parts up, on Max 5×.',
+    ].join('\n'));
+  });
+
+  it('says a reset without a plan change, and marks an estimated part', () => {
+    const parts = [part({ percentEstimated: true, planPercent: 40 }), part({ planPercent: 5, start: '2026-10-03T10:00:00.000Z' })];
+    const text = restartTip(week({ parts }), 'pro', 'UTC');
+    expect(text).toContain('Usage reset on Sat 3 Oct 10:00, without a plan change.');
+    expect(text).toContain('Pro until Sat 3 Oct 10:00: ~40% of Pro');
+  });
+
+  it('explains a plan change without a reset', () => {
+    expect(restartTip(week({ planChange: true }), 'max5', 'UTC')).toContain('without a usage reset');
   });
 });

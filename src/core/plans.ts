@@ -18,16 +18,25 @@ export function planAt(history: readonly PlanPeriod[], ts: string): Plan {
   return active;
 }
 
+export interface PlanChange {
+  /** Start of the new period (ms). */
+  at: number;
+  from: Plan;
+  to: Plan;
+}
+
+/** Each period whose plan differs from the one before; the first period is no change. */
+export function planChanges(history: readonly PlanPeriod[]): PlanChange[] {
+  return history.flatMap((period, i): PlanChange[] =>
+    i > 0 && period.plan !== history[i - 1]!.plan ? [{ at: Date.parse(period.from), from: history[i - 1]!.plan, to: period.plan }] : []);
+}
+
 /**
  * Whether a period of another plan starts inside a window (strictly: a change
- * at its start leaves it whole). The window then holds two plans' usage, and a
- * reading of it belongs to neither.
+ * at its start leaves it whole).
  */
 export function planChangeWithin(history: readonly PlanPeriod[], from: number, to: number): boolean {
-  return history.some((period, i) => {
-    const time = Date.parse(period.from);
-    return i > 0 && period.plan !== history[i - 1]!.plan && time > from && time < to;
-  });
+  return planChanges(history).some(change => change.at > from && change.at < to);
 }
 
 /** List price in USD per month (monthly billing, checked 2026-10-03). */

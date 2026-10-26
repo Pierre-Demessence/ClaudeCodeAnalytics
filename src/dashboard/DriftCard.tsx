@@ -5,7 +5,7 @@ import type { Summary } from '@/dashboard/api';
 
 import { WEEK_MS } from '@/core/calibration';
 import { isOff, MIN_DRIFT_WEEKS } from '@/core/limits';
-import { formatDay, formatUsd } from '@/dashboard/format';
+import { formatDateTime, formatDay, formatUsd } from '@/dashboard/format';
 import { useTip } from '@/dashboard/useTip';
 
 /** Headroom above the tallest bar or the usual line. */
@@ -70,6 +70,12 @@ export function DriftCard({ summary }: { summary: Summary }) {
                           {`${window.ratio.toFixed(1)}% of the weekly limit per $100`}
                           <br />
                           {`${formatUsd(window.cost)} of usage, Claude Code ${Math.round(window.claudeCode)}% of the weekly %`}
+                          {window.from && (
+                            <>
+                              <br />
+                              {`Counted from ${formatDateTime(window.from)}: the week restarted`}
+                            </>
+                          )}
                           {off && (
                             <>
                               <br />

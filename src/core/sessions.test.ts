@@ -138,6 +138,21 @@ describe('estimated windows', () => {
     ]);
   });
 
+  it('ends a reading window where the next one starts when an upgrade moved the reset', () => {
+    // The reset moved from 19:20 to 21:20: the new window starts at 16:20, before the old one ends.
+    const hit = (ts: string): ApiEvent => ({ key: ts, kind: 'limit', limitType: 'five_hour', resetsAt: '2026-10-02T19:20:00.000Z', ts });
+    const { windows } = sessions(
+      [rec('2026-10-02T15:00:00Z'), rec('2026-10-02T17:00:00Z')],
+      [snap('2026-10-02T15:10:00Z', '2026-10-02T19:20:00.000Z', 40), snap('2026-10-02T17:10:00Z', '2026-10-02T21:20:00.000Z', 5)],
+      { hits: [hit('2026-10-02T15:30:00Z'), hit('2026-10-02T17:20:00Z')], now: Date.parse('2026-10-02T17:30:00Z') },
+    );
+    expect(windows.map(w => [w.start, w.end, w.messages, w.inProgress])).toEqual([
+      ['2026-10-02T16:20:00.000Z', '2026-10-02T21:20:00.000Z', 1, true],
+      ['2026-10-02T14:20:00.000Z', '2026-10-02T16:20:00.000Z', 1, undefined],
+    ]);
+    expect(windows.map(w => w.limitHits)).toEqual([['2026-10-02T17:20:00Z'], ['2026-10-02T15:30:00Z']]);
+  });
+
   it('estimates the peak from the 5-hour calibration, without one leaves it out', () => {
     expect(sessions([rec('2026-10-01T09:00:00Z')], [], { k: 2 }).windows[0]).toMatchObject({ peak: 40, peakEstimated: true });
     const [window] = sessions([rec('2026-10-01T09:00:00Z')]).windows;

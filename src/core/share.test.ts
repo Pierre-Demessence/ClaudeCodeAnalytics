@@ -34,14 +34,46 @@ describe('weeklyShares', () => {
     expect(capped[0]?.percent).toBe(100);
   });
 
-  it('marks a window holding a plan change', () => {
+  it('marks a window holding a plan change, and adds the parts up on the new plan', () => {
     const upgraded: PlanPeriod[] = [...history, { from: '2026-10-10T00:00:00Z', plan: 'max5', source: 'manual' }];
     const shares = weeklyShares([
       snap('2026-10-07T19:00:00Z', 60, '2026-10-07T20:00:00Z'),
+      snap('2026-10-09T19:00:00Z', 100, '2026-10-14T20:00:00Z'),
       snap('2026-10-14T19:00:00Z', 20, '2026-10-14T20:00:00Z'),
       snap('2026-10-18T19:00:00Z', 30, '2026-10-19T20:00:00Z'),
     ], () => 0, undefined, upgraded, now);
     expect(shares.map(share => share.planChange)).toEqual([undefined, true, undefined]);
+    // Pro's 100% is 20% of Max 5×, and the Max 5× part reached 20% on top.
+    expect(shares[1]).toMatchObject({ estimated: false, percent: 40, plan: 'max5' });
+    expect(shares[1]!.parts).toEqual([
+      { percent: 100, plan: 'pro', start: '2026-10-07T20:00:00.000Z' },
+      { percent: 20, plan: 'max5', start: '2026-10-10T00:00:00.000Z' },
+    ]);
+    expect(shares[0]!.parts).toBeUndefined();
+  });
+
+  it('adds the parts of a reset week on one plan', () => {
+    const shares = weeklyShares([
+      snap('2026-10-09T19:00:00Z', 70, '2026-10-14T20:00:00Z'),
+      snap('2026-10-10T19:00:00Z', 5, '2026-10-14T20:00:00Z'),
+      snap('2026-10-14T19:00:00Z', 30, '2026-10-14T20:00:00Z'),
+    ], () => 0, undefined, history, now);
+    expect(shares[0]).toMatchObject({ estimated: false, percent: 100, plan: 'pro' });
+    expect(shares[0]!.planChange).toBeUndefined();
+    expect(shares[0]!.parts).toHaveLength(2);
+  });
+
+  it('extends only the part that ran to the reset, and estimates an ended part without readings', () => {
+    const upgraded: PlanPeriod[] = [...history, { from: '2026-10-10T00:00:00Z', plan: 'max5', source: 'manual' }];
+    // The only reading comes after the upgrade and a day early: the Pro part has none.
+    const shares = weeklyShares([snap('2026-10-13T20:00:00Z', 10, '2026-10-14T20:00:00Z')], (from, to) => (to - from) / 3_600_000, { k: 0.1, plan: 'max5' }, upgraded, now);
+    // Max 5× part: 10% + 24 h at $1 an hour × 0.1 %/$ = 12.4%. The Pro part comes from its cost (0.1 %/$ of Max 5× is 0.5 %/$ of Pro).
+    const [ended, running] = shares[0]!.parts!;
+    expect(ended).toMatchObject({ estimated: true, plan: 'pro' });
+    expect(running).toMatchObject({ estimated: true, plan: 'max5' });
+    expect(running!.percent).toBeCloseTo(12.4);
+    expect(shares[0]!.percent).toBeCloseTo(running!.percent + ended!.percent / 5);
+    expect(shares[0]!.estimated).toBe(true);
   });
 
   it('marks an early last reading as estimated even without a ratio', () => {
@@ -60,14 +92,13 @@ describe('typicalWeek', () => {
     expect(typical).toEqual({ high: 55, low: 45, max: 60, median: 50, min: 40, weeks: 3 });
   });
 
-  it('leaves out a week holding a plan change', () => {
+  it('keeps a restarted week, its parts added up', () => {
     const typical = typicalWeek([
       { estimated: false, percent: 40, plan: 'pro', resetsAt: 'a' },
-      { estimated: false, percent: 5, plan: 'max5', planChange: true, resetsAt: 'b' },
+      { estimated: false, percent: 20, plan: 'max5', planChange: true, resetsAt: 'b' }, // = 100 % of Pro
       { estimated: false, percent: 60, plan: 'pro', resetsAt: 'c' },
     ], 'pro');
-    expect(typical).toEqual({ high: 55, low: 45, max: 60, median: 50, min: 40, weeks: 2 });
-    expect(typicalWeek([{ estimated: false, percent: 5, plan: 'max5', planChange: true, resetsAt: 'b' }], 'pro')).toBeUndefined();
+    expect(typical).toEqual({ high: 80, low: 50, max: 100, median: 60, min: 40, weeks: 3 });
   });
 
   it('is undefined without completed weeks', () => {

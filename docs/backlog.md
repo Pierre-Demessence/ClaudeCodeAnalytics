@@ -7,7 +7,9 @@ orders the ones that are scheduled.
 ## Bugs
 
 - Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
-- A plan upgrade may also move the weekly reset time: unverified, since the data dir holds no upgrade yet (a reading before and after one tells). If it moves, two 7-day windows overlap and `weekStartFor` (`src/core/weekWindows.ts:15`) files the messages from the upgrade to the old reset in the old window, where they belong to the new one.
+- Sessions tab: an estimated 5-hour window gets `k × cost` from the current plan's 5-hour fit (`src/core/sessions.ts:181`), so after the Pro to Max 5× change an estimated Pro window shows about a fifth of its Pro estimate, while reading windows keep their own plan's %.
+- A plan change without a drop in the readings leaves readings of two plans in one window part (`windowParts`, `src/core/restarts.ts:61`), whose plan is its last reading's: `weekHistory.ts` then reads an earlier reading's pressure on the wrong scale. Only reachable for a downgrade or an upgrade the readings do not show as a restart.
+- `windowParts` and `weeklyShares` key a window by its exact reset time (`src/core/restarts.ts:35`, `src/core/share.ts:51`): a reset time that differs by a minute of rounding makes two windows, and a drop between them is not seen (`backtest.ts` tolerates 2 minutes).
 
 ## Features
 
@@ -78,13 +80,15 @@ estimates of when the result becomes judgeable, not limits in the code.
 
 ### Needs a second plan
 
-- Convert between plans with the measured multipliers (Plans tab, "How far to trust the conversions") when both plans have enough weeks, instead of the advertised ones.
+- Convert between plans with the measured multipliers (Plans tab, "How far to trust the conversions") when both plans have enough weeks, instead of the advertised ones; the same for the fit borrowed right after a plan change (`borrowedFit`, `src/core/summary.ts`).
 
 ### No week count (waits for an event)
 
 - `[forensics]` Verify against a real transcript that a compaction writes `isCompactSummary` or a `compact_boundary` system entry (none in the local transcripts; `src/core/events.ts` assumes both), and the weekly `quotaLimits.rateLimitType` name (only `five_hour` seen; `hitScope` takes `seven_day`/`week`). Until then the no-gap flush leans on the rewritten-share rule.
 - Price the 4.5-generation models (Opus 4.5, Sonnet 4.5) and long-context premiums if they show up in transcripts; they are flagged as unknown today.
 - Treat a `seven_day.resets_at` of null (if the endpoint ever returns it) as "no usage yet" rather than `bad-shape`.
+- Check whether a downgrade restarts the weekly usage as the Pro to Max 5× upgrade did on 2026-10-26 (100% to 0%, same reset time); only that upgrade has been seen.
+- Check how a free weekly reset shows in the readings: a drop with the same reset time, or a new reset time. A new one would start a 7-day window overlapping the old one, which nothing handles: the old window's estimated extension (`weeklyShares`, `src/core/share.ts`) would count the new window's cost.
 
 ## Technical debt
 

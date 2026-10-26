@@ -1,4 +1,4 @@
-import { ArrowRightLeft, TriangleAlert } from 'lucide-react';
+import { ArrowRightLeft, RotateCcw, TriangleAlert } from 'lucide-react';
 
 import type { WeekRow } from '@/core/weekHistory';
 import type { Summary } from '@/dashboard/api';
@@ -14,13 +14,17 @@ import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
 import { InfoTip } from '@/dashboard/Tip';
 import { usePage } from '@/dashboard/usePage';
 import { useTip } from '@/dashboard/useTip';
-import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
+import { dayHeaders, formatWeekRange, heatBounds, heatLegend, heatLevel, percentText, projectsText, resetText, restartTip, uncappedMedian, uncappedOf, uncappedText, uncappedTip } from '@/dashboard/weeksData';
 
 const HitIcon = ({ size = 14 }: { size?: number }) => <TriangleAlert aria-hidden="true" className="icon-inline icon-critical" size={size} />;
 
 const PlanChangeIcon = ({ size = 14 }: { size?: number }) => <ArrowRightLeft aria-hidden="true" className="icon-inline" size={size} />;
 
-const PLAN_CHANGE_TIP = 'A plan change started in this week. Its peak % covers the new plan only, so the week is left out of the median peak, the calibration, the drift and the plan comparison.';
+const ResetIcon = ({ size = 14 }: { size?: number }) => <RotateCcw aria-hidden="true" className="icon-inline" size={size} />;
+
+/** A week whose usage restarted: a plan change, or a reset without one. */
+const isRestarted = (week: WeekRow) => week.planChange || week.parts;
+const isReset = (week: WeekRow) => !week.planChange && week.parts;
 
 /** Rows per page of the week list. */
 const LIST_ROWS = 12;
@@ -76,7 +80,7 @@ function Stats({ summary, view }: { summary: Summary; view: HistoryView }) {
           <InfoTip label="About median peak">
             {stats.medianPercent === undefined
               ? 'No finished week with a percent yet.'
-              : 'Median of the finished weeks\' peak weekly %, estimates included, on your current plan; a week with a plan change is left out. The tick on every bar marks it.'}
+              : 'Median of the finished weeks\' peak weekly %, estimates included, on your current plan; a week whose usage restarted counts its parts added up. The tick on every bar marks it.'}
           </InfoTip>
         </span>
         {uncapped !== undefined && <span className="wk-uncapped">{`${uncappedText(uncapped)} without the limit`}</span>}
@@ -154,9 +158,9 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                           )}
                         </span>
                         <span className="wk-flags">
-                          {week.planChange && (
-                            <span aria-label="Plan change in this week" className="wk-plan-change" role="img" {...tip(PLAN_CHANGE_TIP)}>
-                              <PlanChangeIcon />
+                          {isRestarted(week) && (
+                            <span aria-label={isReset(week) ? 'Usage reset in this week' : 'Plan change in this week'} className="wk-plan-change" role="img" {...tip(restartTip(week, planFit.plan, timeZone))}>
+                              {isReset(week) ? <ResetIcon /> : <PlanChangeIcon />}
                             </span>
                           )}
                           {week.hit && <HitIcon />}
@@ -204,6 +208,12 @@ function Timeline({ summary, view }: { summary: Summary; view: HistoryView }) {
                   <li>
                     <PlanChangeIcon />
                     plan change in the week
+                  </li>
+                )}
+                {weeks.some(isReset) && (
+                  <li>
+                    <ResetIcon />
+                    usage reset in the week
                   </li>
                 )}
               </ul>
@@ -265,10 +275,10 @@ function List({ summary, view }: { summary: Summary; view: HistoryView }) {
                           <th scope="row">
                             {formatWeekRange(week, timeZone)}
                             {week.inProgress && <span className="session-now">in progress</span>}
-                            {week.planChange && (
-                              <span className="session-now wk-plan-change" {...tip(PLAN_CHANGE_TIP)}>
-                                <PlanChangeIcon size={13} />
-                                plan change
+                            {isRestarted(week) && (
+                              <span className="session-now wk-plan-change" {...tip(restartTip(week, planFit.plan, timeZone))}>
+                                {isReset(week) ? <ResetIcon size={13} /> : <PlanChangeIcon size={13} />}
+                                {isReset(week) ? 'usage reset' : 'plan change'}
                               </span>
                             )}
                           </th>

@@ -1,4 +1,4 @@
-import type { Snapshot } from './types.ts';
+import type { Plan, Snapshot } from './types.ts';
 
 export const HOUR_MS = 3_600_000;
 export const FIVE_HOURS_MS = 5 * HOUR_MS;
@@ -19,6 +19,8 @@ export interface CalibrationPoint {
 
 /** % of the weekly limit used per dollar of API-equivalent usage. */
 export interface Calibration {
+  /** Set when the plan has no fit of its own: the plan whose fit this is, converted at the advertised multipliers. */
+  borrowedFrom?: Plan;
   /** ISO time of the oldest reading in the fit. */
   from: string;
   k: number;
@@ -35,19 +37,21 @@ export function windowStart(snapshot: Snapshot): number {
  * One point per reading: the Claude Code part of the weekly % against the
  * cost seen in transcripts since the window started. Transcripts only see
  * Claude Code, so claude.ai usage is taken out using the endpoint's breakdown.
- * Windows that started before the first imported message are skipped.
+ * Readings whose cost starts before the first imported message are skipped.
  */
 export function calibrationPoints(
   snapshots: readonly Snapshot[],
   costBetween: (from: number, to: number) => number,
   /** Time of the first imported message: earlier windows have incomplete costs. */
   dataStart = Number.NEGATIVE_INFINITY,
+  /** Where a reading's cost counts from; the window start unless its usage restarted inside the window. */
+  startOf: (snapshot: Snapshot) => number = windowStart,
 ): CalibrationPoint[] {
   return snapshots
-    .filter(s => s.weekly >= MIN_PERCENT_FOR_FIT && windowStart(s) >= dataStart)
+    .filter(s => s.weekly >= MIN_PERCENT_FOR_FIT && startOf(s) >= dataStart)
     .map((s) => {
       const ts = Date.parse(s.ts);
-      return { cost: costBetween(windowStart(s), ts), ts, usage: s.weekly * (s.claudeCodeShare ?? 100) / 100 };
+      return { cost: costBetween(startOf(s), ts), ts, usage: s.weekly * (s.claudeCodeShare ?? 100) / 100 };
     });
 }
 

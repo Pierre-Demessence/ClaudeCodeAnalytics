@@ -121,6 +121,12 @@ export function fiveHourWindows({ hits = [], k, limitThreshold, now, records, sn
     }
   }
   const readingWindows = [...anchored.values()].sort((a, b) => a.start - b.start);
+  // An upgrade moves the 5-hour reset, so the new window can start before the old one ends: the old one ends there.
+  for (const [i, window] of readingWindows.entries()) {
+    const following = readingWindows[i + 1];
+    if (following && following.start < window.end)
+      window.end = Math.max(following.start, window.start);
+  }
 
   const windows = [...readingWindows];
   const projectOf = sessionProjects(records);

@@ -158,58 +158,85 @@ function pooledPace(percent: number, observedHours: number, minHours: number): n
 }
 
 interface WeekSpan {
-  /** The % when the demand stopped showing, on the current plan. */
+  /** The % when the demand stopped showing, on the current plan; the parts' added up. */
   cutoffPercent: number;
   hiddenHours: number;
   observedHours: number;
+  /** The cutoff % of the parts with observed time: what the pace pools. */
+  pacePercent: number;
   week: WeekRow;
+}
+
+/** What a span reads of a part: the window's one part when it never restarted. */
+interface SpanPart {
+  end: number;
+  percent: number;
+  pressureAt?: number;
+  pressurePercent?: number;
+  start: number;
 }
 
 /**
  * Splits a week into the time its usage shows the demand (observed) and the
  * time it does not (hidden): before the subscription, after the cutoff (the
  * pressure point or a weekly hit, whichever came first), and inside 5-hour
- * sessions after they were capped.
+ * sessions after they were capped. A week whose usage restarted is split per
+ * part, each with its own cutoff, and the spans are added up.
  */
 function weekSpan(week: WeekRow, sessionWindows: readonly FiveHourWindow[], subscriptionStart: number | undefined): WeekSpan {
-  const start = Date.parse(week.start);
-  const end = Date.parse(week.end);
-  const observedStart = Math.min(end, Math.max(start, subscriptionStart ?? start));
-  const pressureAt = week.pressureAt === undefined ? Infinity : Date.parse(week.pressureAt);
-  const hitAt = Math.min(Infinity, ...(week.limitHits ?? []).map(ts => Date.parse(ts)));
-  const cutoff = Math.max(observedStart, Math.min(pressureAt, hitAt, end));
-  // The pressure reading stands for the cutoff only when it is the cutoff; after an earlier hit the final % is what the limit froze.
-  const final = week.percent!;
-  const cutoffPercent = pressureAt <= hitAt && week.pressurePercent !== undefined ? Math.min(final, week.pressurePercent) : final;
-  let blocked = 0;
-  for (const window of sessionWindows) {
-    const cappedAt = window.cappedAt === undefined ? undefined : Date.parse(window.cappedAt);
-    if (cappedAt !== undefined && cappedAt >= observedStart && cappedAt < cutoff)
-      blocked += Math.min(Date.parse(window.end), cutoff) - cappedAt;
+  const parts: SpanPart[] = week.parts
+    ? week.parts.map(part => ({
+        end: Date.parse(part.end),
+        percent: part.percent,
+        pressureAt: part.pressureAt === undefined ? undefined : Date.parse(part.pressureAt),
+        pressurePercent: part.pressurePercent,
+        start: Date.parse(part.start),
+      }))
+    : [{
+        end: Date.parse(week.end),
+        percent: week.percent!,
+        pressureAt: week.pressureAt === undefined ? undefined : Date.parse(week.pressureAt),
+        pressurePercent: week.pressurePercent,
+        start: Date.parse(week.start),
+      }];
+  const span: WeekSpan = { cutoffPercent: 0, hiddenHours: 0, observedHours: 0, pacePercent: 0, week };
+  for (const { end, percent: final, pressureAt = Infinity, pressurePercent, start } of parts) {
+    const observedStart = Math.min(end, Math.max(start, subscriptionStart ?? start));
+    const hitAt = Math.min(Infinity, ...(week.limitHits ?? []).map(ts => Date.parse(ts)).filter(at => at >= start && at < end));
+    const cutoff = Math.max(observedStart, Math.min(pressureAt, hitAt, end));
+    // The pressure reading stands for the cutoff only when it is the cutoff; after an earlier hit the final % is what the limit froze.
+    const cutoffPercent = pressureAt <= hitAt && pressurePercent !== undefined ? Math.min(final, pressurePercent) : final;
+    let blocked = 0;
+    for (const window of sessionWindows) {
+      const cappedAt = window.cappedAt === undefined ? undefined : Date.parse(window.cappedAt);
+      if (cappedAt !== undefined && cappedAt >= observedStart && cappedAt < cutoff)
+        blocked += Math.min(Date.parse(window.end), cutoff) - cappedAt;
+    }
+    const observedHours = hours(cutoff - observedStart - blocked);
+    span.cutoffPercent += cutoffPercent;
+    span.hiddenHours += hours(observedStart - start + end - cutoff + blocked);
+    span.observedHours += observedHours;
+    // A part without observed time has no usage the pace could come from.
+    if (observedHours > 0)
+      span.pacePercent += cutoffPercent;
   }
-  return {
-    cutoffPercent,
-    hiddenHours: hours(observedStart - start + end - cutoff + blocked),
-    observedHours: hours(cutoff - observedStart - blocked),
-    week,
-  };
+  return span;
 }
 
 /**
  * The finished weeks with a percent and the finished 5-hour windows with a
- * peak since the oldest of those weeks, on the current plan. A week holding a
- * plan change is left out: its final % covers only the new plan's part. A reading stops
+ * peak since the oldest of those weeks, on the current plan. A week whose usage
+ * restarted counts its parts added up. A reading stops
  * where a limit stopped the user, so each demand is the reading plus the time
  * the limit hid, at the user's typical pace (the weeks' and the sessions' own).
  */
 export function buildPlanFitInput({ calibrationK, plan, planHistory, sessionWindows, subscriptionStart, weekHistory }: PlanFitSource): PlanFitInput {
   const spans = weekHistory.weeks
-    .filter(week => !week.inProgress && week.percent !== undefined && !week.planChange)
+    .filter(week => !week.inProgress && week.percent !== undefined)
     .reverse()
     .map(week => weekSpan(week, sessionWindows, subscriptionStart));
   const weekPace = pooledPace(
-    // A week without observed time has no usage the pace could come from.
-    spans.reduce((sum, span) => sum + (span.observedHours > 0 ? span.cutoffPercent : 0), 0),
+    spans.reduce((sum, span) => sum + span.pacePercent, 0),
     spans.reduce((sum, span) => sum + span.observedHours, 0),
     MIN_OBSERVED_WEEK_HOURS,
   );
@@ -225,9 +252,10 @@ export function buildPlanFitInput({ calibrationK, plan, planHistory, sessionWind
     .filter(w => !w.inProgress && w.peak !== undefined && inKeptWeek(Date.parse(w.start)))
     .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
     .map((w) => {
-      const from = planAt(planHistory, w.start);
+      // A window can start just before an upgrade, so its plan is the one it ended on; an estimated peak is already on the current plan.
+      const from = planAt(planHistory, new Date(Date.parse(w.end) - 1).toISOString());
       const cappedAt = w.cappedAt === undefined ? undefined : Date.parse(w.cappedAt);
-      const peak = convertPercent(w.peak!, from, plan);
+      const peak = w.peakEstimated ? w.peak! : convertPercent(w.peak!, from, plan);
       return {
         capPercent: cappedAt === undefined ? peak : convertPercent(w.capPercent ?? LIMIT, from, plan),
         hidden: cappedAt === undefined ? 0 : hours(Date.parse(w.end) - cappedAt),

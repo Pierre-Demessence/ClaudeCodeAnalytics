@@ -28,6 +28,9 @@ export const formatDateTime = (value: string | number) => dateTime.format(new Da
 /** "Fri". */
 export const formatWeekday = (value: string | number) => weekday.format(new Date(value));
 
+/** "Mon 17:27". */
+export const formatWeekdayTime = (value: string | number) => `${weekday.format(new Date(value))} ${time.format(new Date(value))}`;
+
 /** `2026-10-02` (a local day) or an ISO instant, as a short date. */
 export function formatDay(value: string): string {
   return date.format(/^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00`) : new Date(value));

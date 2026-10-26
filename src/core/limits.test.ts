@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Snapshot } from './types.ts';
+import type { PlanPeriod, Snapshot } from './types.ts';
 
 import { DAY_MS, WEEK_MS } from './calibration.ts';
-import { buildLimits } from './limits.ts';
+import { buildLimits, driftWindows } from './limits.ts';
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const FIRST_RESET = Date.parse('2026-08-05T20:00:00Z');
@@ -50,17 +50,49 @@ describe('buildLimits drift', () => {
     expect(drift.map(w => w.resetsAt)).toEqual([reset(3), reset(6)]);
   });
 
-  it('skips a window holding a plan change, whose cost since the start includes the old plan', () => {
+  describe('in a window whose usage restarted', () => {
     const upgrade = new Date(windowStartOfWeek(5) + 2 * DAY_MS).toISOString();
-    const { drift } = limits([3, 4, 5, 6].map(i => reading(i, 30)), {
-      plan: 'max5',
-      planHistory: [
-        { from: new Date(0).toISOString(), plan: 'pro', source: 'manual' },
-        { from: upgrade, plan: 'max5', source: 'manual' },
-      ],
+    const planHistory: PlanPeriod[] = [
+      { from: new Date(0).toISOString(), plan: 'pro', source: 'manual' },
+      { from: upgrade, plan: 'max5', source: 'manual' },
+    ];
+    const at = (i: number, days: number, weekly: number) => reading(i, weekly, { ts: new Date(windowStartOfWeek(i) + days * DAY_MS).toISOString() });
+
+    it('counts each part on its own plan, from its own start', () => {
+      // Week 5: Pro to 50% at day 1.5, then Max 5× from day 2: 30% by day 6.
+      const snapshots = [at(3, 6, 30), at(4, 6, 30), at(5, 1.5, 50), at(5, 6, 30), at(6, 6, 30)];
+      const onMax5 = driftWindows({ costBetween, dataStart: 0, now: NOW, plan: 'max5', planHistory, snapshots });
+      // The Max 5× part: 30 points over the 4 days since the upgrade ($66.67).
+      expect(onMax5.map(w => w.resetsAt)).toEqual([reset(5), reset(6)]);
+      expect(onMax5[0]).toMatchObject({ from: upgrade });
+      expect(onMax5[0]!.ratio).toBeCloseTo(45);
+      expect(onMax5[1]!.from).toBeUndefined();
+      // The Pro part: 50 points over the 1.5 days since the window start ($25).
+      const onPro = driftWindows({ costBetween, dataStart: 0, now: NOW, plan: 'pro', planHistory, snapshots });
+      expect(onPro.map(w => w.resetsAt)).toEqual([reset(3), reset(4), reset(5)]);
+      expect(onPro[2]!.ratio).toBeCloseTo(200);
+      expect(onPro[2]!.from).toBeUndefined();
     });
-    // The reading of week 5 is on Max 5×, but the window began on Pro.
-    expect(drift.map(w => w.resetsAt)).toEqual([reset(6)]);
+
+    it('skips a part started before the first message, and a window only the other plan has readings in', () => {
+      const snapshots = [at(5, 6, 30)];
+      expect(driftWindows({ costBetween, dataStart: Date.parse(upgrade) + 1, now: NOW, plan: 'max5', planHistory, snapshots })).toEqual([]);
+      expect(driftWindows({ costBetween, dataStart: 0, now: NOW, plan: 'pro', planHistory, snapshots })).toEqual([]);
+    });
+
+    it('adds the parts of a reset week on one plan', () => {
+      // 40% by day 3, a reset by day 3.5, then 20% by day 6: 60 points over $50 + $41.67.
+      const snapshots = [at(2, 3, 40), at(2, 3.5, 5), at(2, 6, 20)];
+      const [window] = driftWindows({ costBetween, dataStart: 0, now: NOW, plan: 'pro', planHistory: [], snapshots });
+      expect(window!.cost).toBeCloseTo(91.67, 1);
+      expect(window!.ratio).toBeCloseTo(65.45, 1);
+      expect(window!.from).toBeUndefined();
+    });
+
+    it('skips a window whose parts add up under 10%', () => {
+      const snapshots = [at(2, 3, 6), at(2, 3.5, 1), at(2, 6, 2)];
+      expect(driftWindows({ costBetween, dataStart: 0, now: NOW, plan: 'pro', planHistory: [], snapshots })).toEqual([]);
+    });
   });
 
   it('keeps the last 12 windows and marks the running one', () => {

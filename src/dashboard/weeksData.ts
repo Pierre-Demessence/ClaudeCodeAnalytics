@@ -1,9 +1,11 @@
 import type { FitWeek, PlanFitInput } from '@/core/planFit';
-import type { WeekRow } from '@/core/weekHistory';
+import type { Plan } from '@/core/types';
+import type { WeekPart, WeekRow } from '@/core/weekHistory';
 
 import { dayKey } from '@/core/aggregate';
 import { DAY_MS } from '@/core/calibration';
 import { evaluatePlans } from '@/core/planFit';
+import { PLAN_LABELS } from '@/core/plans';
 import { formatDollars, formatPercent } from '@/dashboard/format';
 import { daysText, differs } from '@/dashboard/plansData';
 import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
@@ -95,6 +97,28 @@ export function uncappedTip(week: WeekRow, fit: FitWeek, timeZone: string): stri
   ].filter(Boolean);
   const why = reasons.length > 0 ? reasons.join(', ') : 'before you subscribed';
   return `At least ${formatPercent(fit.floor)}: ${daysText(fit.hiddenHours)} were hidden (${why}) and filled at your typical pace.`;
+}
+
+/**
+ * Why a week is flagged as restarted: when and why its usage restarted, each part's %, and how the peak adds them up on `plan`.
+ * Only for a week with `parts` or a plan change.
+ */
+export function restartTip(week: WeekRow, plan: Plan, timeZone: string): string {
+  const parts = week.parts;
+  if (!parts || parts.length < 2)
+    return 'The plan changed in this week without a usage reset: the % after the change covers the whole week on the new plan.';
+  const when = (iso: string) => `${formatSessionDay(dayKey(Date.parse(iso), timeZone))} ${formatTime(iso, timeZone)}`;
+  const label = (part: WeekPart) => PLAN_LABELS[part.plan];
+  const percent = (part: WeekPart) => `${part.percentEstimated ? '~' : ''}${formatPercent(part.planPercent)} of ${label(part)}`;
+  const restarts = parts.slice(1).map((part, i) => parts[i]!.plan === part.plan
+    ? `Usage reset on ${when(part.start)}, without a plan change.`
+    : `Usage restarted with the change to ${label(part)} on ${when(part.start)}.`);
+  const lines = parts.map((part, i) => {
+    const from = i > 0 ? `from ${when(part.start)}` : '';
+    const until = i < parts.length - 1 ? `until ${when(part.end)}` : '';
+    return `${label(part)} ${[from, until].filter(Boolean).join(' ')}: ${percent(part)}`;
+  });
+  return [...restarts, ...lines, `The peak adds the parts up, on ${PLAN_LABELS[plan]}.`].join('\n');
 }
 
 /** Up to two project names, then "+n". */
