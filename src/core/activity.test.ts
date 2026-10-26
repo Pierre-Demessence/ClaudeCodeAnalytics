@@ -142,6 +142,17 @@ describe('messageCost', () => {
     // A new conversation has no previous message; 2 minutes is within the 5-minute cache.
     expect(messageCost.outliers.slice(1).map(o => [o.cause, o.pauseMs])).toEqual([['cacheWrite1h', undefined], ['cacheWrite5m', undefined]]);
   });
+
+  it('measures the pause on the main conversation alone: its subagents keep their own caches', () => {
+    // A subagent worked from 10:05 to 11:55 while the main conversation, whose cache lives an hour, waited.
+    const subagent = [5, 35, 65, 95, 115].map(minutes => rec(new Date(Date.parse('2026-10-01T10:00:00Z') + minutes * 60_000).toISOString(), { model: 'claude-haiku-4-5', output: 100, sidechain: true }));
+    const { messageCost } = activity([
+      rec('2026-10-01T10:00:00Z'),
+      ...subagent,
+      rec('2026-10-01T12:00:00Z', { cacheWrite1h: 500_000 }),
+    ]);
+    expect(messageCost.outliers[0]).toMatchObject({ cause: 'cacheWrite1h', pauseMs: 2 * 3_600_000 });
+  });
 });
 
 describe('upgrades', () => {

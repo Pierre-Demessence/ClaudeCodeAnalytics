@@ -61,6 +61,9 @@ Noteworthy changes for users. The format follows
 - After a plan change, the 5-hour forecast takes its typical session pace from
   the sessions under the new plan once there are 3, as the weekly forecast does:
   the sessions a smaller plan's limit cut short held it down.
+- The Usage tab's costliest messages say "after a pause" when the main
+  conversation waited while a subagent worked: the subagent's messages hid the
+  pause, though it keeps a cache of its own.
 
 ## [0.2.0]
 
