@@ -7,14 +7,13 @@ import { windowParts } from './restarts.ts';
 import { FINAL_READING_MS } from './share.ts';
 import { median } from './stats.ts';
 import { buildSummary } from './summary.ts';
+import { RESET_TOLERANCE_MS, snapResets } from './weekWindows.ts';
 
 /** Replay an instant every 6 hours: often enough to see a week's trajectory, rare enough to stay fast. */
 const DEFAULT_STEP_MS = 6 * HOUR_MS;
 const DEFAULT_WEEKS = 8;
 /** A 5-hour window whose last reading is this close to its reset needs no check for later messages. */
 const FIVE_HOUR_FINAL_MS = 30 * 60_000;
-/** Reset times from a replay can differ from the readings' by rounding. */
-const RESET_TOLERANCE_MS = 2 * 60_000;
 /** Past this share of the window left, a call counts as early. */
 const EARLY_SHARE = 0.5;
 
@@ -212,7 +211,8 @@ export function runBacktest(input: BacktestInput): BacktestReport {
   const step = input.stepMs ?? DEFAULT_STEP_MS;
   const records = [...input.records].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
   const recordTimes = records.map(r => Date.parse(r.ts));
-  const snapshots = [...input.snapshots].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  // Grouped as the dashboard groups them, so the truth and the replays share their windows.
+  const snapshots = snapResets([...input.snapshots].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)));
   const snapshotTimes = snapshots.map(s => Date.parse(s.ts));
   const weeklyTruth = weeklyFinals(snapshots, now);
   const fiveHourTruth = fiveHourFinals(snapshots, records, now);

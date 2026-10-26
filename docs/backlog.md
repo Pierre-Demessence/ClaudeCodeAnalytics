@@ -7,9 +7,6 @@ orders the ones that are scheduled.
 ## Bugs
 
 - Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
-- Weeks tab on a phone: the median peak card's "≈ 26% without the limit" runs past the card's edge (`src/dashboard/Weeks.tsx:91`), since `.wk-uncapped` never wraps (`src/dashboard/styles.css:2695`).
-- A plan change without a drop in the readings leaves readings of two plans in one window part (`windowParts`, `src/core/restarts.ts:61`), whose plan is its last reading's: `weekHistory.ts` then reads an earlier reading's pressure on the wrong scale. Only reachable for a downgrade or an upgrade the readings do not show as a restart.
-- `windowParts` and `weeklyShares` key a window by its exact reset time (`src/core/restarts.ts:35`, `src/core/share.ts:51`): a reset time that differs by a minute of rounding makes two windows, and a drop between them is not seen (`backtest.ts` tolerates 2 minutes).
 
 ## Features
 
@@ -103,14 +100,10 @@ estimates of when the result becomes judgeable, not limits in the code.
 
 ## Technical debt
 
-- `writeAtomic` (`src/collector/store.ts:77`) leaves its temp file behind when `rename` throws: the data dir holds `messages-2026-10.jsonl.41372.<uuid>.tmp` from 2026-10-12 (3.6 MB). The cause is probably a Windows `EPERM`/`EBUSY` while another process reads the target (not confirmed). Remove the temp file on failure, and check whether that write was retried.
-
 - The server has no timer: the collector runs only when a client asks (Claude Code hook, the widget's 60 s poll, a dashboard tab, Refresh), so readings resume after a boot only while the widget or a tab is open. A server-side loop in `src/server/api.ts` (`configureServer`/`configurePreviewServer`, about every 60 s, same throttle) would make the dashboard work alone; then drop the 30 s retry in `App.tsx` (`RETRY_MS`). Cost: a permanent background transcript scan.
 - `[forensics]` "By skill or command" lists `${name}` and `…` as skills on the local data (seen in the Breakdown tab, last 4 weeks). Probably a `Skill` call or slash command whose name was never substituted; find the source line and decide whether `parseSkillSignal` should ignore such names (`src/core/transcript.ts`). Unchecked.
 - `[forensics]` Cache flushes of subagents: detection skips them because parallel subagents interleave in a session; it needs `agentId` stored per record (a `SCAN_FORMAT` bump).
-- `[forensics]` A subagent whose `.meta.json` does not exist yet when its transcript is first scanned stays "Unknown": the scan reads the type once per file and later scans only read appended lines (`src/collector/scan.ts`). Not seen on the real data (0 of 125 files).
 - The Docker dashboard shares the `proxy` network with other containers, which can reach its API by IP (Vite always allows IP hosts, and a request without `Origin` passes the POST check). A dedicated network joined only by Traefik would close this; it needs a change in `S:\Dev\DockerInfra\compose.yml`.
 - `GET /api/summary` has no Origin/Host check: it relies on Vite's default `allowedHosts` and localhost-only CORS. Add an explicit check before ever exposing the server beyond loopback.
 - `subscriptionStartedAt` (the billing day) is read from `~/.claude.json` only by host runs (`npm run dev`, `collect`, a host `npm run dashboard`): the container cannot see that file and the hook runs the collector there, so a Docker-only setup keeps the stored value or none (`collect.ts:73`). Mounting the file read-only would fix it, but Claude Code replaces it by rename, which a single-file bind mount may not follow, and it holds the email and account ids.
 - `[forensics]` Check that no transcript line splits its cache writes (`cache_creation.ephemeral_5m_input_tokens` and `ephemeral_1h_input_tokens`) into less than its `cache_creation_input_tokens`: `parseTranscriptLine` trusts the split when present (`src/core/transcript.ts:164`), so the rest would go uncounted. One scan of the transcripts tells.
-- Five dashboard tests (`Breakdown.test.tsx`, `Usage.test.tsx`, `usageData.test.ts`) expect en-GB compact numbers in lower case ("3m", "554k"), which depends on the ICU data: Node 22.22 (ICU 77, CLDR 47) writes "3M" and "554K" (`src/dashboard/format.ts:10`), so `npm test` fails there, and CI may once it picks up that Node. Fix one case in `formatTokens`, or test against the formatter's own output.

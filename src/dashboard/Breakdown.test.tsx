@@ -8,6 +8,7 @@ import type { Summary } from '@/dashboard/api';
 import { DAY_MS, HOUR_MS } from '@/core/calibration';
 import { buildSummary } from '@/core/summary';
 import { Breakdown } from '@/dashboard/Breakdown';
+import { formatTokens } from '@/dashboard/format';
 import { viewOver } from '@/dashboard/rangeTesting';
 import { TipProvider } from '@/dashboard/Tip';
 
@@ -104,15 +105,16 @@ describe('breakdown', () => {
     it('splits the output by thinking, reply text and tool, whose rows sum to the total', () => {
       render(<Breakdown summary={summary(outputRecords)} />, { wrapper: TipProvider });
       const output = card('Where output goes');
-      expect(output.textContent).toContain('3m output tokens');
+      // Token counts as the formatter writes them: "3m" or "3M", depending on the ICU data.
+      expect(output.textContent).toContain(`${formatTokens(3_000_000)} output tokens`);
       expect(output.querySelector('[role="img"]')!.getAttribute('aria-label')).toBe('Thinking 17%, Reply text 33%, Untracked 30%, Tool calls 20%');
       expect(rowsOf('Where output goes')).toEqual([
-        'Thinking500k17%',
-        'Reply text1m33%',
-        'Untracked900k30%',
-        'Bash300k10%',
-        'Read300k10%',
-        'Output total3m100%',
+        `Thinking${formatTokens(500_000)}17%`,
+        `Reply text${formatTokens(1_000_000)}33%`,
+        `Untracked${formatTokens(900_000)}30%`,
+        `Bash${formatTokens(300_000)}10%`,
+        `Read${formatTokens(300_000)}10%`,
+        `Output total${formatTokens(3_000_000)}100%`,
       ]);
       expect(output.textContent).toContain('Untracked: messages recorded before tool calls were kept.');
     });
@@ -120,10 +122,10 @@ describe('breakdown', () => {
     it('splits cost and output tokens by skill, with the rest under No skill', () => {
       render(<Breakdown summary={summary(outputRecords)} />, { wrapper: TipProvider });
       expect(rowsOf('By skill or command')).toEqual([
-        'No skill' + 'no skill active' + '1m$2033%',
-        '/commit' + 'slash command' + '1m$2033%',
-        'superpowers:brainstorming' + 'skill' + '1m$2033%',
-        'All messages3m$60100%',
+        'No skill' + 'no skill active' + `${formatTokens(1_000_000)}$2033%`,
+        '/commit' + 'slash command' + `${formatTokens(1_000_000)}$2033%`,
+        'superpowers:brainstorming' + 'skill' + `${formatTokens(1_000_000)}$2033%`,
+        `All messages${formatTokens(3_000_000)}$60100%`,
       ]);
       expect(tipOf(screen.getByRole('button', { name: 'About tokens and cost' }))).toBe('Cost includes input and cache; tokens are output only.');
     });
@@ -145,11 +147,11 @@ describe('breakdown', () => {
       { wrapper: TipProvider },
     );
     const context = card('Where context grows');
-    expect(context.textContent).toContain('3m input tokens');
+    expect(context.textContent).toContain(`${formatTokens(3_000_000)} input tokens`);
     expect(within(context).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual([
-      'Read–2m67%',
-      'MCP playwright6251m33%',
-      'All tool results6253m100%',
+      `Read–${formatTokens(2_000_000)}67%`,
+      `MCP playwright625${formatTokens(1_000_000)}33%`,
+      `All tool results625${formatTokens(3_000_000)}100%`,
     ]);
   });
 

@@ -79,6 +79,19 @@ Noteworthy changes for users. The format follows
   the cache reads saved.
 - A cache flush's extra cost counts only the tokens written again, the previous
   prompt, and no longer the turn's new tokens, which a live cache writes too.
+- A write to the data dir that fails no longer leaves its temp file there, such
+  as `messages-2026-10.jsonl.<pid>.<id>.tmp`. One left by an earlier version can
+  be deleted.
+- A week whose plan changed without its usage restarting (a downgrade that keeps
+  the week's usage, say) reads the point where its limit got close (90%) on the
+  plan of that reading, not on the plan of the week's last reading: the plan
+  comparison read 92% of Max 5× as 92% of Pro.
+- Readings of one week whose reset times differ by a minute or two (the endpoint
+  rounds them to the minute, which can tip either way) count as one week. Such a
+  week showed twice in the Weeks tab and the typical week, and a restart between
+  two of its readings went unseen.
+- On a phone, the Weeks tab's median peak card wraps its estimate without the
+  limit instead of running past the card's edge.
 
 ## [0.2.0]
 

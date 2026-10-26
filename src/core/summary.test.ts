@@ -78,6 +78,19 @@ describe('buildSummary', () => {
     expect(summary.current).toBeUndefined();
   });
 
+  it('takes reset times a minute apart for one window, so a drop between them restarts it', () => {
+    // The endpoint rounds each reset time to the minute, which can tip either way.
+    const snapshots = [
+      snap(Date.parse('2026-10-14T10:00:00Z'), 100, '2026-10-14T20:00:00.000Z'),
+      snap(Date.parse('2026-10-14T12:00:00Z'), 3, '2026-10-14T19:59:00.000Z'),
+    ];
+    const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots, timeZone: 'UTC' });
+    expect(summary.weeks).toHaveLength(1);
+    expect(summary.weeks[0]).toMatchObject({ percent: 103, resetsAt: '2026-10-14T20:00:00.000Z' });
+    expect(summary.weeks[0]!.parts?.map(part => part.percent)).toEqual([100, 3]);
+    expect(summary.rangeBasis.resets).toEqual([Date.parse('2026-10-14T20:00:00.000Z')]);
+  });
+
   it('feeds the Plans tab with the completed weeks and the multiplier checks', () => {
     const snapshots = [
       snap(Date.parse('2026-10-07T19:00:00Z'), 40, '2026-10-07T20:00:00.000Z'),
