@@ -6,6 +6,8 @@ Noteworthy changes for users. The format follows
 
 ## [Unreleased]
 
+## [0.3.0]
+
 ### Added
 
 - Right after a plan change, the projections borrow the previous plan's ratio,
@@ -160,6 +162,7 @@ pacing, subscription vs API prices, usage breakdowns, past sessions and weeks,
 which plan fits your usage, a Windows taskbar widget and an always-on Docker
 setup.
 
-[Unreleased]: https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Pierre-Demessence/ClaudeCodeAnalytics/releases/tag/v0.1.0

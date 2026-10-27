@@ -1,6 +1,6 @@
 [package]
 name = "cca-widget"
-version = "0.1.0"
+version = "0.3.0"
 description = "Taskbar widget for Claude Code Analytics"
 edition = "2021"
 
