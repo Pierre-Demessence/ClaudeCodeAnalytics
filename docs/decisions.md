@@ -561,5 +561,5 @@ subdomains (only browsers do), and Traefik routes on the `Host` header. HTTP/1.0
 means the answer is never chunked. Rejected: an HTTP client crate (`reqwest` is most of
 the build for one request); a hosts-file entry, which lives outside the repo.
 The widget polls a dedicated route that runs the collector rather than reading
-the data dir itself, so readings keep arriving while the PC is idle and the
-token stays in the collector.
+the data dir itself, so its answer is as fresh as its poll and the token stays in
+the collector.

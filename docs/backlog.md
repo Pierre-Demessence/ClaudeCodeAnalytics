@@ -64,7 +64,7 @@ estimates of when the result becomes judgeable, not limits in the code.
 
 - Uncapped demand on real data: cut uncapped weeks at 90% after the fact and check how close the typical-pace estimate gets to their real final %. Needs at least 3 weeks that never reached the pressure point, so 4 weeks if one of them was capped.
 - `[forecast]` Backtest the week's own ratio (`weekCalibration`, `src/core/summary.ts:319`), used from the week's 3rd reading of 5% or more: a whole-percent reading at 5% is worth ±10%, and the endpoint takes 3 readings within half an hour. Compare it with the pooled ratio and with a blend that leans on the own ratio as the week's cost grows.
-- `[forecast]` The fits (`fitRatio`, `src/core/calibration.ts:84`) take every reading as a point: the endpoint reads every 15 minutes, idle nights included while the widget polls, so a week weighs by how long the PC was on, identical (%, cost) points repeat, and the RMSE runs over cumulative, correlated points. Compare the fit and the backtest with distinct readings only, or one point per window.
+- `[forecast]` The fits (`fitRatio`, `src/core/calibration.ts:84`) take every reading as a point: the endpoint reads every 15 minutes, idle nights included while the server runs, so a week weighs by how long the PC was on, identical (%, cost) points repeat, and the RMSE runs over cumulative, correlated points. Compare the fit and the backtest with distinct readings only, or one point per window.
 - `[forecast]` Check the forecast band with the backtest: low and high are quartiles, so about half of the final values should land inside ("final in range", `src/core/backtest.ts:190`); far from half, the band is too narrow or too wide.
 
 ### 6 weeks
@@ -96,7 +96,6 @@ estimates of when the result becomes judgeable, not limits in the code.
 
 ## Technical debt
 
-- The server has no timer: the collector runs only when a client asks (Claude Code hook, the widget's 60 s poll, a dashboard tab, Refresh), so readings resume after a boot only while the widget or a tab is open. A server-side loop in `src/server/api.ts` (`configureServer`/`configurePreviewServer`, about every 60 s, same throttle) would make the dashboard work alone; then drop the 30 s retry in `App.tsx` (`RETRY_MS`). Cost: a permanent background transcript scan.
 - The Docker dashboard shares the `proxy` network with other containers, which can reach its API by IP (Vite always allows IP hosts, and a request without `Origin` passes the POST check). A dedicated network joined only by Traefik would close this; it needs a change in `S:\Dev\DockerInfra\compose.yml`.
 - `GET /api/summary` has no Origin/Host check: it relies on Vite's default `allowedHosts` and localhost-only CORS. Add an explicit check before ever exposing the server beyond loopback.
 - `subscriptionStartedAt` (the billing day) is read from `~/.claude.json` only by host runs (`npm run dev`, `collect`, a host `npm run dashboard`): the container cannot see that file and the hook runs the collector there, so a Docker-only setup keeps the stored value or none (`collect.ts:73`). Mounting the file read-only would fix it, but Claude Code replaces it by rename, which a single-file bind mount may not follow, and it holds the email and account ids.

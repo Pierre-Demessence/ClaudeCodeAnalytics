@@ -6,6 +6,11 @@ Noteworthy changes for users. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The dashboard server collects every minute on its own, so the usage readings
+  continue after a reboot with no dashboard tab or taskbar widget open.
+
 ### Fixed
 
 - Breakdown's "By skill or command" no longer lists `${name}` or `…`: names

@@ -80,7 +80,7 @@ npm run dashboard               # builds and opens the dashboard
 Run `npm run hook:install` without `--apply` to print the hook and add it yourself.
 After every Claude Code response, the hook asks the
 [always-on dashboard](#always-on-dashboard-docker) to import new transcripts, in
-the background; without it running, opening the dashboard imports them. The hook
+the background; without it, any running dashboard imports them every minute. The hook
 runs no code from this folder, so a branch checked out here never runs on its own.
 Neither uses any of your usage: they read files Claude Code already writes and
 never call Claude, and the hook adds nothing to your conversation.
@@ -164,10 +164,10 @@ new `widget:install`.
 `npm run docker:up` builds the image and serves the dashboard at
 <http://analytics.claudecode.localhost>. Needs Docker Desktop and a running
 Traefik reverse proxy on an external `proxy` network. The container mounts
-`~/.claude` read-only and `~/.claude-code-analytics`, and runs the collector when
-the hook asks. It runs the version it was built from: run `npm run docker:up`
-again after updating, and only on code you trust, since the collector can read
-your login token.
+`~/.claude` read-only and `~/.claude-code-analytics`, and runs the collector every
+minute and when the hook asks. It runs the version it was built from: run
+`npm run docker:up` again after updating, and only on code you trust, since the
+collector can read your login token.
 
 ## Development
 

@@ -44,7 +44,8 @@ Run lint, test and build before considering work done.
 - `src/collector/` — Node: transcript scan, usage endpoint client, data-dir
   store, lock, hook installer; entry `cli.ts`.
 - `src/server/api.ts` — Vite plugin serving `/api/*` in dev and preview (`/api/range` is the
-  history tabs' view of a range, from the stored data only).
+  history tabs' view of a range, from the stored data only), and running the throttled
+  collector every minute while the server is up.
 - `src/dashboard/` — React app (`main.tsx` entry).
 - `widget/` — the taskbar widget, one native Rust process (no webview): `widget.svg`
   is its look, `src/` the logic (`view` texts and flags, `template` fills the SVG,

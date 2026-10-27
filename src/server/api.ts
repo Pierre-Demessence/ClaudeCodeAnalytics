@@ -1,4 +1,4 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
 
 import { Buffer } from 'node:buffer';
@@ -22,6 +22,8 @@ const LOCK_WAIT_MS = 5_000;
 /** The endpoint shares Claude Code's rate limit: never poll faster than the 15-minute default. */
 const MIN_THROTTLE_MINUTES = 15;
 const MAX_THROTTLE_MINUTES = 1440;
+/** As often as the taskbar widget polls; the endpoint keeps its own throttle. */
+const COLLECT_EVERY_MS = 60_000;
 
 class HttpError extends Error {
   readonly status: number;
@@ -231,7 +233,7 @@ async function handle(req: IncomingMessage, res: ServerResponse, lockWaitMs: num
     return send(res, 200, await ranged(store, timeZone, url.searchParams));
   }
   if (req.method === 'GET' && url.pathname === '/widget') {
-    // The taskbar widget polls this: it keeps the endpoint readings coming while the PC is idle.
+    // The taskbar widget polls this: collecting first makes its answer as fresh as its poll.
     await collect({ claudeDir: claudeDir(), dataDir: store.dir }).catch(() => {});
     return send(res, 200, widgetView(await summary(store, timeZone), Date.now()));
   }
@@ -294,6 +296,18 @@ function onError(res: ServerResponse, error: unknown) {
   }
 }
 
+/**
+ * Runs the collector on a timer while the server is up, so readings continue with
+ * no tab or widget open. Each run is throttled and skipped while another holds the lock.
+ */
+function collectWhileOpen(httpServer: Server | null) {
+  if (!httpServer)
+    return;
+  const timer = setInterval(() => void collect({ claudeDir: claudeDir(), dataDir: dataDir() }).catch(() => {}), COLLECT_EVERY_MS);
+  timer.unref();
+  httpServer.once('close', () => clearInterval(timer));
+}
+
 /** Serves `/api/*` from the collector's data dir, in `vite dev` and `vite preview`. */
 export function apiPlugin(): Plugin {
   const middleware = createApiMiddleware();
@@ -301,9 +315,11 @@ export function apiPlugin(): Plugin {
     name: 'usage-api',
     configurePreviewServer(server) {
       server.middlewares.use('/api', middleware);
+      collectWhileOpen(server.httpServer as Server);
     },
     configureServer(server) {
       server.middlewares.use('/api', middleware);
+      collectWhileOpen(server.httpServer as Server | null);
     },
   };
 }
