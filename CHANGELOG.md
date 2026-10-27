@@ -12,6 +12,15 @@ Noteworthy changes for users. The format follows
   converted with the advertised limits, until the new plan has 3 readings of its
   own; the Calibration tab says so.
 
+### Changed
+
+- The Plans tab no longer calls the smallest plan that holds your weeks "too
+  big": it fits with room to grow, says how many typical weeks it has room for,
+  and is the recommended plan. A plan is too big only when a cheaper one also
+  holds your weeks. When a week used on a smaller plan went over its limit, the
+  best plan's card warns that you may have held back, and may use more than the
+  numbers show.
+
 ### Fixed
 
 - The weekly forecast and "Room left" no longer understate a heavy week. The

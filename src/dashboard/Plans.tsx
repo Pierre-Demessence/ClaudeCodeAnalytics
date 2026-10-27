@@ -9,7 +9,7 @@ import { BestPlanCard } from '@/dashboard/BestPlanCard';
 import { FitChart } from '@/dashboard/FitChart';
 import { MultipliersCard } from '@/dashboard/MultipliersCard';
 import { PlanFitCards } from '@/dashboard/PlanFitCards';
-import { SHARE_OPTIONS } from '@/dashboard/plansData';
+import { heldBackText, SHARE_OPTIONS } from '@/dashboard/plansData';
 import { Toggle } from '@/dashboard/Toggle';
 import { VerdictBox } from '@/dashboard/VerdictBox';
 
@@ -41,7 +41,7 @@ export function Plans({ summary }: { summary: Summary }) {
   return (
     <>
       <div className="fit-top">
-        <BestPlanCard best={best} current={current} input={planFit} share={share} timeZone={timeZone} />
+        <BestPlanCard best={best} current={current} heldBack={heldBackText(best, planFit, share)} input={planFit} share={share} timeZone={timeZone} />
         <section className="card fit-whatif">
           <h2>What if Opus ran on Sonnet?</h2>
           <p className="note">Re-prices the whole tab. Approximate.</p>

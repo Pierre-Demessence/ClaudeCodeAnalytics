@@ -7,6 +7,8 @@ import { VerdictBox } from '@/dashboard/VerdictBox';
 interface Props {
   best: PlanFit;
   current: PlanFit;
+  /** Why the numbers may be a minimum, from `heldBackText`. */
+  heldBack?: string;
   input: PlanFitInput;
   /** Share of Opus work moved to Sonnet; the card says so when above 0. */
   share: number;
@@ -14,7 +16,7 @@ interface Props {
 }
 
 /** The plan that fits the last weeks best, and what switching to it does to the bill. It names no other plan. */
-export function BestPlanCard({ best, current, input, share, timeZone }: Props) {
+export function BestPlanCard({ best, current, heldBack, input, share, timeZone }: Props) {
   const { action, tag } = switchText(best, current);
   const verdict = bestVerdict(best, input, timeZone);
   return (
@@ -29,6 +31,7 @@ export function BestPlanCard({ best, current, input, share, timeZone }: Props) {
         {action && <span className="fit-action">{action}</span>}
       </div>
       <VerdictBox detail={verdict.detail} kind={FIT_KIND[best.verdict]} title={verdict.title} />
+      {heldBack && <p className="note">{heldBack}</p>}
     </section>
   );
 }

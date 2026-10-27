@@ -69,7 +69,7 @@ describe('labels', () => {
 });
 
 describe('estimate without the limit', () => {
-  const fitWeek = (extra: Partial<FitWeek> = {}): FitWeek => ({ cost: 0, demand: 212, estimated: true, floor: 99, hiddenHours: 86.4, shift: 0, start: '2026-10-01T05:00:00.000Z', ...extra });
+  const fitWeek = (extra: Partial<FitWeek> = {}): FitWeek => ({ cost: 0, demand: 212, estimated: true, floor: 99, hiddenHours: 86.4, plans: ['pro'], shift: 0, start: '2026-10-01T05:00:00.000Z', ...extra });
   const input = (weeks: FitWeek[]): PlanFitInput => ({ plan: 'pro', sessions: [], weeks });
 
   it('joins the estimate of a finished week above its reading', () => {

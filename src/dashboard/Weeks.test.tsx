@@ -52,7 +52,7 @@ const card = (name: string) => screen.getByRole('heading', { name }).closest('se
 /** The week ended by the 100% reading, with an estimate of 212% without the limit; the week before has no percent. */
 function withUncapped(data: Summary): Summary {
   const finished = data.weekHistory.weeks.find(w => w.percent === 100)!;
-  const fit = { cost: 40, demand: 212, estimated: true, floor: 100, hiddenHours: 86.4, shift: 0, start: finished.start };
+  const fit = { cost: 40, demand: 212, estimated: true, floor: 100, hiddenHours: 86.4, plans: ['max5' as const], shift: 0, start: finished.start };
   return { ...data, planFit: { ...data.planFit, weeks: [fit] } };
 }
 
@@ -128,7 +128,7 @@ describe('weeks tab', () => {
     const data: Summary = { ...buildSummary({ endpointEnabled: true, events: [], now: NOW, planHistory, records, snapshots, timeZone: 'UTC' }), status: {} };
     // The week before the upgrade read 100% of Pro: 20% of Max 5×, and 42% of Max 5× without the limit.
     const pro = data.weekHistory.weeks[1]!;
-    renderTab({ ...data, planFit: { ...data.planFit, weeks: [{ cost: 40, demand: 42, estimated: true, floor: 20, hiddenHours: 86.4, shift: 0, start: pro.start }] } });
+    renderTab({ ...data, planFit: { ...data.planFit, weeks: [{ cost: 40, demand: 42, estimated: true, floor: 20, hiddenHours: 86.4, plans: ['pro'], shift: 0, start: pro.start }] } });
     const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
     expect(lines[1]!.querySelector<HTMLElement>('.week-bar.hit')!.style.width).toBe('100%');
     // Its plan is not named on the row, only in the tooltips.

@@ -13,7 +13,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 const HOUR = HOUR_MS;
 
 function week(i: number, demand: number, extra: Partial<FitWeek> = {}): FitWeek {
-  return { cost: 100, demand, estimated: false, floor: demand, hiddenHours: 0, shift: 0, start: iso(START + i * WEEK_MS), ...extra };
+  return { cost: 100, demand, estimated: false, floor: demand, hiddenHours: 0, plans: ['max5'], shift: 0, start: iso(START + i * WEEK_MS), ...extra };
 }
 
 function session(demand: number, extra: Partial<FitSession> = {}): FitSession {
@@ -78,8 +78,24 @@ describe('evaluatePlans', () => {
       expect(verdictOf([30, 50, 40])).toBe('fits');
     });
 
-    it('is too big when never over and the busiest week stays under half', () => {
-      expect(verdictOf([30, 49.9, 40])).toBe('tooBig');
+    it('is too big when never over, the busiest week stays under half and a cheaper plan holds the weeks', () => {
+      // On Pro: 50%, 75% and 60%, which fits.
+      expect(verdictOf([10, 15, 12])).toBe('tooBig');
+    });
+
+    it('fits however roomy when the cheaper plan is too small', () => {
+      // On Pro: 150%, 249.5% and 200%, over in every week.
+      expect(verdictOf([30, 49.9, 40])).toBe('fits');
+    });
+
+    it('is too big next to a cheaper plan that is close, or itself too big', () => {
+      // On Pro: 2 of 5 weeks over, close; on Max 20× the busiest week is 6%.
+      const { max20, max5, pro } = byPlan({ plan: 'max5', sessions: [], weeks: [24, 22, 10, 12, 15].map((w, i) => week(i, w)) });
+      expect([pro!.verdict, max5!.verdict, max20!.verdict]).toEqual(['close', 'tooBig', 'tooBig']);
+    });
+
+    it('never calls Pro too big: nothing is cheaper', () => {
+      expect(byPlan({ plan: 'max5', sessions: [], weeks: [1, 2, 1].map((w, i) => week(i, w)) }).pro!.verdict).toBe('fits');
     });
 
     it('is close with 1 or 2 weeks over, too small from 3', () => {
@@ -131,12 +147,14 @@ describe('bestPlan', () => {
   it('prefers close to too big', () => {
     // Max 5× is close; Max 20× is too big and costs more.
     expect(best(sample())).toBe('max5');
-    // Pro is over in 3 weeks, so Max 5× is the cheaper of the two too big plans.
-    expect(best({ plan: 'max5', sessions: [], weeks: [week(0, 20), week(1, 30), week(2, 10), week(3, 25)] })).toBe('max5');
   });
 
-  it('prefers too big to too small', () => {
-    expect(evaluatePlans({ plan: 'max5', sessions: [], weeks: [week(0, 150), week(1, 150), week(2, 150), week(3, 150), week(4, 30)] }).map(f => f.verdict)).toEqual(['tooSmall', 'tooSmall', 'tooBig']);
+  it('picks the smallest plan that holds the weeks, however roomy', () => {
+    // Pro is over in 3 weeks, so Max 5× fits with room to grow and Max 20× is too big.
+    const roomy: PlanFitInput = { plan: 'max5', sessions: [], weeks: [week(0, 20), week(1, 30), week(2, 10), week(3, 25)] };
+    expect(evaluatePlans(roomy).map(f => f.verdict)).toEqual(['tooSmall', 'fits', 'tooBig']);
+    expect(best(roomy)).toBe('max5');
+    expect(evaluatePlans({ plan: 'max5', sessions: [], weeks: [week(0, 150), week(1, 150), week(2, 150), week(3, 150), week(4, 30)] }).map(f => f.verdict)).toEqual(['tooSmall', 'tooSmall', 'fits']);
     expect(best({ plan: 'max5', sessions: [], weeks: [week(0, 150), week(1, 150), week(2, 150), week(3, 150), week(4, 30)] })).toBe('max20');
   });
 
@@ -184,7 +202,12 @@ describe('buildPlanFitInput', () => {
   it('keeps the finished weeks with a percent, oldest first', () => {
     const input = buildPlanFitInput({ ...base, weekHistory: history([row(3, { inProgress: true }), row(2), row(1, { percent: undefined }), row(0, { percent: 30, shift: undefined })]) });
     expect(input.weeks.map(w => w.start)).toEqual([iso(START), iso(START + 2 * WEEK_MS)]);
-    expect(input.weeks[0]).toEqual({ cost: 100, demand: 30, estimated: false, floor: 30, hiddenHours: 0, shift: 0, start: iso(START) });
+    expect(input.weeks[0]).toEqual({ cost: 100, demand: 30, estimated: false, floor: 30, hiddenHours: 0, plans: ['max5'], shift: 0, start: iso(START) });
+  });
+
+  it('keeps the plan each week was used on, the current one when a week has none', () => {
+    const input = buildPlanFitInput({ ...base, weekHistory: history([row(1), row(0, { plan: 'pro' })]) });
+    expect(input.weeks.map(w => w.plans)).toEqual([['pro'], ['max5']]);
   });
 
   it('keeps a restarted week and the sessions that started in it', () => {
@@ -210,7 +233,7 @@ describe('buildPlanFitInput', () => {
     // The pace pools the two plain weeks (50% over 168 h each) and the parts' cutoffs (18% + 10% over 24 h + 96 h).
     const pace = (50 + 50 + 28) / (168 + 168 + 120);
     expect(restarted.demand).toBeCloseTo(28 + 48 * pace);
-    expect(restarted).toMatchObject({ estimated: true, floor: 30 });
+    expect(restarted).toMatchObject({ estimated: true, floor: 30, plans: ['pro', 'max5'] });
   });
 
   it('leaves a part before the subscription out of the pace, and counts it hidden', () => {

@@ -377,13 +377,20 @@ which would draw a Pro week at a fifth of its height instead of what the Pro lim
 
 Each plan gets one verdict from the finished weeks among the last 12 windows
 and the 5-hour sessions that started in them, converted with the advertised multipliers: **fits** (never at 100%,
-busiest week at least half the limit), **close** (1 or 2 weeks over, and at most
+busiest week at least half the limit, or the smallest plan that holds the weeks), **close** (1 or 2 weeks over, and at most
 a tenth of the sessions), **too small**, **too big** (never over, busiest week
-under half). The best plan ranks fits, close, too big, too small, then fewer
-weeks over, fewer sessions over, lower price: a plan that fits everything but
-is too big is only suggested when nothing better exists, and close beats too
-big because paying double to avoid one week at the limit is rarely right. The
-50% bound and the other thresholds are named constants in `core/planFit.ts`.
+under half, and the next cheaper plan fits or is close). A roomy plan whose next
+cheaper plan is too small, or Pro with nothing cheaper, fits "with room to grow"
+and says how many typical weeks it has room for: it is the smallest plan that
+holds the weeks, and the weeks were measured under the smaller plan's limits, so
+the user likely held back and will use more once they are lifted. Calling it too
+big would steer away from the only plan that works. The best plan ranks fits,
+close, too big, too small, then fewer weeks over, fewer sessions over, lower
+price; close beats too big because paying double to avoid one week at the limit
+is rarely right. When a week used on a plan cheaper than the best one went over
+that plan's limit, the best plan's card says the numbers may be a minimum,
+without naming that plan (the card names only the best one). The 50%
+bound and the other thresholds are named constants in `core/planFit.ts`.
 
 The Opus-to-Sonnet what-if re-prices each message's tokens at the newest Sonnet
 price (the work as it would run today, not on the Sonnet of its own

@@ -24,6 +24,7 @@ const planFit: PlanFitInput = {
     estimated: demand > 100,
     floor: demand,
     hiddenHours: 0,
+    plans: ['max5'],
     shift: 0.3,
     start: new Date(Date.UTC(2026, 6, 10 + 7 * i, 7)).toISOString(),
   })),
@@ -62,6 +63,18 @@ describe('plans tab', () => {
     expect(best.textContent).not.toMatch(/Pro|Max 20×/);
   });
 
+  it('warns on the best plan that weeks used on a smaller plan that held them are a minimum, naming no plan', () => {
+    renderTab(summary({ multipliers, plan: 'max5', planFit: { ...planFit, weeks: planFit.weeks.map(w => ({ ...w, plans: ['pro' as const] })) } }));
+    const best = card('Best plan for your last 12 weeks');
+    expect(best.textContent).toContain('Measured on a smaller plan whose limits you ran into');
+    expect(best.textContent).not.toMatch(/Pro|Max 20×/);
+  });
+
+  it('says nothing of a smaller plan when the weeks were used on the best one', () => {
+    renderTab(full());
+    expect(card('Best plan for your last 12 weeks').textContent).not.toContain('smaller plan');
+  });
+
   it('gives each plan a verdict with its own title', () => {
     renderTab(full());
     expect(within(card('Pro')).getByText('Too small.')).toBeTruthy();
@@ -69,6 +82,20 @@ describe('plans tab', () => {
     expect(within(card('Max 20×')).getByText('Too big.')).toBeTruthy();
     expect(within(card('Max 5×')).getByText('current')).toBeTruthy();
     expect(within(card('Max 20×')).getByText('$200 / month')).toBeTruthy();
+  });
+
+  it('recommends the smallest plan that holds the weeks with room to grow, not as too big', () => {
+    const scale = (d: number) => d * 0.4;
+    const light: PlanFitInput = {
+      ...planFit,
+      sessions: planFit.sessions.map(s => ({ ...s, demand: scale(s.demand), floor: scale(s.floor) })),
+      weeks: planFit.weeks.map(w => ({ ...w, demand: scale(w.demand), floor: scale(w.floor) })),
+    };
+    renderTab(summary({ multipliers, plan: 'max5', planFit: light }));
+    expect(within(card('Best plan for your last 12 weeks')).getByText('Fits, with room to grow.')).toBeTruthy();
+    expect(within(card('Max 5×')).getByText('Fits, with room to grow.')).toBeTruthy();
+    expect(within(card('Pro')).getByText('Too small.')).toBeTruthy();
+    expect(within(card('Max 20×')).getByText('Too big.')).toBeTruthy();
   });
 
   it('re-prices the whole tab when Opus work moves to Sonnet', () => {

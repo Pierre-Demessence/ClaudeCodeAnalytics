@@ -3,8 +3,8 @@ import type { Plan } from '@/core/types';
 import type { BoxKind } from '@/dashboard/VerdictBox';
 
 import { dayKey } from '@/core/aggregate';
-import { weekFloors, weekPercents } from '@/core/planFit';
-import { PLAN_LABELS } from '@/core/plans';
+import { TOO_BIG_BELOW, weekFloors, weekPercents } from '@/core/planFit';
+import { PLAN_LABELS, PLAN_PRICES, PLANS } from '@/core/plans';
 import { formatDay, formatDollars, formatPercent } from '@/dashboard/format';
 
 /** The chart's top, in % of the limit: taller bars are cut. */
@@ -44,6 +44,15 @@ export function estimateText(percent: number, floor: number): EstimateText {
 /** "≈ 29%" when `percent` is an estimate above its minimum, else "29%"; rounded down like `floored`. */
 const flooredEstimate = (percent: number, floor: number) => `${differs(percent, floor) ? '≈ ' : ''}${floored(percent)}`;
 
+/** A plan that fits with its busiest week under half its limit: the smallest that holds the weeks, not too big. */
+const roomy = (fit: PlanFit) => fit.busiest < TOO_BIG_BELOW && fit.typical > 0;
+
+/** "≈ 2.7×": typical weeks that fit under the limit, rounded down to one decimal (whole from 10). */
+function roomText(typical: number): string {
+  const ratio = 100 / typical;
+  return `≈ ${ratio < 10 ? Math.floor(ratio * 10) / 10 : Math.floor(ratio)}×`;
+}
+
 /** "≈ 13×", or a dash without a calibrated budget. */
 export const valueText = (ratio: number | undefined) => (ratio === undefined ? '–' : `≈ ${Math.round(ratio)}×`);
 
@@ -69,7 +78,9 @@ export function cardVerdict(fit: PlanFit, input: PlanFitInput, timeZone: string)
   const unused = Math.max(0, Math.round(100 - fit.typical));
   switch (fit.verdict) {
     case 'fits':
-      return { detail: `A typical week leaves ${unused}% unused.`, title: 'Fits every week and session.' };
+      return roomy(fit)
+        ? { detail: `Room for ${roomText(fit.typical)} a typical week; the smallest plan that holds your weeks.`, title: 'Fits, with room to grow.' }
+        : { detail: `A typical week leaves ${unused}% unused.`, title: 'Fits every week and session.' };
     case 'close':
       return { detail: overText(fit, input, timeZone, false), title: 'Close.' };
     case 'tooBig':
@@ -82,8 +93,12 @@ export function cardVerdict(fit: PlanFit, input: PlanFitInput, timeZone: string)
 /** The verdict of the best plan, which names only that plan. */
 export function bestVerdict(fit: PlanFit, input: PlanFitInput, timeZone: string): VerdictText {
   switch (fit.verdict) {
-    case 'fits':
-      return { detail: `A typical week uses ${estimateText(fit.typical, fit.typicalFloor).main} of it and your busiest week ${estimateText(fit.busiest, fit.busiestFloor).main}.`, title: 'Fits every week and session.' };
+    case 'fits': {
+      const uses = `A typical week uses ${estimateText(fit.typical, fit.typicalFloor).main} of it and your busiest week ${estimateText(fit.busiest, fit.busiestFloor).main}`;
+      return roomy(fit)
+        ? { detail: `${uses}: room for ${roomText(fit.typical)} a typical week.`, title: 'Fits, with room to grow.' }
+        : { detail: `${uses}.`, title: 'Fits every week and session.' };
+    }
     case 'close':
       return { detail: overText(fit, input, timeZone, true), title: 'Close.' };
     case 'tooBig':
@@ -91,6 +106,23 @@ export function bestVerdict(fit: PlanFit, input: PlanFitInput, timeZone: string)
     case 'tooSmall':
       return { detail: overText(fit, input, timeZone, true), title: 'Too small, but the nearest match.' };
   }
+}
+
+/**
+ * A warning that the numbers are a minimum: a week used on a plan cheaper than `best` went over that plan's limit, so
+ * the user may have held back to stay under it. Undefined when none did.
+ */
+export function heldBackText(best: PlanFit, input: PlanFitInput, share: number): string | undefined {
+  const ranInto = PLANS.some((plan) => {
+    if (PLAN_PRICES[plan] >= best.price)
+      return false;
+    const percents = weekPercents(input, plan, share);
+    return input.weeks.some((week, i) => week.plans.includes(plan) && percents[i]! >= 100);
+  });
+  // Unnamed: the best plan's card names no other plan.
+  return ranInto
+    ? 'Measured on a smaller plan whose limits you ran into: if you held back to stay under them, expect to use more than these numbers show.'
+    : undefined;
 }
 
 /** What the best plan means for the current one: a tag and, when it differs, what switching does to the bill. */

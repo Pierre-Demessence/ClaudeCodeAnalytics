@@ -8,7 +8,7 @@ import { median } from './stats.ts';
 
 /** Completed weeks needed before a plan comparison says anything. */
 export const MIN_FIT_WEEKS = 3;
-/** A plan whose busiest week stays under this % of its limit is too big. */
+/** A plan whose busiest week stays under this % of its limit is too big when a cheaper plan holds the weeks; the smallest that does fits with room to grow. */
 export const TOO_BIG_BELOW = 50;
 /** Weeks over the limit up to which a plan is close rather than too small. */
 export const CLOSE_MAX_WEEKS = 2;
@@ -33,6 +33,8 @@ export interface FitWeek {
   floor: number;
   /** Hours of the week that the limit, a capped session or a missing subscription hid. */
   hiddenHours: number;
+  /** The plans the week was used on, oldest first: more than one when its usage restarted on a plan change. */
+  plans: Plan[];
   /** Share of the cost saved if all Opus ran on Sonnet, 0 to 1. */
   shift: number;
   /** ISO. */
@@ -107,7 +109,7 @@ export function evaluatePlans(input: PlanFitInput, share = 0): PlanFit[] {
   const dollarsPerPercent = input.weeklyBudget === undefined ? 0 : input.weeklyBudget / LIMIT;
   const weekCosts = input.weeks.map(week => shifted(week.cost + (week.demand - week.floor) * dollarsPerPercent, share, week.shift));
   const demandCost = median(weekCosts) ?? 0;
-  return PLANS.map((plan): PlanFit => {
+  const fits = PLANS.map((plan): PlanFit => {
     const percents = weekPercents(input, plan, share);
     const floors = weekFloors(input, plan, share);
     const overWeeks = input.weeks.filter((_, i) => percents[i]! >= LIMIT).map(week => week.start);
@@ -129,6 +131,8 @@ export function evaluatePlans(input: PlanFitInput, share = 0): PlanFit[] {
       weeksOver: overWeeks.length,
     };
   });
+  // Plans go cheapest first. Roomy is only too much next to a cheaper plan that holds the weeks: the smallest that does fits.
+  return fits.map((fit, i) => (fit.verdict === 'tooBig' && (i === 0 || fits[i - 1]!.verdict === 'tooSmall') ? { ...fit, verdict: 'fits' } : fit));
 }
 
 const VERDICT_RANK: Record<FitVerdict, number> = { close: 1, fits: 0, tooBig: 2, tooSmall: 3 };
@@ -247,7 +251,8 @@ export function buildPlanFitInput({ calibrationK, plan, planHistory, sessionWind
   const weeks = spans.map(({ cutoffPercent, hiddenHours, week }): FitWeek => {
     const floor = week.percent!;
     const demand = weekPace === undefined ? floor : Math.max(floor, cutoffPercent + hiddenHours * weekPace);
-    return { cost: week.cost, demand, estimated: week.percentEstimated === true || demand > floor, floor, hiddenHours, shift: week.shift ?? 0, start: week.start };
+    const plans = week.parts ? [...new Set(week.parts.map(part => part.plan))] : [week.plan ?? plan];
+    return { cost: week.cost, demand, estimated: week.percentEstimated === true || demand > floor, floor, hiddenHours, plans, shift: week.shift ?? 0, start: week.start };
   });
 
   // Only the windows that started inside a kept week: the one in progress and weeks without a percent have no say.
