@@ -21,6 +21,7 @@ interface RawBlock {
 }
 
 interface RawEntry {
+  agentId?: string;
   aiTitle?: string;
   cwd?: string;
   effort?: string;
@@ -172,6 +173,8 @@ export function parseTranscriptLine(line: string, project: string, skill?: strin
   }
   if (entry.isSidechain === true) {
     record.sidechain = true;
+    if (typeof entry.agentId === 'string' && entry.agentId)
+      record.agentId = entry.agentId;
     if (agentType)
       record.agentType = agentType;
   }
@@ -203,13 +206,16 @@ export function parseTitleLine(line: string): { sessionId: string; title: string
 
 export type SkillSignal = { kind: 'prompt' } | { kind: 'start'; name: string };
 
+/** Claude Code writes a slash command as a text that starts with its markup; a prompt that only quotes the markup is no command. */
+const COMMAND_START = /^\s*<command-(?:message|name)>/;
 const COMMAND_PATTERN = /<command-name>([^<]+)<\/command-name>/;
 
 /**
  * Reads what a line says about the skill a conversation is running: the model
- * calling the `Skill` tool, or the user starting a slash command, begins one;
- * the user's next real prompt ends it. Null for any other line, including
- * tool results, meta messages, command output and subagent lines.
+ * calling the `Skill` tool, or the user starting a slash command (a text block
+ * that starts with the command markup), begins one; the user's next real
+ * prompt ends it. Null for any other line, including tool results, meta
+ * messages, command output and subagent lines.
  */
 export function parseSkillSignal(line: string): SkillSignal | null {
   // Most lines are neither: skip parsing them a second time.
@@ -238,10 +244,10 @@ export function parseSkillSignal(line: string): SkillSignal | null {
   const blocks = blocksOf(entry);
   if (blocks.some(block => block.type === 'tool_result'))
     return null;
-  const text = typeof content === 'string' ? content : blocks.map(block => block.text ?? '').join('\n');
-  if (text.startsWith('<local-command'))
+  const texts = typeof content === 'string' ? [content] : blocks.map(block => block.text ?? '');
+  if (texts.join('\n').startsWith('<local-command'))
     return null;
-  const command = COMMAND_PATTERN.exec(text)?.[1]?.trim();
+  const command = texts.map(text => COMMAND_START.test(text) ? COMMAND_PATTERN.exec(text)?.[1]?.trim() : undefined).find(Boolean);
   return command ? { name: command, kind: 'start' } : { kind: 'prompt' };
 }
 
@@ -271,9 +277,9 @@ function addTools(a: Record<string, number> | undefined, b: Record<string, numbe
  * Each copy holds one block, so its tool calls are added up, but only among
  * the copies already met (`seen` holds their keys): the first copy of a
  * message not met yet replaces the stored tools instead, so re-reading a
- * transcript does not count them twice. A skill or agent type, once set, is
- * kept, and a stored record without an agent type gets the one given. The
- * input sizes follow the same rules as the tool calls.
+ * transcript does not count them twice. A skill, agent type or agent id, once
+ * set, is kept, and a stored record without an agent type or id gets the one
+ * given. The input sizes follow the same rules as the tool calls.
  * Returns whether the map changed.
  */
 export function mergeRecord(records: Map<string, UsageRecord>, record: UsageRecord, seen = new Set<string>()): boolean {
@@ -289,10 +295,13 @@ export function mergeRecord(records: Map<string, UsageRecord>, record: UsageReco
   const skill = existing.skill ?? record.skill;
   const fills = !existing.sessionId && record.sessionId && record.output === existing.output;
   const base = record.output > existing.output || fills ? record : existing;
+  const agentId = existing.agentId ?? record.agentId;
   const agentType = existing.agentType ?? record.agentType;
-  if (base === existing && sameTools(tools, existing.tools) && sameTools(toolInput, existing.toolInput) && skill === existing.skill && agentType === existing.agentType)
+  if (base === existing && sameTools(tools, existing.tools) && sameTools(toolInput, existing.toolInput) && skill === existing.skill && agentId === existing.agentId && agentType === existing.agentType)
     return false;
   const merged = { ...base };
+  if (agentId)
+    merged.agentId = agentId;
   if (agentType)
     merged.agentType = agentType;
   if (existing.context)

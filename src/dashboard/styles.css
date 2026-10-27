@@ -1886,8 +1886,10 @@ button.info-tip:hover {
   background: var(--text-primary);
 }
 
+/* Its own stacking context: the z-indices of the "now" line, the labels and a lit block stay inside the row. */
 .session-track {
   position: relative;
+  isolation: isolate;
   height: 44px;
   border-radius: 4px;
   background-color: var(--surface-0);
@@ -1905,23 +1907,42 @@ button.info-tip:hover {
   border: 2px solid var(--series-1);
   border-radius: 4px;
   background: var(--surface-2);
-  transition: opacity 0.12s ease;
+  transition: border-color 0.12s ease;
 }
 
-/* A block too narrow for its label (a window cut by the first day) lets it spill over the neighbour while lit. */
+/* A lit block rises above the others and the "now" line; one too narrow for its label (a window cut by the first day) lets it spill over the neighbour. */
 .session-block:hover,
 .session-block:focus {
-  z-index: 1;
+  z-index: 5;
   overflow: visible;
 }
 
+/* A dimmed block fades under a veil of the track's color, not with `opacity`, which would make it a stacking context and put its label back under the "now" line. */
+.session-block::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: var(--surface-0);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
 .session-block.dimmed {
-  opacity: 0.3;
+  border-color: color-mix(in srgb, var(--series-1) 30%, var(--surface-0));
+}
+
+.session-block.dimmed::after {
+  opacity: 0.7;
 }
 
 .session-block.estimated {
   border-style: dashed;
   border-color: var(--text-secondary);
+}
+
+.session-block.estimated.dimmed {
+  border-color: color-mix(in srgb, var(--text-secondary) 30%, var(--surface-0));
 }
 
 .session-block.cut-left {
@@ -1951,13 +1972,15 @@ button.info-tip:hover {
   background-image: repeating-linear-gradient(-45deg, var(--critical) 0 3px, transparent 3px 7px);
 }
 
+/* Above the "now" line, which would otherwise cut the in-progress window's % ("3|1%"); the block's own background under the chip keeps the line from showing through. */
 .session-label {
   position: relative;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   padding: 0 5px;
   border-radius: 3px;
-  background: var(--chip);
+  background: linear-gradient(var(--chip), var(--chip)), var(--surface-2);
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;

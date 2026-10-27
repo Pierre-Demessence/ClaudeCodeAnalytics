@@ -11,6 +11,9 @@ Noteworthy changes for users. The format follows
 - Right after a plan change, the projections borrow the previous plan's ratio,
   converted with the advertised limits, until the new plan has 3 readings of its
   own; the Calibration tab says so.
+- The cache card counts the cache flushes of subagents too, each subagent apart:
+  parallel subagents take turns in one conversation, so they were left out. The
+  next collector run reads every transcript again once to tell them apart.
 
 ### Changed
 
@@ -101,6 +104,16 @@ Noteworthy changes for users. The format follows
   two of its readings went unseen.
 - On a phone, the Weeks tab's median peak card wraps its estimate without the
   limit instead of running past the card's edge.
+- On the Sessions tab, the "now" line no longer runs through the % of the window
+  in progress ("3|1%"): it passes behind the label, also while another window is
+  highlighted.
+- A prompt that quotes Claude Code's slash-command markup, or carries an IDE
+  selection that does, no longer starts a skill in "By skill or command": only a
+  text that starts with the markup is a command. Such prompts made skills of names
+  like `${name}` and `…`; the messages imported before keep them.
+- The Usage tab's costliest messages measure a subagent's pause from that
+  subagent's own previous message: another subagent at work hid the pause, and a
+  subagent's first message could read as coming after one.
 
 ## [0.2.0]
 

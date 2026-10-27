@@ -49,20 +49,22 @@ function extraCost(record: UsageRecord, previous: UsageRecord): number {
 
 /**
  * Finds the turns that rebuilt the prompt cache, oldest first, in each
- * session's main conversation; a session's first turn has no cache to lose.
- * Subagent turns are left out: parallel subagents interleave in a session, and
- * records carry no agent id to tell their caches apart.
+ * session's main conversation and in each of its subagents apart: parallel
+ * subagents interleave in a session, each with a cache of its own. A chain's
+ * first turn has no cache to lose. A subagent turn without an agent id
+ * (imported before it was kept, its transcript gone) is left out.
  */
 export function detectFlushes(records: readonly UsageRecord[], events: readonly ApiEvent[]): Flush[] {
   const groups = new Map<string, UsageRecord[]>();
   for (const record of records) {
-    if (!record.sessionId || record.sidechain)
+    if (!record.sessionId || (record.sidechain && !record.agentId))
       continue;
-    const group = groups.get(record.sessionId);
+    const chain = record.sidechain ? `${record.sessionId}|${record.agentId}` : record.sessionId;
+    const group = groups.get(chain);
     if (group)
       group.push(record);
     else
-      groups.set(record.sessionId, [record]);
+      groups.set(chain, [record]);
   }
 
   const compactions = new Map<string, number[]>();

@@ -28,6 +28,8 @@ export interface ToolContext {
 
 /** One deduplicated assistant message, as stored by the collector. No content. */
 export interface UsageRecord {
+  /** The subagent's id, which names its transcript; present only on a subagent's message, and not on one imported before it was kept whose transcript is gone. */
+  agentId?: string;
   /** The subagent's type (`Explore`, `general-purpose`, …); present only on a subagent's message, and not when its metadata file was missing. */
   agentType?: string;
   cacheRead: number;

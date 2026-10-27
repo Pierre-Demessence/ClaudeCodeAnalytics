@@ -82,6 +82,12 @@ describe('parseTranscriptLine', () => {
     expect(parseTranscriptLine(entryWithMetadata(), 'proj', undefined, 'Explore')).not.toHaveProperty('agentType');
   });
 
+  it('keeps the agent id on subagent lines only', () => {
+    expect(parseTranscriptLine(entryWithMetadata({ extra: { agentId: 'a1b2', isSidechain: true } }), 'proj')?.agentId).toBe('a1b2');
+    expect(parseTranscriptLine(entryWithMetadata({ extra: { agentId: 'a1b2' } }), 'proj')).not.toHaveProperty('agentId');
+    expect(parseTranscriptLine(entryWithMetadata({ extra: { agentId: '', isSidechain: true } }), 'proj')).not.toHaveProperty('agentId');
+  });
+
   it('marks subagent lines, which have no effort', () => {
     const record = parseTranscriptLine(entryWithMetadata({ extra: { effort: undefined, isSidechain: true } }), 'proj');
     expect(record?.sidechain).toBe(true);
@@ -277,6 +283,16 @@ describe('mergeRecord tools and skill', () => {
     expect(mergeRecord(records, parseTranscriptLine(subagent, 'p', undefined, 'Explore')!, new Set())).toBe(false);
   });
 
+  it('adds the agent id to a stored subagent record that has none', () => {
+    const records = new Map<string, UsageRecord>();
+    const old = parseTranscriptLine(entryWithMetadata({ extra: { isSidechain: true } }), 'p')!;
+    records.set(old.key, old);
+    const subagent = parseTranscriptLine(entryWithMetadata({ extra: { agentId: 'a1b2', isSidechain: true } }), 'p')!;
+    expect(mergeRecord(records, subagent, new Set())).toBe(true);
+    expect(records.get('msg_1|req_1')?.agentId).toBe('a1b2');
+    expect(mergeRecord(records, subagent, new Set())).toBe(false);
+  });
+
   it('adds the skill to a stored record that has none', () => {
     const records = new Map<string, UsageRecord>();
     mergeRecord(records, parseTranscriptLine(entryWithMetadata(), 'p')!, new Set());
@@ -296,6 +312,17 @@ describe('parseSkillSignal', () => {
   it('starts a command when a prompt begins with a slash command', () => {
     const content = '<command-name>/commit</command-name>\n<command-message>commit</command-message>\n<command-args></command-args>';
     expect(parseSkillSignal(user(content))).toEqual({ name: '/commit', kind: 'start' });
+    // Claude Code writes the message first.
+    expect(parseSkillSignal(user('<command-message>review</command-message>\n<command-name>/review</command-name>\n<command-args>12</command-args>'))).toEqual({ name: '/review', kind: 'start' });
+    expect(parseSkillSignal(user([{ text: '<ide_opened_file>The user opened app.ts in the IDE.</ide_opened_file>', type: 'text' }, { text: '<command-message>commit</command-message>\n<command-name>/commit</command-name>', type: 'text' }]))).toEqual({ name: '/commit', kind: 'start' });
+  });
+
+  it('reads a prompt that only quotes the command markup as a prompt', () => {
+    // eslint-disable-next-line no-template-curly-in-string -- the markup as `scan.test.ts` writes it, quoted.
+    const quoted = 'const command = (name: string) => user(`<command-name>${name}</command-name>`);';
+    expect(parseSkillSignal(user(`Why is this a skill? ${quoted}`))).toEqual({ kind: 'prompt' });
+    expect(parseSkillSignal(user([{ text: `<ide_selection>The user selected line 117 of scan.test.ts:\n${quoted}</ide_selection>`, type: 'text' }, { text: 'Explain this', type: 'text' }]))).toEqual({ kind: 'prompt' });
+    expect(parseSkillSignal(user('Slash commands are lines holding <command-name>…</command-name>'))).toEqual({ kind: 'prompt' });
   });
 
   it('ends the skill on a real prompt, as text or as content blocks', () => {

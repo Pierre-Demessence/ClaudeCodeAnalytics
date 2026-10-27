@@ -157,8 +157,8 @@ Run lint, test and build before considering work done.
   (`sessionId`, `cwd`, `gitBranch`, …), tool names with call counts, the character
   count of their inputs, the size of each tool's results (characters and
   screenshots, never their content), the
-  skill or slash command name and the subagent type (from its `.meta.json`,
-  never its description), never content or tool inputs themselves; conversation titles are
+  skill or slash command name and the subagent's id and type (the type from its
+  `.meta.json`, never its description), never content or tool inputs themselves; conversation titles are
   kept per session in `sessions.json`; `events.jsonl` keeps rate-limit hits,
   overloads and compactions (times and limit types, never their text). `deleted-readings.jsonl` keeps the manual readings deleted from the
   dashboard: keep it. `backup-format-<n>/` holds the message

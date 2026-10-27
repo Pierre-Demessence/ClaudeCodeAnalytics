@@ -277,6 +277,17 @@ describe('collect', () => {
       expect((await store.loadRecords()).get('m2|req_m2')?.agentType).toBe('Explore');
     });
 
+    it('fills the agent id of subagent records imported without it', async () => {
+      const dir = join(claudeDir, 'projects', 'proj-a', 'session', 'subagents');
+      await writeFile(join(dir, 'agent.jsonl'), JSON.stringify({ ...JSON.parse(assistantLine('m2', 10)), agentId: 'a1b2', isSidechain: true }));
+      const store = await seedOldDataDir();
+      const stored = new Map([['m2|req_m2', { ...oldRecord('m2|req_m2', 10), sessionId: 's1', sidechain: true as const }]]);
+      await store.saveRecords(stored, ['2026-10']);
+      await collect({ claudeDir, dataDir, fetchImpl, now: NOW });
+
+      expect((await store.loadRecords()).get('m2|req_m2')?.agentId).toBe('a1b2');
+    });
+
     it('finds the events of transcripts imported before the bump', async () => {
       const hitFile = join(claudeDir, 'projects', 'proj-a', 's2.jsonl');
       await writeFile(hitFile, `${HIT_LINE}\n`);
