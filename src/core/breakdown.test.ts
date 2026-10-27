@@ -18,6 +18,22 @@ describe('projectOf', () => {
   it('falls back to the transcript folder without a directory', () => {
     expect(projectOf(undefined, 'S--Dev-app')).toEqual({ name: 'S--Dev-app', path: 'S--Dev-app' });
   });
+
+  it('counts a Claude Code worktree as its repository', () => {
+    expect(projectOf('S:\\Dev\\Web\\My App\\.claude\\worktrees\\delete-account', 'x')).toEqual({ name: 'My App', path: 's:\\Dev\\Web\\My App' });
+    expect(projectOf('/home/me/app/.claude/worktrees/fix/', 'x')).toEqual({ name: 'app', path: '/home/me/app' });
+    expect(projectOf('/home/me/app/.claude/worktrees/fix/src', 'x')).toEqual({ name: 'app', path: '/home/me/app' });
+  });
+
+  it('groups every folder under the temp directory into one project', () => {
+    const windows = { name: 'Temporary folders', path: 'c:\\Users\\me\\AppData\\Local\\Temp' };
+    expect(projectOf('C:\\Users\\me\\AppData\\Local\\Temp\\split-sim-1mfd2w', 'x')).toEqual(windows);
+    expect(projectOf('c:\\Users\\me\\AppData\\Local\\Temp\\claude\\proj\\scratchpad\\lc', 'x')).toEqual(windows);
+    expect(projectOf('/tmp/run-abc', 'x')).toEqual({ name: 'Temporary folders', path: '/tmp' });
+    expect(projectOf('/var/folders/zz/abc123/T/run-abc', 'x')).toEqual({ name: 'Temporary folders', path: '/var/folders/zz/abc123/T' });
+    expect(projectOf('/private/tmp/run-abc', 'x')).toEqual({ name: 'Temporary folders', path: '/private/tmp' });
+    expect(projectOf('/home/me/tmpl', 'x')).toEqual({ name: 'tmpl', path: '/home/me/tmpl' });
+  });
 });
 
 describe('buildBreakdown', () => {
@@ -33,6 +49,19 @@ describe('buildBreakdown', () => {
       ['s:\\Dev\\app', 60],
       ['old-folder', 20],
       ['s:\\Dev\\other', 20],
+    ]);
+  });
+
+  it('adds up conversations in different temp folders and worktrees as one project each', () => {
+    const breakdown = buildBreakdown([
+      rec('2026-10-01T10:00:00Z', { cwd: 'C:\\Users\\me\\AppData\\Local\\Temp\\run-a' }),
+      rec('2026-10-01T11:00:00Z', { cwd: 'C:\\Users\\me\\AppData\\Local\\Temp\\run-b', sessionId: 's2' }),
+      rec('2026-10-01T12:00:00Z', { cwd: 'S:\\Dev\\app', sessionId: 's3' }),
+      rec('2026-10-01T13:00:00Z', { cwd: 'S:\\Dev\\app\\.claude\\worktrees\\fix', sessionId: 's4' }),
+    ], {});
+    expect(breakdown.projects.map(p => [p.name, p.cost])).toEqual([
+      ['Temporary folders', 40],
+      ['app', 40],
     ]);
   });
 

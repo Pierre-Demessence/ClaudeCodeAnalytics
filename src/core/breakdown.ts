@@ -106,7 +106,16 @@ export interface Breakdown {
 
 const projectCache = new Map<string, { name: string; path: string }>();
 
-/** A working directory as a project: drive letter lower-cased, named by its last segment. */
+/** The default OS temp directory on Windows, Linux and macOS, as the first group. */
+const TEMP_DIR = /^([a-z]:[\\/]Users[\\/][^\\/]+[\\/]AppData[\\/]Local[\\/]Temp|(?:\/private)?\/tmp|(?:\/private)?\/var\/folders\/[^/]+\/[^/]+\/T)(?:[\\/]|$)/i;
+const WORKTREE = /[\\/]\.claude[\\/]worktrees[\\/][^\\/]+(?:[\\/].*)?$/;
+
+/**
+ * A working directory as a project: drive letter lower-cased, named by its
+ * last segment. A Claude Code worktree counts as its repository, and every
+ * folder under the temp directory (scripted runs, scratchpads) as one project,
+ * or each throwaway folder would be a row of its own.
+ */
 export function projectOf(cwd: string | undefined, folder: string): { name: string; path: string } {
   if (!cwd)
     return { name: folder, path: folder };
@@ -115,7 +124,14 @@ export function projectOf(cwd: string | undefined, folder: string): { name: stri
   let project = projectCache.get(cwd);
   if (!project) {
     const path = cwd.replace(/^[a-z]:/i, drive => drive.toLowerCase()).replace(/(?<=.)[\\/]+$/, '');
-    project = { name: path.split(/[\\/]/).at(-1) || path, path };
+    const temp = TEMP_DIR.exec(path)?.[1];
+    if (temp) {
+      project = { name: 'Temporary folders', path: temp };
+    }
+    else {
+      const repo = path.replace(WORKTREE, '');
+      project = { name: repo.split(/[\\/]/).at(-1) || repo, path: repo };
+    }
     projectCache.set(cwd, project);
   }
   return project;

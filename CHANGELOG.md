@@ -23,6 +23,9 @@ Noteworthy changes for users. The format follows
   holds your weeks. When a week used on a smaller plan went over its limit, the
   best plan's card warns that you may have held back, and may use more than the
   numbers show.
+- Conversations started in a Claude Code worktree count under their repository,
+  and those started anywhere in the temp directory (scripted runs, scratchpads)
+  under one "Temporary folders" project, instead of one project per folder.
 
 ### Fixed
 
