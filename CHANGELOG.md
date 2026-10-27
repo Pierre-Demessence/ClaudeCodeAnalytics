@@ -6,6 +6,11 @@ Noteworthy changes for users. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Breakdown's "By skill or command" no longer lists `${name}` or `…`: names
+  stored from prompts that only quoted a slash command count as no skill.
+
 ## [0.3.0]
 
 ### Added

@@ -257,6 +257,20 @@ describe('buildBreakdown', () => {
     expect(breakdown.skills).toEqual([{ name: '/commit', cost: 20, output: 1_000_000 }]);
   });
 
+  it('counts names no skill or command can have as no skill', () => {
+    // Stored before the parser told a prompt quoting the command markup from a command.
+    const breakdown = buildBreakdown([
+      // eslint-disable-next-line no-template-curly-in-string -- the literal name found in stored data
+      rec('2026-10-01T10:00:00Z', { skill: '${name}' }),
+      rec('2026-10-01T10:01:00Z', { sidechain: true }),
+      rec('2026-10-01T10:02:00Z', { skill: '…' }),
+      rec('2026-10-01T10:03:00Z', { skill: '/impeccable:impeccable' }),
+      rec('2026-10-01T10:04:00Z', { skill: 'apps/web:déployer' }),
+    ], {});
+    expect(breakdown.skills.map(skill => skill.name)).toEqual(['/impeccable:impeccable', 'apps/web:déployer']);
+    expect(breakdown.noSkill.cost).toBe(60);
+  });
+
   it('keeps the costliest skills and groups the rest', () => {
     const records = Array.from({ length: 11 }, (_, i) => rec(`2026-10-01T10:${String(i).padStart(2, '0')}:00Z`, { output: (i + 1) * 100_000, skill: `skill-${i}` }));
     const { otherSkills, skills } = buildBreakdown(records, {});

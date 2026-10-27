@@ -156,6 +156,15 @@ export function sessionProjects(records: readonly UsageRecord[]): (record: Usage
 }
 
 /**
+ * Letters, digits and the separators of plugin, scoped and MCP names. Older scans
+ * stored names like `${name}` or `…` from prompts that quoted the command markup,
+ * and a re-read keeps a stored skill.
+ */
+const SKILL_NAME = /^[\p{L}\p{N}_./:@-]+$/u;
+
+const validSkill = (skill: string | undefined) => (skill && SKILL_NAME.test(skill) ? skill : undefined);
+
+/**
  * Returns each record's skill or slash command. A subagent's own transcript
  * knows none, so its messages take the one its conversation was under at the
  * time: that of the latest main-agent message before it.
@@ -166,7 +175,7 @@ export function sessionSkills(records: readonly UsageRecord[]): (record: UsageRe
     if (record.sidechain || !record.sessionId)
       continue;
     const messages = mainBySession.get(record.sessionId) ?? [];
-    messages.push({ ms: Date.parse(record.ts), skill: record.skill });
+    messages.push({ ms: Date.parse(record.ts), skill: validSkill(record.skill) });
     mainBySession.set(record.sessionId, messages);
   }
   for (const messages of mainBySession.values())
@@ -174,7 +183,7 @@ export function sessionSkills(records: readonly UsageRecord[]): (record: UsageRe
 
   return (record) => {
     if (!record.sidechain)
-      return record.skill;
+      return validSkill(record.skill);
     const messages = record.sessionId && mainBySession.get(record.sessionId);
     if (!messages)
       return undefined;
