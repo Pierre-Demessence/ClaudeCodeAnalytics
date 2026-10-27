@@ -4,10 +4,6 @@ Everything not done yet. One line per item; delete an item in the same commit
 that completes it. Sections say what kind of work an item is; `docs/roadmap.md`
 orders the ones that are scheduled.
 
-## Bugs
-
-- Sessions timeline: the "now" line crosses the in-progress window's percent label (`Sessions.tsx`), e.g. "3|1%".
-
 ## Features
 
 New capabilities.

@@ -92,6 +92,9 @@ Noteworthy changes for users. The format follows
   two of its readings went unseen.
 - On a phone, the Weeks tab's median peak card wraps its estimate without the
   limit instead of running past the card's edge.
+- On the Sessions tab, the "now" line no longer runs through the % of the window
+  in progress ("3|1%"): it passes behind the label, also while another window is
+  highlighted.
 
 ## [0.2.0]
 
