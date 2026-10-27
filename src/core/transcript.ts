@@ -203,13 +203,16 @@ export function parseTitleLine(line: string): { sessionId: string; title: string
 
 export type SkillSignal = { kind: 'prompt' } | { kind: 'start'; name: string };
 
+/** Claude Code writes a slash command as a text that starts with its markup; a prompt that only quotes the markup is no command. */
+const COMMAND_START = /^\s*<command-(?:message|name)>/;
 const COMMAND_PATTERN = /<command-name>([^<]+)<\/command-name>/;
 
 /**
  * Reads what a line says about the skill a conversation is running: the model
- * calling the `Skill` tool, or the user starting a slash command, begins one;
- * the user's next real prompt ends it. Null for any other line, including
- * tool results, meta messages, command output and subagent lines.
+ * calling the `Skill` tool, or the user starting a slash command (a text block
+ * that starts with the command markup), begins one; the user's next real
+ * prompt ends it. Null for any other line, including tool results, meta
+ * messages, command output and subagent lines.
  */
 export function parseSkillSignal(line: string): SkillSignal | null {
   // Most lines are neither: skip parsing them a second time.
@@ -238,10 +241,10 @@ export function parseSkillSignal(line: string): SkillSignal | null {
   const blocks = blocksOf(entry);
   if (blocks.some(block => block.type === 'tool_result'))
     return null;
-  const text = typeof content === 'string' ? content : blocks.map(block => block.text ?? '').join('\n');
-  if (text.startsWith('<local-command'))
+  const texts = typeof content === 'string' ? [content] : blocks.map(block => block.text ?? '');
+  if (texts.join('\n').startsWith('<local-command'))
     return null;
-  const command = COMMAND_PATTERN.exec(text)?.[1]?.trim();
+  const command = texts.map(text => COMMAND_START.test(text) ? COMMAND_PATTERN.exec(text)?.[1]?.trim() : undefined).find(Boolean);
   return command ? { name: command, kind: 'start' } : { kind: 'prompt' };
 }
 

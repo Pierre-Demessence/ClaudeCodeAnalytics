@@ -95,6 +95,10 @@ Noteworthy changes for users. The format follows
 - On the Sessions tab, the "now" line no longer runs through the % of the window
   in progress ("3|1%"): it passes behind the label, also while another window is
   highlighted.
+- A prompt that quotes Claude Code's slash-command markup, or carries an IDE
+  selection that does, no longer starts a skill in "By skill or command": only a
+  text that starts with the markup is a command. Such prompts made skills of names
+  like `${name}` and `…`; the messages imported before keep them.
 
 ## [0.2.0]
 
