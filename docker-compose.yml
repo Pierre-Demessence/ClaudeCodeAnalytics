@@ -5,11 +5,13 @@ services:
     restart: unless-stopped
     # No published port: only Traefik (bound to 127.0.0.1:80) reaches the
     # dashboard. Vite's default allowedHosts accepts `*.localhost`, which
-    # blocks DNS-rebinding requests with any other Host header.
+    # blocks DNS-rebinding requests with any other Host header. Its network is
+    # shared with Traefik alone, so other containers cannot call the API by IP.
     networks:
-      - proxy
+      - claudecodeanalytics
     labels:
       - traefik.enable=true
+      - traefik.docker.network=claudecodeanalytics
       - traefik.http.routers.claudecodeanalytics.rule=Host(`analytics.claudecode.localhost`)
       - traefik.http.routers.claudecodeanalytics.entrypoints=web
       - traefik.http.services.claudecodeanalytics.loadbalancer.server.port=4173
@@ -27,5 +29,5 @@ services:
       - no-new-privileges:true
 
 networks:
-  proxy:
+  claudecodeanalytics:
     external: true

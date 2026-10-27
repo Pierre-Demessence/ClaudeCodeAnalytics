@@ -96,7 +96,6 @@ estimates of when the result becomes judgeable, not limits in the code.
 
 ## Technical debt
 
-- The Docker dashboard shares the `proxy` network with other containers, which can reach its API by IP (Vite always allows IP hosts, and a request without `Origin` passes the POST check). A dedicated network joined only by Traefik would close this; it needs a change in `S:\Dev\DockerInfra\compose.yml`.
 - `GET /api/summary` has no Origin/Host check: it relies on Vite's default `allowedHosts` and localhost-only CORS. Add an explicit check before ever exposing the server beyond loopback.
 - `subscriptionStartedAt` (the billing day) is read from `~/.claude.json` only by host runs (`npm run dev`, `collect`, a host `npm run dashboard`): the container cannot see that file and the hook runs the collector there, so a Docker-only setup keeps the stored value or none (`collect.ts:73`). Mounting the file read-only would fix it, but Claude Code replaces it by rename, which a single-file bind mount may not follow, and it holds the email and account ids.
 - A collector killed mid-write (container stop, Ctrl+C) leaves its `*.tmp` file in the data dir for good: `writeAtomic` (`src/collector/store.ts`) removes it only when the write throws. Readers ignore it, but each is a whole month file (one of 3.6 MB seen). Sweep temp files older than an hour when the store opens.

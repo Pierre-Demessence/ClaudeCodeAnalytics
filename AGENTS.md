@@ -17,7 +17,8 @@ that setup isn't yours.
 - Dashboard: `npm run dashboard` (build + preview) or `npm run dev`
 - Always-on dashboard: `npm run docker:up` (rebuild + restart the container
   at `http://analytics.claudecode.localhost`, behind Traefik). Needs a running
-  Traefik on an external `proxy` network; skip it if you don't have one.
+  Traefik joined to an external `claudecodeanalytics` network; skip it if you
+  don't have one.
 - Taskbar widget: `npm run widget:dev` (debug build, redraws when
   `widget/widget.svg` is saved) / `npm run widget:install` (release build copied
   to `%LOCALAPPDATA%Claude Code Analytics Widget` and started) /
@@ -176,8 +177,9 @@ Run lint, test and build before considering work done.
   `server.host` or `allowedHosts: true` without adding a Host check. The Docker
   container listens on `0.0.0.0` but publishes no port: from the host, only
   Traefik (bound to `127.0.0.1:80`) reaches it, and `*.localhost` passes the
-  default `allowedHosts`. Other containers on the `proxy` network can still
-  call it by IP (Vite always allows IP hosts). Never publish a port.
+  default `allowedHosts`. Its `claudecodeanalytics` network is shared with Traefik
+  alone: another container on it could call the API by IP (Vite always allows IP
+  hosts). Never publish a port or move it back to a shared network.
 - `GET /api/range` reads the stored data only: it never runs the collector or calls the
   endpoint, so any number of tabs can ask for ranges without touching the rate limit.
 - The container loads `vite.config.ts` with `--configLoader native` (its root

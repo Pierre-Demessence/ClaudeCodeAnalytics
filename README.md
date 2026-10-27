@@ -163,11 +163,12 @@ new `widget:install`.
 
 `npm run docker:up` builds the image and serves the dashboard at
 <http://analytics.claudecode.localhost>. Needs Docker Desktop and a running
-Traefik reverse proxy on an external `proxy` network. The container mounts
-`~/.claude` read-only and `~/.claude-code-analytics`, and runs the collector every
-minute and when the hook asks. It runs the version it was built from: run
-`npm run docker:up` again after updating, and only on code you trust, since the
-collector can read your login token.
+Traefik reverse proxy joined to an external `claudecodeanalytics` network, which
+no other container joins, so no other container can call the dashboard's API.
+The container mounts `~/.claude` read-only and `~/.claude-code-analytics`, and
+runs the collector every minute and when the hook asks. It runs the version it
+was built from: run `npm run docker:up` again after updating, and only on code
+you trust, since the collector can read your login token.
 
 ## Development
 
