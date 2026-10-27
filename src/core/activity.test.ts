@@ -154,6 +154,17 @@ describe('messageCost', () => {
     ]);
     expect(messageCost.outliers[0]).toMatchObject({ cause: 'cacheWrite1h', pauseMs: 2 * 3_600_000 });
   });
+
+  it('measures a subagent\'s pause on its own messages: parallel subagents keep caches of their own', () => {
+    const { messageCost } = activity([
+      rec('2026-10-01T10:00:00Z', { agentId: 'a', sidechain: true }),
+      rec('2026-10-01T10:10:00Z', { agentId: 'b', sidechain: true }),
+      rec('2026-10-01T10:20:00Z', { agentId: 'a', cacheWrite5m: 300_000, sidechain: true }),
+      // A subagent's first message has no cache to lose, whatever ran before it.
+      rec('2026-10-01T11:00:00Z', { agentId: 'c', cacheWrite5m: 400_000, sidechain: true }),
+    ]);
+    expect(messageCost.outliers.map(o => o.pauseMs)).toEqual([undefined, 20 * 60_000]);
+  });
 });
 
 describe('upgrades', () => {

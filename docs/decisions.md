@@ -449,10 +449,12 @@ rebuilt) flagged 24 of 104 "flushes" on the local data, some of 473 tokens.
 Rejected: the plain read-drop rule of the AeternaLabsHQ/claude-code-stats
 reference.
 
-Flushes are detected on the main conversation only: parallel subagents of one
-session interleave their turns and records carry no agent id, so a subagent's
-first turn read as a flush (54 of the 80 flushes found on the local data were
-subagent turns, but only $3.60 of the $38.44).
+Flushes are detected on each chain apart: the main conversation, and every
+subagent by the `agentId` its messages carry. Parallel subagents of one session
+interleave their turns, so read as one chain, a subagent's first turn read as a
+flush (54 of the 80 flushes found on the local data were subagent turns, but only
+$3.60 of the $38.44). Subagent messages without an id (their transcripts deleted
+before the id was kept) are left out.
 
 A flush's extra cost counts the tokens written again only: the previous turn's
 prompt, less what the turn still read from the cache, at the write price instead of

@@ -21,6 +21,7 @@ interface RawBlock {
 }
 
 interface RawEntry {
+  agentId?: string;
   aiTitle?: string;
   cwd?: string;
   effort?: string;
@@ -172,6 +173,8 @@ export function parseTranscriptLine(line: string, project: string, skill?: strin
   }
   if (entry.isSidechain === true) {
     record.sidechain = true;
+    if (typeof entry.agentId === 'string' && entry.agentId)
+      record.agentId = entry.agentId;
     if (agentType)
       record.agentType = agentType;
   }
@@ -274,9 +277,9 @@ function addTools(a: Record<string, number> | undefined, b: Record<string, numbe
  * Each copy holds one block, so its tool calls are added up, but only among
  * the copies already met (`seen` holds their keys): the first copy of a
  * message not met yet replaces the stored tools instead, so re-reading a
- * transcript does not count them twice. A skill or agent type, once set, is
- * kept, and a stored record without an agent type gets the one given. The
- * input sizes follow the same rules as the tool calls.
+ * transcript does not count them twice. A skill, agent type or agent id, once
+ * set, is kept, and a stored record without an agent type or id gets the one
+ * given. The input sizes follow the same rules as the tool calls.
  * Returns whether the map changed.
  */
 export function mergeRecord(records: Map<string, UsageRecord>, record: UsageRecord, seen = new Set<string>()): boolean {
@@ -292,10 +295,13 @@ export function mergeRecord(records: Map<string, UsageRecord>, record: UsageReco
   const skill = existing.skill ?? record.skill;
   const fills = !existing.sessionId && record.sessionId && record.output === existing.output;
   const base = record.output > existing.output || fills ? record : existing;
+  const agentId = existing.agentId ?? record.agentId;
   const agentType = existing.agentType ?? record.agentType;
-  if (base === existing && sameTools(tools, existing.tools) && sameTools(toolInput, existing.toolInput) && skill === existing.skill && agentType === existing.agentType)
+  if (base === existing && sameTools(tools, existing.tools) && sameTools(toolInput, existing.toolInput) && skill === existing.skill && agentId === existing.agentId && agentType === existing.agentType)
     return false;
   const merged = { ...base };
+  if (agentId)
+    merged.agentId = agentId;
   if (agentType)
     merged.agentType = agentType;
   if (existing.context)

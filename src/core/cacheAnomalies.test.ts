@@ -93,10 +93,22 @@ describe('detectFlushes', () => {
     expect(detectFlushes(records, [])).toEqual([]);
   });
 
-  it('leaves subagent turns out: parallel subagents interleave and their caches cannot be told apart', () => {
+  it('follows each subagent apart: parallel subagents interleave in a session, each with a cache of its own', () => {
+    const agent = (id: string, records: UsageRecord[]) => records.map(r => ({ ...r, agentId: id, key: `${r.key}-${id}`, sidechain: true as const }));
+    // Two subagents take turns 15 s apart; `b` reads under half of `a`'s cache and writes more than the gap: as one chain, a flush every turn.
+    const a = agent('a', steady());
+    const b = agent('b', Array.from({ length: 10 }, (_, i) => turn(i * 30 + 15, { read: 4000, write5m: 9000 })));
+    expect(detectFlushes([...steady(), ...a, ...b], [])).toEqual([]);
+    // A subagent that pauses past its cache lifetime rebuilds it.
+    const flushes = detectFlushes([...a, ...agent('a', [turn(270 + 600, { read: 0, write5m: 50_000 })])], []);
+    expect(flushes).toEqual([expect.objectContaining({ kind: 'idleGap', sessionId: 's1', tokens: 50_000 })]);
+    // A subagent turn does not break the main conversation's chain.
+    expect(detectFlushes([...steady(), ...b, turn(270 + 600, { write5m: 50_000 })], [])).toHaveLength(1);
+  });
+
+  it('leaves out a subagent turn without an agent id: its subagent cannot be told apart', () => {
     const subagents = [...steady().map(r => ({ ...r, key: `${r.key}-sub`, sidechain: true as const })), { ...turn(270 + 600, { write5m: 50_000 }), key: 'sub-flush', sidechain: true as const }];
     expect(detectFlushes(subagents, [])).toEqual([]);
-    // They do not disturb the main chain either.
     expect(detectFlushes([...steady(), ...subagents, turn(270 + 600, { write5m: 50_000 })], [])).toHaveLength(1);
   });
 

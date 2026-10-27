@@ -23,7 +23,7 @@ export type ScanState = Record<string, { calls?: Record<string, OpenCall>; malfo
  * that only a full re-read of the transcripts can fill in for what was already
  * imported (see `collect`).
  */
-export const SCAN_FORMAT = 7;
+export const SCAN_FORMAT = 8;
 
 /** Contents of `scan-state.json`. */
 export interface StoredScanState {

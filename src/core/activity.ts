@@ -257,11 +257,11 @@ function messageCostOf(week: readonly UsageRecord[], records: readonly UsageReco
     const outlier: Outlier = { ...projectFor(record), cause, cost, tokens: record[cause], ts: record.ts };
     if ((cause === 'cacheWrite5m' || cause === 'cacheWrite1h') && record.sessionId) {
       const ms = Date.parse(record.ts);
-      // The main conversation and its subagents each have their own cache: a subagent at work does not keep the main one alive.
+      // The main conversation and each subagent have their own cache: another one at work does not keep it alive.
       let previous = -Infinity;
       for (const other of records) {
         const otherMs = Date.parse(other.ts);
-        if (other.sessionId === record.sessionId && Boolean(other.sidechain) === Boolean(record.sidechain) && otherMs < ms && otherMs > previous)
+        if (other.sessionId === record.sessionId && Boolean(other.sidechain) === Boolean(record.sidechain) && other.agentId === record.agentId && otherMs < ms && otherMs > previous)
           previous = otherMs;
       }
       if (ms - previous > CACHE_LIFETIME_MS[cause] && previous > -Infinity)

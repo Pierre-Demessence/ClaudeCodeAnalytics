@@ -11,6 +11,9 @@ Noteworthy changes for users. The format follows
 - Right after a plan change, the projections borrow the previous plan's ratio,
   converted with the advertised limits, until the new plan has 3 readings of its
   own; the Calibration tab says so.
+- The cache card counts the cache flushes of subagents too, each subagent apart:
+  parallel subagents take turns in one conversation, so they were left out. The
+  next collector run reads every transcript again once to tell them apart.
 
 ### Fixed
 
@@ -99,6 +102,9 @@ Noteworthy changes for users. The format follows
   selection that does, no longer starts a skill in "By skill or command": only a
   text that starts with the markup is a command. Such prompts made skills of names
   like `${name}` and `…`; the messages imported before keep them.
+- The Usage tab's costliest messages measure a subagent's pause from that
+  subagent's own previous message: another subagent at work hid the pause, and a
+  subagent's first message could read as coming after one.
 
 ## [0.2.0]
 
