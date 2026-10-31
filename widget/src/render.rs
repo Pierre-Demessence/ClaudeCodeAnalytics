@@ -87,6 +87,7 @@ mod tests {
         WidgetRow {
             estimated,
             limit,
+            none: false,
             percent: Some(percent),
             resets_at_ms: Some(NOW + resets_in),
         }
@@ -110,6 +111,19 @@ mod tests {
                 weekly: row(61.5, 98.0, true, 30 * HOUR),
             }),
         }
+    }
+
+    fn no_five_hour_limit() -> State {
+        let mut state = normal();
+        let view = state.view.as_mut().unwrap();
+        view.five_hour = WidgetRow {
+            estimated: false,
+            limit: 95.0,
+            none: true,
+            percent: None,
+            resets_at_ms: None,
+        };
+        state
     }
 
     fn offline() -> State {
@@ -187,6 +201,11 @@ mod tests {
     #[test]
     fn offline_dark() {
         check("offline-dark", &offline(), true, 200, 48);
+    }
+
+    #[test]
+    fn no_five_hour_limit_light() {
+        check("none-light", &no_five_hour_limit(), false, 200, 48);
     }
 
     #[test]

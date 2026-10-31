@@ -81,6 +81,10 @@ describe('convertPercent', () => {
     expect(convertPercent(10, 'max5', 'max20', 'fiveHour')).toBeUndefined();
     expect(convertPercent(10, 'max20', 'pro', 'fiveHour')).toBeUndefined();
   });
+
+  it('keeps a 5-hour % on the same plan, Ultra included', () => {
+    expect(convertPercent(40, 'max20', 'max20', 'fiveHour')).toBe(40);
+  });
 });
 
 describe('planFromSubscription', () => {
@@ -88,6 +92,10 @@ describe('planFromSubscription', () => {
     expect(planFromSubscription('pro', 'default_claude_ai')).toBe('pro');
     expect(planFromSubscription('max', 'default_claude_max_20x')).toBe('max20');
     expect(planFromSubscription('max', 'default_claude_max_5x')).toBe('max5');
+  });
+
+  it('maps the Ultra subscription type', () => {
+    expect(planFromSubscription('ultra', undefined)).toBe('max20');
   });
 
   it('returns undefined for unknown values', () => {

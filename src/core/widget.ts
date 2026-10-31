@@ -5,6 +5,8 @@ export interface WidgetRow {
   estimated: boolean;
   /** % from which the window counts as having hit the limit. */
   limit: number;
+  /** The account has no such limit (Ultra, verified): the row reads "none". */
+  none?: true;
   percent?: number;
   /** Epoch milliseconds; absent for an idle or unknown window. */
   resetsAtMs?: number;
@@ -16,7 +18,7 @@ export interface WidgetView {
   weekly: WidgetRow;
 }
 
-type WidgetInput = Pick<DashboardSummary, 'current' | 'fiveHourSession' | 'limitThreshold' | 'weekLimitThreshold'>;
+type WidgetInput = Pick<DashboardSummary, 'current' | 'fiveHourSession' | 'limitThreshold' | 'noFiveHourLimit' | 'weekLimitThreshold'>;
 
 /** The two rows of the taskbar widget, from the same numbers the Overview shows. */
 export function widgetView(summary: WidgetInput, now: number): WidgetView {
@@ -28,7 +30,10 @@ export function widgetView(summary: WidgetInput, now: number): WidgetView {
   // an expired window altogether, so a week with no session still means idle.
   const sessionOpen = session?.resetsAt !== undefined && Date.parse(session.resetsAt) > now;
   const fiveHour: WidgetRow = { estimated: false, limit: summary.limitThreshold };
-  if (session && sessionOpen) {
+  if (summary.noFiveHourLimit) {
+    fiveHour.none = true;
+  }
+  else if (session && sessionOpen) {
     fiveHour.estimated = session.estimatedNow !== undefined;
     fiveHour.percent = session.estimatedNow ?? session.percent;
     fiveHour.resetsAtMs = Date.parse(session.resetsAt!);

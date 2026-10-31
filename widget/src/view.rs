@@ -14,6 +14,9 @@ pub struct WidgetRow {
     pub estimated: bool,
     /// % from which the window counts as having hit the limit.
     pub limit: f64,
+    /// The account has no such limit: the row reads `none`.
+    #[serde(default)]
+    pub none: bool,
     pub percent: Option<f64>,
     /// Epoch milliseconds; absent for an idle or unknown window.
     pub resets_at_ms: Option<i64>,
@@ -41,7 +44,7 @@ pub struct RowReadout {
     /// 0 to 100: how much of the bar is filled.
     pub fill: f64,
     pub at_limit: bool,
-    /// `42%`, `~42%` for an estimate, `–` without a reading.
+    /// `42%`, `~42%` for an estimate, `none` without such a limit, `–` without a reading.
     pub percent: String,
     pub reset: String,
 }
@@ -76,6 +79,7 @@ fn row_readout(label: &'static str, row: Option<&WidgetRow>, now_ms: i64) -> Row
             _ => false,
         },
         percent: match (row, percent) {
+            (Some(row), _) if row.none => "none".to_string(),
             (Some(row), Some(p)) => format!("{}{}%", if row.estimated { "~" } else { "" }, p.round()),
             _ => "–".to_string(),
         },
@@ -122,12 +126,14 @@ mod tests {
             five_hour: WidgetRow {
                 estimated: false,
                 limit: 95.0,
+                none: false,
                 percent: Some(42.0),
                 resets_at_ms: Some(NOW + 2 * HOUR + 59 * MINUTE_MS),
             },
             weekly: WidgetRow {
                 estimated: false,
                 limit: 98.0,
+                none: false,
                 percent: Some(7.0),
                 resets_at_ms: Some(NOW + 53 * HOUR),
             },
@@ -241,6 +247,23 @@ mod tests {
     }
 
     #[test]
+    fn shows_none_for_a_window_the_account_does_not_have() {
+        let mut view = view();
+        view.five_hour = WidgetRow {
+            none: true,
+            percent: None,
+            resets_at_ms: None,
+            ..view.five_hour
+        };
+        let readout = shown(view, false, NOW);
+        assert_eq!(readout.rows[0].percent, "none");
+        assert_eq!(readout.rows[0].reset, "–");
+        assert_eq!(readout.rows[0].fill, 0.0);
+        assert!(!readout.rows[0].at_limit);
+        assert_eq!(readout.rows[1].percent, "7%");
+    }
+
+    #[test]
     fn shows_dashes_before_the_api_has_ever_answered_and_flags_it_offline() {
         let readout = readout(
             &State {
@@ -277,6 +300,7 @@ mod tests {
         }"#;
         let view: WidgetView = serde_json::from_str(json).unwrap();
         assert_eq!(view.five_hour.percent, Some(42.5));
+        assert!(!view.five_hour.none);
         assert_eq!(view.five_hour.resets_at_ms, Some(1_791_824_340_000));
         assert!(view.weekly.estimated);
         assert_eq!(view.weekly.percent, None);

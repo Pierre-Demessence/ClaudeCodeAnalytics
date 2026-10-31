@@ -107,6 +107,12 @@ describe('overview', () => {
     expect(screen.getByText('No session in progress.')).toBeTruthy();
   });
 
+  it('says there is no 5-hour limit on an account without one', () => {
+    render(<Overview summary={summary({}, { noFiveHourLimit: true })} />);
+    expect(screen.getByText('No 5-hour limit on this account.')).toBeTruthy();
+    expect(screen.queryByText('No session in progress.')).toBeNull();
+  });
+
   it('shows the 5-hour session with its own verdict', () => {
     const fiveHourSession: FiveHourSession = {
       forecast: { high: 60, low: 40, median: 50, method: 'calibrated' },

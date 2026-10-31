@@ -12,13 +12,14 @@ const DAY = 24 * HOUR;
 const now = Date.parse('2026-10-12T15:00:00Z');
 const iso = (ms: number) => new Date(ms).toISOString();
 
-type Input = Pick<DashboardSummary, 'current' | 'fiveHourSession' | 'limitThreshold' | 'weekLimitThreshold'>;
+type Input = Pick<DashboardSummary, 'current' | 'fiveHourSession' | 'limitThreshold' | 'noFiveHourLimit' | 'weekLimitThreshold'>;
 
 function summary(overrides: Partial<Input> = {}): Input {
   return {
     current: { pacing: {} as never, readAt: iso(now - HOUR), resetsAt: iso(now + 2 * DAY + 5 * HOUR), source: 'endpoint', weekly: 59 },
     fiveHourSession: { percent: 42, readAt: iso(now - 10 * MIN), resetsAt: iso(now + 2 * HOUR + 59 * MIN + 40_000) },
     limitThreshold: 95,
+    noFiveHourLimit: false,
     weekLimitThreshold: 98,
     ...overrides,
   };
@@ -58,6 +59,12 @@ describe('widgetView', () => {
     expect(view.weekly.percent).toBe(59);
   });
 
+  it('marks the 5-hour row as none on an account without that limit', () => {
+    const view = widgetView(summary({ fiveHourSession: undefined, noFiveHourLimit: true }), now);
+    expect(view.fiveHour).toEqual({ estimated: false, limit: 95, none: true });
+    expect(view.weekly.percent).toBe(59);
+  });
+
   it('leaves a window unknown without any reading', () => {
     const view = widgetView(summary({ current: undefined, fiveHourSession: undefined }), now);
     expect(view.fiveHour).toEqual({ estimated: false, limit: 95 });
@@ -82,6 +89,12 @@ describe('widgetView on a real summary', () => {
   it('shows 0% for a reading that reports no window', () => {
     const view = build([reading({ fiveHour: 0 })]);
     expect(view.fiveHour).toEqual({ estimated: false, limit: 95, percent: 0 });
+  });
+
+  it('shows none for the 5-hour row of an Ultra account whose readings have no 5-hour window', () => {
+    const ultra = [{ from: iso(now - 30 * DAY), plan: 'max20' as const, source: 'manual' as const }];
+    const view = widgetView(buildSummary({ endpointEnabled: true, now, planHistory: ultra, records: [], snapshots: [reading({})], timeZone: 'UTC' }), now);
+    expect(view.fiveHour).toEqual({ estimated: false, limit: 95, none: true });
   });
 
   it('leaves both rows unknown with no reading at all', () => {

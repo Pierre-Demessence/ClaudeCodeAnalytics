@@ -146,6 +146,8 @@ export interface DashboardSummary {
   modelRatios: ModelRatio[];
   /** Measured against advertised multipliers between neighbouring plans. */
   multipliers: MultiplierCheck[];
+  /** Ultra without any 5-hour reading in the last week: verified accounts have no 5-hour limit. */
+  noFiveHourLimit: boolean;
   plan: Plan;
   /** The last weeks and 5-hour sessions on the current plan, for the Plans tab. */
   planFit: PlanFitInput;
@@ -194,6 +196,8 @@ export interface PreparedSummary {
   fiveHourCalibration?: Calibration;
   fiveHourSession?: FiveHourSession;
   limitThreshold: number;
+  /** Ultra without any 5-hour reading in the last week: verified accounts have no such limit. */
+  noFiveHourLimit: boolean;
   plan: Plan;
   /** Weekly reset times seen in readings, sorted. */
   resets: number[];
@@ -252,7 +256,10 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
   const fitOn = (which: Plan) => fitRatio(calibrationPoints(onPlan(which), costBetween, first, startOf), now);
   const fiveHourFitOn = (which: Plan) => fitRatio(fiveHourCalibrationPoints(onPlan(which), costBetween, first), now);
   const calibration = fitOn(plan) ?? borrowedFit(fitOn, plan, planHistory, 'week');
-  const fiveHourCalibration = fiveHourFitOn(plan) ?? borrowedFit(fiveHourFitOn, plan, planHistory, 'fiveHour');
+  // Ultra's 5-hour limit exists only where readings show it (an account not verified yet); the Plans tab's hypothetical Ultra is the verified one.
+  const noFiveHourLimit = plan === 'max20' && latest !== undefined && !snapshots.some(s => s.fiveHour !== undefined && now - Date.parse(s.ts) < WEEK_MS && planAt(planHistory, s.ts) === 'max20');
+  // Without a 5-hour limit there is nothing to calibrate or read estimated sessions on, whatever old readings say.
+  const fiveHourCalibration = noFiveHourLimit ? undefined : fiveHourFitOn(plan) ?? borrowedFit(fiveHourFitOn, plan, planHistory, 'fiveHour');
   const yesterday = dayKey(now - DAY_MS, timeZone);
   const typicalFrom = [firstDay, dayKey(now - TYPICAL_DAYS * DAY_MS, timeZone)].sort().at(-1)!;
   const dailyCostsFrom = (from: string) => from <= yesterday
@@ -283,7 +290,7 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
   let fiveHourSession: FiveHourSession | undefined;
   if (latest) {
     const readAt = Date.parse(latest.ts);
-    const fiveHour = fiveHourStillValid(latest, now) ? latest.fiveHour : undefined;
+    const fiveHour = !noFiveHourLimit && fiveHourStillValid(latest, now) ? latest.fiveHour : undefined;
     if (fiveHour !== undefined) {
       fiveHourSession = { percent: fiveHour, readAt: latest.ts, resetsAt: latest.fiveHourResetsAt };
       // Without a reset time (manual readings), the window's position is unknown.
@@ -406,6 +413,7 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
     fiveHourCalibration,
     fiveHourSession,
     limitThreshold,
+    noFiveHourLimit,
     plan,
     resets,
     sessionHits,
@@ -423,7 +431,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
   const { now, planHistory, records, timeZone } = input;
   const nowIso = new Date(now).toISOString();
   const prepared = prepareSummary(input);
-  const { calibration, costBetween, current, first, fiveHourCalibration, fiveHourSession, limitThreshold, plan, resets, sessionHits, sessionWindows, snapshots, weekHits, weekLimitThreshold, weeks, weekStartOf } = prepared;
+  const { calibration, costBetween, current, first, fiveHourCalibration, fiveHourSession, limitThreshold, noFiveHourLimit, plan, resets, sessionHits, sessionWindows, snapshots, weekHits, weekLimitThreshold, weeks, weekStartOf } = prepared;
   const latest = snapshots.at(-1);
   const subscriptionStart = subscriptionStartOf(planHistory, input.subscriptionStart);
   // A loop, not Math.max(...): spreading a year of records overflows the call stack.
@@ -479,6 +487,7 @@ export function buildSummary(input: SummaryInput): DashboardSummary {
     limitThreshold,
     modelRatios: modelRatios(records, now - TYPICAL_DAYS * DAY_MS, now, timeZone),
     multipliers: buildMultipliers(limitsInput),
+    noFiveHourLimit,
     plan,
     planFit: buildPlanFitInput({ calibrationK: calibration?.k, plan, planHistory, sessionWindows, subscriptionStart, weekHistory }),
     planHistory,

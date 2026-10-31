@@ -1,5 +1,8 @@
 # Max and Ultra: renamed plans, Ultra's weekly limit, no 5-hour limit
 
+Status: "Rename", "Weekly multipliers" and "No 5-hour limit" are committed; only the final deletion of this plan is left, after the user's check
+of the Plans tab and the Overview.
+
 ## Goal
 
 Anthropic renamed Max 5× to **Max** and Max 20× to **Ultra** (prices unchanged:
@@ -54,12 +57,15 @@ verified). Both plans also have a separate weekly Fable limit: out of scope, see
   that cannot be converted counts as not over, a borrowed 5-hour fit from or to
   Ultra is skipped. Weekly callers keep a number (a `convertWeekly` helper
   keeps their call sites short).
-- Ultra's 5-hour limit: present only when the readings show it. "Has a 5-hour
-  limit" = the plan is not Ultra, or the latest endpoint reading on the current
-  Ultra period has a `fiveHour` value. Without one, `buildSummary` sets
-  `fiveHourSession` to a `{ none: true }` state instead of an estimate, and
-  the transcript-only 5-hour estimates in Sessions are skipped for Ultra
-  windows (their % is undefined).
+- Ultra's 5-hour limit: present only when the readings show it. `noFiveHourLimit`
+  on the summary = the plan is Ultra, there is a reading, and no reading of the
+  last 7 days on the Ultra period (endpoint or manual) has a `fiveHour` value:
+  the endpoint omits it whenever no window is open, so a latest-reading rule
+  would flicker for an account that has the limit. Then `fiveHourSession` and
+  the 5-hour calibration are absent, so the transcript-only 5-hour estimates in
+  Sessions have no % (their % is undefined). A same-plan 5-hour conversion is the
+  identity, so an Ultra account that does show the limit calibrates on its own
+  readings and the Plans tab counts its sessions over it.
 - The Plans tab's hypothetical Ultra assumes a verified account (no 5-hour
   limit): what a user upgrading gets once verified.
 - `restarts.ts` compares plan sizes with the weekly multipliers.
@@ -96,7 +102,7 @@ verified). Both plans also have a separate weekly Fable limit: out of scope, see
   Visible after: the Plans tab's Ultra card shows weeks about twice as full as
   before and no sessions over the limit; the multipliers card says 2×.
   Needs you: a look at the Plans tab (at the end).
-- [ ] **No 5-hour limit**: summary state, Overview card, Sessions skip, widget
+- [x] **No 5-hour limit**: summary state, Overview card, Sessions skip, widget
   row and snapshot, detection of `ultra`. Tests per AC6–AC8; widget
   `npm run widget:test`.
   Visible after: nothing on a Max account; an Ultra account sees "No 5-hour

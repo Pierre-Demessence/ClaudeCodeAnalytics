@@ -49,6 +49,9 @@ export const PLAN_PRICES: Record<Plan, number> = { max20: 200, max5: 100, pro: 2
 
 /** The same absolute usage, expressed as a % of another plan's limit; undefined when a plan has no such limit. */
 export function convertPercent(percent: number, from: Plan, to: Plan, window: LimitWindow): number | undefined {
+  // An Ultra account that does show a 5-hour limit is calibrated on its own readings: same plan, same limit.
+  if (from === to)
+    return percent;
   const multipliers: Partial<Record<Plan, number>> = window === 'week' ? WEEKLY_MULTIPLIERS : FIVE_HOUR_MULTIPLIERS;
   const fromMultiplier = multipliers[from];
   const toMultiplier = multipliers[to];
@@ -64,6 +67,8 @@ export function convertWeekly(percent: number, from: Plan, to: Plan): number {
 export function planFromSubscription(subscriptionType: string | undefined, rateLimitTier: string | undefined): Plan | undefined {
   if (subscriptionType === 'pro')
     return 'pro';
+  if (subscriptionType === 'ultra')
+    return 'max20';
   if (subscriptionType === 'max')
     return rateLimitTier?.includes('20x') ? 'max20' : 'max5';
   return undefined;

@@ -521,6 +521,50 @@ describe('buildSummary', () => {
     expect(manual(6 * 3_600_000)).toBeUndefined();
   });
 
+  describe('on Ultra', () => {
+    const ultra: PlanPeriod[] = [{ from: '2026-01-01T00:00:00.000Z', plan: 'max20', source: 'manual' }];
+    const at = (time: string) => Date.parse(`2026-10-20T${time}:00Z`);
+    const fiveHourResetsAt = '2026-10-20T15:00:00.000Z';
+    const today = [at('10:00'), at('11:00'), at('11:55')].map(ts => rec(ts));
+    const withWindow = [['10:30', 10], ['11:30', 20], ['11:50', 20]].map(([time, fiveHour]) =>
+      snap(at(time as string), 30, RESET, { fiveHour: fiveHour as number, fiveHourResetsAt }));
+    const run = (snapshots: Snapshot[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory: ultra, records: [...records, ...today], snapshots, timeZone: 'UTC' });
+
+    it('has no 5-hour session when the readings show no 5-hour window', () => {
+      const summary = run([snap(at('11:50'), 30, RESET)]);
+      expect(summary.noFiveHourLimit).toBe(true);
+      expect(summary.fiveHourSession).toBeUndefined();
+      // The estimated windows from transcripts carry no % either: there is no limit to read them on.
+      expect(summary.sessions.windows.length).toBeGreaterThan(0);
+      expect(summary.sessions.windows.every(w => w.peak === undefined)).toBe(true);
+    });
+
+    it('does not claim the absence of a limit before any reading', () => {
+      expect(run([]).noFiveHourLimit).toBe(false);
+    });
+
+    it('treats a reading with a 5-hour window as the limit, calibrated on its own readings', () => {
+      const summary = run(withWindow);
+      expect(summary.noFiveHourLimit).toBe(false);
+      expect(summary.fiveHourCalibration?.k).toBeCloseTo(0.5);
+      expect(summary.fiveHourSession?.estimatedNow).toBeCloseTo(30);
+    });
+
+    it('stops expecting a 5-hour limit once a week passes without a 5-hour reading', () => {
+      const old = withWindow.map(s => ({ ...s, ts: new Date(Date.parse(s.ts) - 8 * DAY_MS).toISOString() }));
+      const summary = run([...old, snap(at('11:50'), 30, RESET)]);
+      expect(summary.noFiveHourLimit).toBe(true);
+      // The old readings no longer calibrate a limit that is gone.
+      expect(summary.fiveHourCalibration).toBeUndefined();
+      expect(summary.sessions.windows.filter(w => w.source === 'estimated').every(w => w.peak === undefined)).toBe(true);
+    });
+
+    it('is never set on the other plans', () => {
+      const summary = buildSummary({ endpointEnabled: true, now: NOW, planHistory: [], records, snapshots: [snap(at('11:50'), 30, RESET)], timeZone: 'UTC' });
+      expect(summary.noFiveHourLimit).toBe(false);
+    });
+  });
+
   it('keeps a valid 5-hour reading when the new week has no calibration yet', () => {
     // The weekly window reset 2 hours ago; the last reading came just before, and a message since makes the week non-zero.
     const resetAt = NOW - 2 * 3_600_000;

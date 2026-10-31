@@ -81,6 +81,7 @@ mod tests {
         let row = WidgetRow {
             estimated: false,
             limit: 95.0,
+            none: false,
             percent: Some(percent),
             resets_at_ms: Some(2 * 3_600_000),
         };

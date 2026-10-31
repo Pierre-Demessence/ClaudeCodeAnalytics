@@ -14,6 +14,11 @@ Noteworthy changes for users. The format follows
   so the Plans tab shows its weeks about twice as full as before, and the
   multipliers card advertises Max to Ultra as 2×. Ultra has no 5-hour limit, so
   none of your sessions count as over it.
+- On an Ultra account the dashboard and the taskbar widget no longer show a
+  5-hour limit: the Overview says "No 5-hour limit on this account" and the
+  widget's 5-hour row reads "none". An Ultra account whose readings still carry
+  a 5-hour window (not verified yet) keeps it. Ultra is also detected from the
+  `ultra` subscription type.
 - The dashboard server collects every minute on its own, so the usage readings
   continue after a reboot with no dashboard tab or taskbar widget open.
 

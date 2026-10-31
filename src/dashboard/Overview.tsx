@@ -199,7 +199,9 @@ export function Overview({ summary }: { summary: Summary }) {
             )
           : (
               <EmptyCard title="5-hour session">
-                <VerdictBox detail="A new 5-hour window starts with your next message." kind="info" title="No session in progress." />
+                {summary.noFiveHourLimit
+                  ? <VerdictBox detail="Only the weekly limit applies to your Ultra plan." kind="info" title="No 5-hour limit on this account." />
+                  : <VerdictBox detail="A new 5-hour window starts with your next message." kind="info" title="No session in progress." />}
               </EmptyCard>
             )}
       </div>
