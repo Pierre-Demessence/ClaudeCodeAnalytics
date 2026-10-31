@@ -2,7 +2,7 @@ import type { PartPercent } from './restarts.ts';
 import type { Plan, PlanPeriod, Snapshot } from './types.ts';
 
 import { WEEK_MS } from './calibration.ts';
-import { convertPercent, planAt, planChangeWithin } from './plans.ts';
+import { convertWeekly, planAt, planChangeWithin } from './plans.ts';
 import { endedPartPercent, windowParts } from './restarts.ts';
 import { median, quantile } from './stats.ts';
 
@@ -61,7 +61,7 @@ export function weeklyShares(
       const plan = planAt(planHistory, last.ts);
       // The extension is in % of the calibration's plan; express it on this week's plan. Usage stops at the cap.
       const lastPercent = lateEstimate && calibration
-        ? Math.min(100, last.weekly + convertPercent(calibration.k * costBetween(ts, resetsAt), calibration.plan, plan))
+        ? Math.min(100, last.weekly + convertWeekly(calibration.k * costBetween(ts, resetsAt), calibration.plan, plan))
         : last.weekly;
       const planChange = planChangeWithin(planHistory, resetsAt - WEEK_MS, resetsAt) || undefined;
       // Only the part that ran to the reset is extended; the ones that ended at a restart are final.
@@ -73,7 +73,7 @@ export function weeklyShares(
       return {
         estimated: all.some(part => part.estimated),
         parts: all,
-        percent: all.reduce((sum, part) => sum + convertPercent(part.percent, part.plan, plan), 0),
+        percent: all.reduce((sum, part) => sum + convertWeekly(part.percent, part.plan, plan), 0),
         plan,
         planChange,
         resetsAt: last.weeklyResetsAt,
@@ -85,7 +85,7 @@ export function weeklyShares(
 export function typicalWeek(shares: readonly WeekShare[], plan: Plan): TypicalWeek | undefined {
   if (shares.length === 0)
     return undefined;
-  const values = shares.map(share => convertPercent(share.percent, share.plan, plan));
+  const values = shares.map(share => convertWeekly(share.percent, share.plan, plan));
   return {
     high: quantile(values, 0.75)!,
     low: quantile(values, 0.25)!,

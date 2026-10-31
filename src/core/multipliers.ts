@@ -2,7 +2,7 @@ import type { LimitsInput } from './limits.ts';
 import type { Plan } from './types.ts';
 
 import { driftWindows, MIN_DRIFT_WEEKS } from './limits.ts';
-import { PLAN_MULTIPLIERS } from './plans.ts';
+import { WEEKLY_MULTIPLIERS } from './plans.ts';
 import { median, quantile } from './stats.ts';
 
 /**
@@ -34,7 +34,7 @@ const NEIGHBOURS: readonly (readonly [Plan, Plan])[] = [['pro', 'max5'], ['max5'
 export function buildMultipliers(input: LimitsInput): MultiplierCheck[] {
   const ratios = (plan: Plan) => driftWindows(input, plan).filter(w => !w.current).map(w => w.ratio);
   return NEIGHBOURS.map(([from, to]): MultiplierCheck => {
-    const advertised = PLAN_MULTIPLIERS[to] / PLAN_MULTIPLIERS[from];
+    const advertised = WEEKLY_MULTIPLIERS[to] / WEEKLY_MULTIPLIERS[from];
     const small = ratios(from);
     const big = ratios(to);
     if (small.length < MIN_DRIFT_WEEKS || big.length < MIN_DRIFT_WEEKS)

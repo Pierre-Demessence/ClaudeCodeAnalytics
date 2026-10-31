@@ -1,7 +1,7 @@
 import type { Plan, PlanPeriod, Snapshot } from './types.ts';
 
 import { WEEK_MS } from './calibration.ts';
-import { convertPercent, PLAN_MULTIPLIERS, planAt, planChanges } from './plans.ts';
+import { convertWeekly, planAt, planChanges, WEEKLY_MULTIPLIERS } from './plans.ts';
 
 /** A reading this many points under the previous one of its window marks a restart. */
 export const RESTART_DROP = 2;
@@ -58,7 +58,7 @@ export function windowParts(snapshots: readonly Snapshot[], planHistory: readonl
     // An upgrade before the first reading cannot show as a drop, and restarts the usage.
     const firstReading = Date.parse(readings[0]!.ts);
     for (const change of changes) {
-      if (PLAN_MULTIPLIERS[change.to] > PLAN_MULTIPLIERS[change.from] && change.at > windowFrom && change.at < reset && firstReading >= change.at)
+      if (WEEKLY_MULTIPLIERS[change.to] > WEEKLY_MULTIPLIERS[change.from] && change.at > windowFrom && change.at < reset && firstReading >= change.at)
         restarts.add(change.at);
     }
 
@@ -103,6 +103,6 @@ export function endedPartPercent(
     return { percent: last.weekly, plan: part.plan, start };
   if (!calibration)
     return { estimated: true, percent: 0, plan: part.plan, start };
-  const percent = Math.min(100, convertPercent(calibration.k * costBetween(part.start, part.end), calibration.plan, part.plan));
+  const percent = Math.min(100, convertWeekly(calibration.k * costBetween(part.start, part.end), calibration.plan, part.plan));
   return { estimated: true, percent, plan: part.plan, start };
 }

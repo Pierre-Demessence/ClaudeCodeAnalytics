@@ -39,7 +39,7 @@ describe('evaluatePlans', () => {
     const { max20, max5, pro } = byPlan(sample());
     expect(max5).toMatchObject({ busiest: 118, sessionsOver: 2, typical: 62.5, weeksOver: 1 });
     expect(pro).toMatchObject({ busiest: 590, typical: 312.5 });
-    expect(max20).toMatchObject({ busiest: 29.5, sessionsOver: 0, typical: 15.625, weeksOver: 0 });
+    expect(max20).toMatchObject({ busiest: 59, sessionsOver: 0, typical: 31.25, weeksOver: 0 });
   });
 
   it('reports the minimums next to the estimates, converted and shifted the same way', () => {
@@ -54,9 +54,14 @@ describe('evaluatePlans', () => {
     expect(byPlan(sample()).max5!.overWeeks).toEqual([iso(START + 4 * WEEK_MS)]);
   });
 
-  it('judges the design sample: Pro too small, Max close, Ultra too big', () => {
+  it('judges the design sample: Pro too small, Max close, Ultra fits', () => {
     const { max20, max5, pro } = byPlan(sample());
-    expect([pro!.verdict, max5!.verdict, max20!.verdict]).toEqual(['tooSmall', 'close', 'tooBig']);
+    expect([pro!.verdict, max5!.verdict, max20!.verdict]).toEqual(['tooSmall', 'close', 'fits']);
+  });
+
+  it('counts no session over on Ultra, which has no 5-hour limit', () => {
+    expect(byPlan(sample()).max20!.sessionsOver).toBe(0);
+    expect(byPlan(sample({ plan: 'max20' })).max5!.sessionsOver).toBe(0);
   });
 
   it('re-prices with the Opus share moved to Sonnet', () => {
@@ -89,7 +94,7 @@ describe('evaluatePlans', () => {
     });
 
     it('is too big next to a cheaper plan that is close, or itself too big', () => {
-      // On Pro: 2 of 5 weeks over, close; on Ultra the busiest week is 6%.
+      // On Pro: 2 of 5 weeks over, close; on Ultra the busiest week is 12%.
       const { max20, max5, pro } = byPlan({ plan: 'max5', sessions: [], weeks: [24, 22, 10, 12, 15].map((w, i) => week(i, w)) });
       expect([pro!.verdict, max5!.verdict, max20!.verdict]).toEqual(['close', 'tooBig', 'tooBig']);
     });
@@ -144,9 +149,17 @@ describe('bestPlan', () => {
     expect(best(sample(), 1)).toBe('max5');
   });
 
+  it('prefers a plan that fits to a close one', () => {
+    // Max is close (a week over); Ultra holds every week and costs more.
+    expect(best(sample())).toBe('max20');
+  });
+
   it('prefers close to too big', () => {
-    // Max is close; Ultra is too big and costs more.
-    expect(best(sample())).toBe('max5');
+    // No week over 100%, but two sessions are: Max is close, and Ultra, at under 50% in its busiest week, is too big.
+    const input = sample();
+    const calm = { ...input, weeks: input.weeks.map(w => w.demand > 100 ? { ...w, demand: 98, floor: 98 } : w) };
+    expect(byPlan(calm).max20!.verdict).toBe('tooBig');
+    expect(best(calm)).toBe('max5');
   });
 
   it('picks the smallest plan that holds the weeks, however roomy', () => {
@@ -159,8 +172,8 @@ describe('bestPlan', () => {
   });
 
   it('settles a tie on fewer weeks over, then on price', () => {
-    // On Ultra 400 is exactly 100%, but 100 is only 25%: fewer weeks over than the plans below.
-    expect(best({ plan: 'max5', sessions: [], weeks: [400, 400, 400, 400, 100, 100].map((d, i) => week(i, d)) })).toBe('max20');
+    // On Ultra 200 is exactly 100%, but 100 is only 50%: fewer weeks over than the plans below.
+    expect(best({ plan: 'max5', sessions: [], weeks: [200, 200, 200, 200, 100, 100].map((d, i) => week(i, d)) })).toBe('max20');
     expect(best({ plan: 'max5', sessions: [], weeks: [400, 400, 400, 400].map((d, i) => week(i, d)) })).toBe('pro');
   });
 });
@@ -361,6 +374,19 @@ describe('buildPlanFitInput', () => {
     });
     // 50% on Pro is 10% on Max.
     expect(input.sessions.map(s => s.demand)).toEqual([10, 50]);
+  });
+
+  it('drops a window taken on Ultra, which has no 5-hour % on another plan', () => {
+    const input = buildPlanFitInput({
+      ...base,
+      planHistory: [{ from: iso(START - 2 * WEEK_MS), plan: 'max20', source: 'manual' }, { from: iso(START + 3 * DAY_MS), plan: 'max5', source: 'manual' }],
+      weekHistory: history([row(0)]),
+      sessionWindows: [
+        window(START + DAY_MS, { peak: 50 }),
+        window(START + 4 * DAY_MS, { peak: 50 }),
+      ],
+    });
+    expect(input.sessions.map(s => s.demand)).toEqual([50]);
   });
 
   describe('a window around an upgrade', () => {

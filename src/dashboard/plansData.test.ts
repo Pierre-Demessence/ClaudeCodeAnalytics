@@ -12,12 +12,14 @@ const input: PlanFitInput = {
   weeks: [41, 55, 118, 62].map((demand, i) => week(i, demand, demand > 100 ? { estimated: true } : {})),
 };
 const fits = Object.fromEntries(evaluatePlans(input).map(f => [f.plan, f])) as Record<PlanFit['plan'], PlanFit>;
+/** Ultra holds the sample's weeks; this is a plan that is more than they need. */
+const big = { ...fits.max20, busiest: 29.5, busiestFloor: 29.5, typical: 14.625, typicalFloor: 14.625, verdict: 'tooBig' as const };
 
 describe('verdict texts', () => {
   it('describes each verdict of a card', () => {
     expect(cardVerdict(fits.max5, input, 'UTC')).toEqual({ detail: 'Over the limit in 1 of 4 weeks and 1 of 20 sessions.', title: 'Close.' });
     expect(cardVerdict(fits.pro, input, 'UTC').title).toBe('Too small.');
-    expect(cardVerdict(fits.max20, input, 'UTC')).toEqual({ detail: 'Your busiest week used only 29% of it; a typical week leaves 85% unused.', title: 'Too big.' });
+    expect(cardVerdict(big, input, 'UTC')).toEqual({ detail: 'Your busiest week used only 29% of it; a typical week leaves 85% unused.', title: 'Too big.' });
     expect(cardVerdict({ ...fits.max5, typical: 61, verdict: 'fits' }, input, 'UTC').detail).toBe('A typical week leaves 39% unused.');
   });
 
@@ -35,13 +37,13 @@ describe('verdict texts', () => {
   });
 
   it('names what is wrong with a best plan that is not a clean fit', () => {
-    expect(bestVerdict(fits.max20, input, 'UTC')).toEqual({ detail: 'Your busiest week used only 29% of it.', title: 'More than you need.' });
+    expect(bestVerdict(big, input, 'UTC')).toEqual({ detail: 'Your busiest week used only 29% of it.', title: 'More than you need.' });
     expect(bestVerdict({ ...fits.max5, verdict: 'tooSmall' }, input, 'UTC').title).toBe('Too small, but the nearest match.');
     expect(bestVerdict({ ...fits.max5, busiest: 80, busiestFloor: 80, typical: 60, typicalFloor: 60, verdict: 'fits' }, input, 'UTC').detail).toBe('A typical week uses 60% of it and your busiest week 80%.');
   });
 
   it('never rounds a busiest week just under half up to 50%', () => {
-    expect(bestVerdict({ ...fits.max20, busiest: 49.6, busiestFloor: 49.6 }, input, 'UTC').detail).toBe('Your busiest week used only 49% of it.');
+    expect(bestVerdict({ ...big, busiest: 49.6, busiestFloor: 49.6 }, input, 'UTC').detail).toBe('Your busiest week used only 49% of it.');
   });
 });
 
@@ -114,9 +116,9 @@ describe('chartBars', () => {
   it('converts the minimum with the estimate when the chart shows another plan', () => {
     const weeks = [week(0, 40, { estimated: true, floor: 20, hiddenHours: 36 }), week(1, 60), week(2, 60)];
     const [bar] = chartBars({ plan: 'max5', sessions: [], weeks }, 'max20', 0, 'UTC');
-    expect(bar).toMatchObject({ label: '≈10%' });
-    expect(bar!.floorHeight).toBeCloseTo(5 / 150 * 100);
-    expect(bar!.tip).toContain('At least 5%: 1.5 days');
+    expect(bar).toMatchObject({ label: '≈20%' });
+    expect(bar!.floorHeight).toBeCloseTo(10 / 150 * 100);
+    expect(bar!.tip).toContain('At least 10%: 1.5 days');
   });
 });
 
@@ -132,7 +134,7 @@ describe('estimateText', () => {
 
   it('marks the numbers of the verdicts that are estimates', () => {
     expect(bestVerdict({ ...fits.max5, busiest: 80, busiestFloor: 60, typical: 60, typicalFloor: 60, verdict: 'fits' }, input, 'UTC').detail).toBe('A typical week uses 60% of it and your busiest week ≈ 80%.');
-    expect(cardVerdict({ ...fits.max20, busiest: 29.5, busiestFloor: 20 }, input, 'UTC').detail).toContain('only ≈ 29% of it');
+    expect(cardVerdict({ ...big, busiestFloor: 20 }, input, 'UTC').detail).toContain('only ≈ 29% of it');
   });
 });
 

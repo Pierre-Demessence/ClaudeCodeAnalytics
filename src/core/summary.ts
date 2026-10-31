@@ -10,6 +10,7 @@ import type { ModelRatio } from './modelRatio.ts';
 import type { MultiplierCheck } from './multipliers.ts';
 import type { WeekPacing } from './pacing.ts';
 import type { PlanFitInput } from './planFit.ts';
+import type { LimitWindow } from './plans.ts';
 import type { PartPercent } from './restarts.ts';
 import type { FiveHourWindow, Sessions } from './sessions.ts';
 import type { WeekShare } from './share.ts';
@@ -213,15 +214,18 @@ export interface PreparedSummary {
  * that has one stands in, converted at the advertised multipliers (`k` is a % per
  * dollar, so it scales like a %). Rough, since the multipliers are approximate.
  */
-function borrowedFit(fitOn: (plan: Plan) => Calibration | undefined, plan: Plan, planHistory: readonly PlanPeriod[]): Calibration | undefined {
+function borrowedFit(fitOn: (plan: Plan) => Calibration | undefined, plan: Plan, planHistory: readonly PlanPeriod[], window: LimitWindow): Calibration | undefined {
   const tried = new Set<Plan>([plan]);
   for (const period of planHistory.toReversed()) {
     if (tried.has(period.plan))
       continue;
     tried.add(period.plan);
     const fit = fitOn(period.plan);
-    if (fit)
-      return { ...fit, borrowedFrom: period.plan, k: convertPercent(fit.k, period.plan, plan), rmse: convertPercent(fit.rmse, period.plan, plan) };
+    const k = fit && convertPercent(fit.k, period.plan, plan, window);
+    const rmse = fit && convertPercent(fit.rmse, period.plan, plan, window);
+    // A 5-hour fit cannot cross to or from a plan without that limit: look further back.
+    if (fit && k !== undefined && rmse !== undefined)
+      return { ...fit, borrowedFrom: period.plan, k, rmse };
   }
   return undefined;
 }
@@ -247,8 +251,8 @@ export function prepareSummary(input: SummaryInput): PreparedSummary {
   const onPlan = (which: Plan) => snapshots.filter(s => planAt(planHistory, s.ts) === which);
   const fitOn = (which: Plan) => fitRatio(calibrationPoints(onPlan(which), costBetween, first, startOf), now);
   const fiveHourFitOn = (which: Plan) => fitRatio(fiveHourCalibrationPoints(onPlan(which), costBetween, first), now);
-  const calibration = fitOn(plan) ?? borrowedFit(fitOn, plan, planHistory);
-  const fiveHourCalibration = fiveHourFitOn(plan) ?? borrowedFit(fiveHourFitOn, plan, planHistory);
+  const calibration = fitOn(plan) ?? borrowedFit(fitOn, plan, planHistory, 'week');
+  const fiveHourCalibration = fiveHourFitOn(plan) ?? borrowedFit(fiveHourFitOn, plan, planHistory, 'fiveHour');
   const yesterday = dayKey(now - DAY_MS, timeZone);
   const typicalFrom = [firstDay, dayKey(now - TYPICAL_DAYS * DAY_MS, timeZone)].sort().at(-1)!;
   const dailyCostsFrom = (from: string) => from <= yesterday

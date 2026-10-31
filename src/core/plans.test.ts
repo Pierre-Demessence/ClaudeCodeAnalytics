@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlanPeriod } from './types.ts';
 
-import { convertPercent, planAt, planChanges, planChangeWithin, planFromSubscription, withDetectedPlan } from './plans.ts';
+import { convertPercent, convertWeekly, planAt, planChanges, planChangeWithin, planFromSubscription, withDetectedPlan } from './plans.ts';
 
 const history: PlanPeriod[] = [
   { from: '2026-09-01T00:00:00Z', plan: 'pro', source: 'detected' },
@@ -58,11 +58,28 @@ describe('planChangeWithin', () => {
   });
 });
 
+describe('convertWeekly', () => {
+  it('scales by the advertised weekly multipliers: Pro 1, Max 5, Ultra 10', () => {
+    expect(convertWeekly(50, 'pro', 'max5')).toBe(10);
+    expect(convertWeekly(10, 'max5', 'max20')).toBe(5);
+    expect(convertWeekly(100, 'max5', 'max20')).toBe(50);
+    expect(convertWeekly(10, 'max20', 'pro')).toBe(100);
+  });
+});
+
 describe('convertPercent', () => {
-  it('scales by the advertised plan multipliers', () => {
-    expect(convertPercent(50, 'pro', 'max5')).toBe(10);
-    expect(convertPercent(10, 'max5', 'max20')).toBe(2.5);
-    expect(convertPercent(10, 'max20', 'pro')).toBe(200);
+  it('converts a weekly % like convertWeekly', () => {
+    expect(convertPercent(100, 'max5', 'max20', 'week')).toBe(50);
+  });
+
+  it('scales a 5-hour % by Pro 1, Max 5', () => {
+    expect(convertPercent(50, 'pro', 'max5', 'fiveHour')).toBe(10);
+    expect(convertPercent(10, 'max5', 'pro', 'fiveHour')).toBe(50);
+  });
+
+  it('has no 5-hour equivalent to or from Ultra', () => {
+    expect(convertPercent(10, 'max5', 'max20', 'fiveHour')).toBeUndefined();
+    expect(convertPercent(10, 'max20', 'pro', 'fiveHour')).toBeUndefined();
   });
 });
 

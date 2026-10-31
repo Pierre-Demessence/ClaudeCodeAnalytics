@@ -5,7 +5,7 @@ import type { WeekPart, WeekRow } from '@/core/weekHistory';
 import { dayKey } from '@/core/aggregate';
 import { DAY_MS } from '@/core/calibration';
 import { evaluatePlans } from '@/core/planFit';
-import { convertPercent, PLAN_LABELS } from '@/core/plans';
+import { convertWeekly, PLAN_LABELS } from '@/core/plans';
 import { formatDollars, formatPercent } from '@/dashboard/format';
 import { daysText, differs } from '@/dashboard/plansData';
 import { formatSessionDay, formatTime } from '@/dashboard/sessionsData';
@@ -86,7 +86,7 @@ export function uncappedOf(planFit: PlanFitInput, week: WeekRow): FitWeek | unde
   if (!fit)
     return undefined;
   const plan = week.plan ?? planFit.plan;
-  const shown = { ...fit, demand: convertPercent(fit.demand, planFit.plan, plan), floor: convertPercent(fit.floor, planFit.plan, plan) };
+  const shown = { ...fit, demand: convertWeekly(fit.demand, planFit.plan, plan), floor: convertWeekly(fit.floor, planFit.plan, plan) };
   return differs(shown.demand, week.planPercent ?? week.percent) ? shown : undefined;
 }
 
@@ -98,7 +98,7 @@ export function typicalTick(week: WeekRow, median: number, plan: Plan): { left: 
   const other = otherPlan(week, plan);
   if (!other)
     return { left: Math.min(median, 100), text: `Typical week: ${formatPercent(median)}` };
-  const onOther = convertPercent(median, plan, other);
+  const onOther = convertWeekly(median, plan, other);
   return { left: Math.min(onOther, 100), text: `Typical week: ${formatPercent(onOther)} of ${PLAN_LABELS[other]} (${formatPercent(median)} of ${PLAN_LABELS[plan]})` };
 }
 

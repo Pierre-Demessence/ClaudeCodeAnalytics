@@ -90,7 +90,7 @@ verified). Both plans also have a separate weekly Fable limit: out of scope, see
   lint, tests, build, the grep in AC1.
   Visible after: the header badge and the Plans tab say "Max" and "Ultra".
   Needs you: nothing.
-- [ ] **Weekly multipliers**: split multipliers, `convertPercent` by window,
+- [x] **Weekly multipliers**: split multipliers, `convertPercent` by window,
   update every caller listed by `grep -rn convertPercent src`, Ultra sessions
   never over, multipliers card at 2×, backlog line for Fable. Tests per AC3–AC5.
   Visible after: the Plans tab's Ultra card shows weeks about twice as full as

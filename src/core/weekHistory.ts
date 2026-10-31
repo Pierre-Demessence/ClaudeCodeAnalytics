@@ -6,7 +6,7 @@ import type { ApiEvent, Plan, PlanPeriod, Snapshot, UsageRecord } from './types.
 
 import { sessionProjects } from './breakdown.ts';
 import { DAY_MS, WEEK_MS } from './calibration.ts';
-import { convertPercent, planAt, planChangeWithin } from './plans.ts';
+import { convertWeekly, planAt, planChangeWithin } from './plans.ts';
 import { messageCost, sonnetSaving } from './pricing.ts';
 import { median } from './stats.ts';
 
@@ -141,7 +141,7 @@ function pressureByCost(spend: readonly { cost: number; ms: number }[], k: numbe
   return undefined;
 }
 
-const sumOnPlan = (parts: readonly PartPercent[], plan: Plan) => parts.reduce((sum, part) => sum + convertPercent(part.percent, part.plan, plan), 0);
+const sumOnPlan = (parts: readonly PartPercent[], plan: Plan) => parts.reduce((sum, part) => sum + convertWeekly(part.percent, part.plan, plan), 0);
 
 /**
  * Whether a week hit the limit: its final reading is not an estimate and reaches the threshold on the plan it
@@ -224,7 +224,7 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
         source = 'estimated';
     }
     else if (share) {
-      percent = convertPercent(share.percent, share.plan, plan);
+      percent = convertWeekly(share.percent, share.plan, plan);
       planPercent = share.percent;
       ownPlan = share.plan;
       percentEstimated = share.estimated;
@@ -233,20 +233,20 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
       const reached = snapshots
         .filter(s => Date.parse(s.weeklyResetsAt) === end && s.weekly >= PRESSURE_PERCENT)
         .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))[0];
-      pressure = reached && { at: reached.ts, percent: convertPercent(reached.weekly, readingPlan(reached, share.plan), plan) };
+      pressure = reached && { at: reached.ts, percent: convertWeekly(reached.weekly, readingPlan(reached, share.plan), plan) };
     }
     else if (calibrationK !== undefined && week.cost > 0) {
       // `calibrationK` is a % of the current plan per dollar; the week's limit and its pressure point are on the
       // plan it ran on. Without readings it has no parts: that is the plan it started on (`plan` without a history).
       const ranOn = planHistory.length > 0 ? planAt(planHistory, new Date(start).toISOString()) : plan;
-      const k = convertPercent(calibrationK, plan, ranOn);
+      const k = convertWeekly(calibrationK, plan, ranOn);
       planPercent = Math.min(100, k * week.cost);
       ownPlan = ranOn;
-      percent = convertPercent(planPercent, ranOn, plan);
+      percent = convertWeekly(planPercent, ranOn, plan);
       percentEstimated = true;
       source = 'estimated';
       const reached = pressureByCost(week.spend, k);
-      pressure = reached && { at: reached.at, percent: convertPercent(reached.percent, ranOn, plan) };
+      pressure = reached && { at: reached.at, percent: convertWeekly(reached.percent, ranOn, plan) };
       if (start < firstMessage)
         transcriptsFrom = new Date(firstMessage).toISOString();
     }
@@ -262,12 +262,12 @@ export function buildWeekHistory(input: WeekHistoryInput): WeekHistory {
           .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))[0];
       return {
         end: new Date(partEnd).toISOString(),
-        percent: convertPercent(part.percent, part.plan, plan),
+        percent: convertWeekly(part.percent, part.plan, plan),
         percentEstimated: part.estimated,
         plan: part.plan,
         planPercent: part.percent,
         pressureAt: reached?.ts,
-        pressurePercent: reached && convertPercent(reached.weekly, readingPlan(reached, part.plan), plan),
+        pressurePercent: reached && convertWeekly(reached.weekly, readingPlan(reached, part.plan), plan),
         start: part.start,
       };
     });

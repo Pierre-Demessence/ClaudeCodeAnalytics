@@ -10,6 +10,10 @@ Noteworthy changes for users. The format follows
 
 - Anthropic's renamed plans: Max 5× is now "Max" and Max 20× is "Ultra" in the
   header, the Plans tab, the plan history and the settings.
+- Ultra is compared at 10× Pro's weekly usage, not 20×,
+  so the Plans tab shows its weeks about twice as full as before, and the
+  multipliers card advertises Max to Ultra as 2×. Ultra has no 5-hour limit, so
+  none of your sessions count as over it.
 - The dashboard server collects every minute on its own, so the usage readings
   continue after a reboot with no dashboard tab or taskbar widget open.
 

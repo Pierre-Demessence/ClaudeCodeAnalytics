@@ -31,7 +31,7 @@ const planFit: PlanFitInput = {
 };
 const multipliers: MultiplierCheck[] = [
   { advertised: 5, from: 'pro', measured: { fromWeeks: 6, high: 5.4, low: 3.9, toWeeks: 6, value: 4.6 }, to: 'max5' },
-  { advertised: 4, from: 'max5', to: 'max20' },
+  { advertised: 2, from: 'max5', to: 'max20' },
 ];
 
 function summary(extra: Partial<Summary> = {}): Summary {
@@ -39,6 +39,14 @@ function summary(extra: Partial<Summary> = {}): Summary {
 }
 
 const full = () => summary({ multipliers, plan: 'max5', planFit });
+/** No week over the limit, so Ultra is too big and Max, over in two sessions, is the best plan. */
+function held(weekExtra: Partial<PlanFitInput['weeks'][number]> = {}) {
+  return summary({
+    multipliers,
+    plan: 'max5',
+    planFit: { ...planFit, weeks: planFit.weeks.map(w => ({ ...w, ...w.demand > 100 ? { demand: 98, estimated: false, floor: 98 } : {}, ...weekExtra })) },
+  });
+}
 const renderTab = (data: Summary) => render(<TipProvider><Plans summary={data} /></TipProvider>);
 const card = (name: string) => screen.getByRole('heading', { name }).closest('section, article') as HTMLElement;
 
@@ -53,30 +61,38 @@ describe('plans tab', () => {
   });
 
   it('names the best plan with its verdict, and only that plan', () => {
-    renderTab(full());
+    renderTab(held());
     const best = card('Best plan for your last 12 weeks');
     expect(within(best).getByText('Max')).toBeTruthy();
     expect(within(best).getByText('your current plan')).toBeTruthy();
     expect(within(best).getByText('Close.')).toBeTruthy();
-    expect(best.textContent).toContain('Over the limit in 1 of 12 weeks (');
-    expect(best.textContent).toContain('2 of 30 sessions');
+    expect(best.textContent).toContain('Over the limit in 2 of 30 sessions');
     expect(best.textContent).not.toMatch(/Pro|Ultra/);
   });
 
+  it('recommends Ultra when its weekly limit holds the week that Max does not', () => {
+    renderTab(full());
+    const best = card('Best plan for your last 12 weeks');
+    expect(within(best).getByText('Ultra')).toBeTruthy();
+    expect(within(best).getByText('switch from Max')).toBeTruthy();
+    expect(within(best).getByText('Fits every week and session.')).toBeTruthy();
+    expect(card('Max').textContent).toContain('Over the limit in 1 of 12 weeks and 2 of 30 sessions');
+  });
+
   it('warns on the best plan that weeks used on a smaller plan that held them are a minimum, naming no plan', () => {
-    renderTab(summary({ multipliers, plan: 'max5', planFit: { ...planFit, weeks: planFit.weeks.map(w => ({ ...w, plans: ['pro' as const] })) } }));
+    renderTab(held({ plans: ['pro'] }));
     const best = card('Best plan for your last 12 weeks');
     expect(best.textContent).toContain('Measured on a smaller plan whose limits you ran into');
     expect(best.textContent).not.toMatch(/Pro|Ultra/);
   });
 
   it('says nothing of a smaller plan when the weeks were used on the best one', () => {
-    renderTab(full());
+    renderTab(held());
     expect(card('Best plan for your last 12 weeks').textContent).not.toContain('smaller plan');
   });
 
   it('gives each plan a verdict with its own title', () => {
-    renderTab(full());
+    renderTab(held());
     expect(within(card('Pro')).getByText('Too small.')).toBeTruthy();
     expect(within(card('Max')).getByText('Close.')).toBeTruthy();
     expect(within(card('Ultra')).getByText('Too big.')).toBeTruthy();
@@ -150,6 +166,7 @@ describe('plans tab', () => {
     const trust = card('How far to trust the conversions');
     expect(within(trust).getByText('measured 4.6×')).toBeTruthy();
     expect(within(trust).getByText('not measured')).toBeTruthy();
-    expect(trust.textContent).toContain('advertised 4× is used');
+    expect(trust.textContent).toContain('advertised 2× is used');
+    expect(trust.textContent).toContain('Anthropic advertises 5× and 10× Pro\'s weekly usage');
   });
 });

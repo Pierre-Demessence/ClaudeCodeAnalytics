@@ -95,8 +95,8 @@ describe('final percent', () => {
 
   it('takes a completed window\'s final reading, converted to the current plan', () => {
     const { weeks: rows } = weeks({ plan: 'max20', shares: [share(1, 80)], snapshots: [snap(1)] });
-    // Ultra is 4 times Max.
-    expect(rows[0]).toMatchObject({ percent: 20, source: 'reading' });
+    // Ultra is twice Max.
+    expect(rows[0]).toMatchObject({ percent: 40, source: 'reading' });
     expect(rows[0]!.percentEstimated).toBeUndefined();
   });
 
@@ -213,11 +213,11 @@ describe('hit', () => {
   });
 
   it('reads the threshold on the plan of the week, not on the current plan', () => {
-    // A Pro week at its limit reads 20% of Max; an Ultra week at 30% reads 600% of Pro.
+    // A Pro week at its limit reads 20% of Max; an Ultra week at 30% reads 300% of Pro.
     const pro = weeks({ shares: [{ ...share(100), plan: 'pro' }], snapshots: [snap(1, 100)] }).weeks[0]!;
     expect(pro).toMatchObject({ hit: true, percent: 20 });
     const max20 = weeks({ plan: 'pro', shares: [{ ...share(30), plan: 'max20' }], snapshots: [snap(1, 30)] }).weeks[0]!;
-    expect(max20.percent).toBe(600);
+    expect(max20.percent).toBe(300);
     expect(max20.hit).toBeUndefined();
   });
 

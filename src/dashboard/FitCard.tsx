@@ -4,14 +4,14 @@ import type { Plan } from '@/core/types';
 import type { Summary } from '@/dashboard/api';
 
 import { WEEK_MS } from '@/core/calibration';
-import { PLAN_LABELS, PLAN_MULTIPLIERS } from '@/core/plans';
+import { PLAN_LABELS, WEEKLY_MULTIPLIERS } from '@/core/plans';
 import { InfoTip } from '@/dashboard/Tip';
 
 const per100 = (k: number) => `${(k * 100).toFixed(1)}%`;
 
 /** "Max is 5× Pro", or "Pro is 1/5 of Max". */
 function multiplierSentence(plan: Plan, from: Plan): string {
-  const ratio = PLAN_MULTIPLIERS[plan] / PLAN_MULTIPLIERS[from];
+  const ratio = WEEKLY_MULTIPLIERS[plan] / WEEKLY_MULTIPLIERS[from];
   return ratio >= 1
     ? `${PLAN_LABELS[plan]} is ${ratio}× ${PLAN_LABELS[from]}`
     : `${PLAN_LABELS[plan]} is 1/${1 / ratio} of ${PLAN_LABELS[from]}`;

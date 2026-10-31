@@ -4,8 +4,13 @@ export const PLANS: readonly Plan[] = ['pro', 'max5', 'max20'];
 
 export const PLAN_LABELS: Record<Plan, string> = { max20: 'Ultra', max5: 'Max', pro: 'Pro' };
 
-/** Advertised usage relative to Pro. Approximate: Anthropic does not publish exact limits. */
-export const PLAN_MULTIPLIERS: Record<Plan, number> = { max20: 20, max5: 5, pro: 1 };
+/** Advertised weekly usage relative to Pro. Approximate: Anthropic does not publish exact limits. */
+export const WEEKLY_MULTIPLIERS: Record<Plan, number> = { max20: 10, max5: 5, pro: 1 };
+
+/** Advertised 5-hour usage relative to Pro. Ultra has none: verified accounts have no 5-hour limit. */
+export const FIVE_HOUR_MULTIPLIERS: Partial<Record<Plan, number>> = { max5: 5, pro: 1 };
+
+export type LimitWindow = 'fiveHour' | 'week';
 
 /** Plan active at `ts`; before the first period, the first plan; Pro without history. */
 export function planAt(history: readonly PlanPeriod[], ts: string): Plan {
@@ -42,9 +47,17 @@ export function planChangeWithin(history: readonly PlanPeriod[], from: number, t
 /** List price in USD per month (monthly billing, checked 2026-10-03). */
 export const PLAN_PRICES: Record<Plan, number> = { max20: 200, max5: 100, pro: 20 };
 
-/** The same absolute usage, expressed as a % of another plan's limit. */
-export function convertPercent(percent: number, from: Plan, to: Plan): number {
-  return percent * PLAN_MULTIPLIERS[from] / PLAN_MULTIPLIERS[to];
+/** The same absolute usage, expressed as a % of another plan's limit; undefined when a plan has no such limit. */
+export function convertPercent(percent: number, from: Plan, to: Plan, window: LimitWindow): number | undefined {
+  const multipliers: Partial<Record<Plan, number>> = window === 'week' ? WEEKLY_MULTIPLIERS : FIVE_HOUR_MULTIPLIERS;
+  const fromMultiplier = multipliers[from];
+  const toMultiplier = multipliers[to];
+  return fromMultiplier === undefined || toMultiplier === undefined ? undefined : percent * fromMultiplier / toMultiplier;
+}
+
+/** `convertPercent` for the weekly limit, which every plan has. */
+export function convertWeekly(percent: number, from: Plan, to: Plan): number {
+  return percent * WEEKLY_MULTIPLIERS[from] / WEEKLY_MULTIPLIERS[to];
 }
 
 /** Maps the credentials' `subscriptionType` / `rateLimitTier` to a plan, if recognised. */

@@ -181,7 +181,10 @@ export function fiveHourWindows({ hits = [], k, limitThreshold, now, planHistory
 
   // `k` reads a cost on the current plan; a window that ran on another plan reads its % on that one, up to its limit.
   const kPlan = planAt(planHistory, new Date(now).toISOString());
-  const estimate = (w: Building) => k === undefined ? undefined : Math.min(100, convertPercent(k * w.cost, kPlan, planAt(planHistory, new Date(w.end - 1).toISOString())));
+  const estimate = (w: Building) => {
+    const percent = k === undefined ? undefined : convertPercent(k * w.cost, kPlan, planAt(planHistory, new Date(w.end - 1).toISOString()), 'fiveHour');
+    return percent === undefined ? undefined : Math.min(100, percent);
+  };
   return past
     .map((w): FiveHourWindow => {
       const peak = w.source === 'reading' ? w.peak : estimate(w);

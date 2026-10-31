@@ -128,8 +128,10 @@ conversation titles, for sharing screenshots like the ones above.
 - Only this machine's transcripts are counted. claude.ai chat usage counts
   toward the same limits: the endpoint separates it, and a manual reading can
   too; otherwise it is counted as Claude Code.
-- Other plans' figures are approximate, from Anthropic's advertised
-  multipliers over Pro; the Plans tab shows how well your own weeks match them.
+- Other plans' figures are approximate, from Anthropic's advertised weekly limits
+  (Max is 5× Pro, Ultra 10× Pro); the Plans tab shows how well your own weeks
+  match them. Ultra has no 5-hour limit, so a session counts as over a limit only
+  when both plans have one (Pro and Max).
 - When your usage restarts inside a week (an upgrade, a free reset), the week is
   split there: the projection and the pacing start again from the restart, and the
   week's peak adds the parts up.

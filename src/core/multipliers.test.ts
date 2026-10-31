@@ -39,7 +39,7 @@ describe('buildMultipliers', () => {
   const max5 = [12, 14, 16, 18, 20].map((weekly, i) => reading(i + 5, weekly));
 
   it('has one entry for each pair of neighbouring plans, advertised ratio included', () => {
-    expect(multipliers([]).map(m => [m.from, m.to, m.advertised])).toEqual([['pro', 'max5', 5], ['max5', 'max20', 4]]);
+    expect(multipliers([]).map(m => [m.from, m.to, m.advertised])).toEqual([['pro', 'max5', 5], ['max5', 'max20', 2]]);
   });
 
   it('measures the ratio of the median drift ratios, with its likely range', () => {
