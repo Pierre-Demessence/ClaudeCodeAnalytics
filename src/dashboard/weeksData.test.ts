@@ -52,7 +52,7 @@ describe('labels', () => {
   });
 
   it('shows a week\'s % on its own plan', () => {
-    // A Pro week at its limit, now on Max 5×.
+    // A Pro week at its limit, now on Max.
     const pro = week({ percent: 20, plan: 'pro', planPercent: 100 });
     expect(percentText(pro)).toBe('100%');
     expect(percentText({ ...pro, percentEstimated: true })).toBe('~100%');
@@ -100,7 +100,7 @@ describe('estimate without the limit', () => {
   });
 
   it('shows the estimate of a week from another plan on that plan, like its peak', () => {
-    // On Max 5×, a Pro week at its limit reads 20% and is estimated at 42% without it: 210% of Pro.
+    // On Max, a Pro week at its limit reads 20% and is estimated at 42% without it: 210% of Pro.
     const planFit = { ...input([fitWeek({ demand: 42, floor: 20 })]), plan: 'max5' as const };
     const pro = week({ percent: 20, plan: 'pro', planPercent: 100 });
     const uncapped = uncappedOf(planFit, pro)!;
@@ -137,8 +137,8 @@ describe('typical tick', () => {
 
   it('moves to where the median falls on the plan of a week from another plan, up to the end of its bar', () => {
     const pro = week({ percent: 20, plan: 'pro', planPercent: 100 });
-    expect(typicalTick(pro, 15, 'max5')).toEqual({ left: 75, text: 'Typical week: 75% of Pro (15% of Max 5×)' });
-    expect(typicalTick(pro, 40, 'max5')).toEqual({ left: 100, text: 'Typical week: 200% of Pro (40% of Max 5×)' });
+    expect(typicalTick(pro, 15, 'max5')).toEqual({ left: 75, text: 'Typical week: 75% of Pro (15% of Max)' });
+    expect(typicalTick(pro, 40, 'max5')).toEqual({ left: 100, text: 'Typical week: 200% of Pro (40% of Max)' });
   });
 });
 
@@ -148,10 +148,10 @@ describe('restartTip', () => {
   it('lists the parts of a plan change and says how the peak adds them up', () => {
     const parts = [part({ planPercent: 100 }), part({ end: '2026-10-08T05:00:00.000Z', percent: 6, plan: 'max5', planPercent: 30, start: '2026-10-03T10:00:00.000Z' })];
     expect(restartTip(week({ parts, planChange: true }), 'max5', 'UTC')).toBe([
-      'Usage restarted with the change to Max 5× on Sat 3 Oct 10:00.',
+      'Usage restarted with the change to Max on Sat 3 Oct 10:00.',
       'Pro until Sat 3 Oct 10:00: 100% of Pro',
-      'Max 5× from Sat 3 Oct 10:00: 30% of Max 5×',
-      'The peak adds the parts up, on Max 5×.',
+      'Max from Sat 3 Oct 10:00: 30% of Max',
+      'The peak adds the parts up, on Max.',
     ].join('\n'));
   });
 

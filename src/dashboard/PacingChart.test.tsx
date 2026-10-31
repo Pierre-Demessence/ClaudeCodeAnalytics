@@ -57,7 +57,7 @@ describe('pacing chart', () => {
     it('labels the restart with the new plan and the time', () => {
       const { container } = renderChart(restarted, 5);
       expect(container.querySelector('.pacing-restart')).not.toBeNull();
-      expect(container.textContent).toMatch(/Max 5× from \w{3} \d{2}:\d{2}/);
+      expect(container.textContent).toMatch(/Max from \w{3} \d{2}:\d{2}/);
     });
 
     it('starts the actual line and the even pace at the restart, at 0%', () => {

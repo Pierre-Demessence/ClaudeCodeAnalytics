@@ -157,9 +157,9 @@ describe('app', () => {
     // The auto-reload fires while the refresh is still running and finishes first.
     plan = 'max5';
     await act(async () => vi.advanceTimersByTime(5 * 60_000));
-    await waitFor(() => expect(document.querySelector('.plan-badge')?.textContent).toBe('Max 5×'));
+    await waitFor(() => expect(document.querySelector('.plan-badge')?.textContent).toBe('Max'));
     await act(async () => finishRefresh(Response.json({ ...summary(), plan: 'pro' })));
-    expect(document.querySelector('.plan-badge')!.textContent).toBe('Max 5×');
+    expect(document.querySelector('.plan-badge')!.textContent).toBe('Max');
     vi.useRealTimers();
   });
 
@@ -198,7 +198,7 @@ describe('app', () => {
     expect(new URL(fetch.mock.calls[0]![0], 'http://x').searchParams.get('collect')).toBe('0');
     expect(new URL(fetch.mock.calls[1]![0], 'http://x').searchParams.has('collect')).toBe(false);
     await act(async () => finishFull(Response.json({ ...summary(), plan: 'max5' })));
-    expect(document.querySelector('.plan-badge')!.textContent).toBe('Max 5×');
+    expect(document.querySelector('.plan-badge')!.textContent).toBe('Max');
     expect(screen.queryByText('Updating…')).toBeNull();
   });
 

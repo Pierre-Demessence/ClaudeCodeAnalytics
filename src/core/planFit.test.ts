@@ -20,7 +20,7 @@ function session(demand: number, extra: Partial<FitSession> = {}): FitSession {
   return { demand, estimated: false, floor: demand, shift: 0, ...extra };
 }
 
-/** The sample of the design: Max 5× with one week and two sessions over the limit. */
+/** The sample of the design: Max with one week and two sessions over the limit. */
 function sample(extra: Partial<PlanFitInput> = {}): PlanFitInput {
   const percents = [41, 55, 63, 47, 118, 72, 58, 66, 49, 84, 62, 77];
   const peaks = [12, 35, 48, 22, 64, 71, 18, 55, 112, 41, 29, 66, 38, 52, 24, 77, 45, 33, 60, 19, 88, 43, 27, 104, 58, 36, 50, 31, 69, 40];
@@ -54,7 +54,7 @@ describe('evaluatePlans', () => {
     expect(byPlan(sample()).max5!.overWeeks).toEqual([iso(START + 4 * WEEK_MS)]);
   });
 
-  it('judges the design sample: Pro too small, Max 5× close, Max 20× too big', () => {
+  it('judges the design sample: Pro too small, Max close, Ultra too big', () => {
     const { max20, max5, pro } = byPlan(sample());
     expect([pro!.verdict, max5!.verdict, max20!.verdict]).toEqual(['tooSmall', 'close', 'tooBig']);
   });
@@ -89,7 +89,7 @@ describe('evaluatePlans', () => {
     });
 
     it('is too big next to a cheaper plan that is close, or itself too big', () => {
-      // On Pro: 2 of 5 weeks over, close; on Max 20× the busiest week is 6%.
+      // On Pro: 2 of 5 weeks over, close; on Ultra the busiest week is 6%.
       const { max20, max5, pro } = byPlan({ plan: 'max5', sessions: [], weeks: [24, 22, 10, 12, 15].map((w, i) => week(i, w)) });
       expect([pro!.verdict, max5!.verdict, max20!.verdict]).toEqual(['close', 'tooBig', 'tooBig']);
     });
@@ -115,14 +115,14 @@ describe('evaluatePlans', () => {
 
     it('counts only the usage that fits under each plan', () => {
       const { max20, max5, pro } = byPlan(costs());
-      // A month is 52 / 12 weeks. Pro's limit is a fifth of Max 5×' $480: $96.
+      // A month is 52 / 12 weeks. Pro's limit is a fifth of Max's $480: $96.
       expect(pro!.apiValueRatio).toBeCloseTo(96 * 52 / 12 / 20);
       expect(max5!.apiValueRatio).toBeCloseTo(300 * 52 / 12 / 100);
       expect(max20!.apiValueRatio).toBeCloseTo(300 * 52 / 12 / 200);
     });
 
     it('adds the hidden part of each week at the budget per %', () => {
-      // $4.8 per % of Max 5×: the weeks cost $300, $300 and $300 + 40 % × $4.8; the median stays $300.
+      // $4.8 per % of Max: the weeks cost $300, $300 and $300 + 40 % × $4.8; the median stays $300.
       const hidden = costs({ weeks: [week(0, 60, { cost: 300 }), week(1, 60, { cost: 300 }), week(2, 100, { cost: 300, floor: 60 })] });
       expect(byPlan(hidden).max5!.apiValueRatio).toBeCloseTo(300 * 52 / 12 / 100);
       const mostly = costs({ weeks: [week(0, 100, { cost: 300, floor: 60 }), week(1, 100, { cost: 300, floor: 60 }), week(2, 60, { cost: 300 })] });
@@ -145,12 +145,12 @@ describe('bestPlan', () => {
   });
 
   it('prefers close to too big', () => {
-    // Max 5× is close; Max 20× is too big and costs more.
+    // Max is close; Ultra is too big and costs more.
     expect(best(sample())).toBe('max5');
   });
 
   it('picks the smallest plan that holds the weeks, however roomy', () => {
-    // Pro is over in 3 weeks, so Max 5× fits with room to grow and Max 20× is too big.
+    // Pro is over in 3 weeks, so Max fits with room to grow and Ultra is too big.
     const roomy: PlanFitInput = { plan: 'max5', sessions: [], weeks: [week(0, 20), week(1, 30), week(2, 10), week(3, 25)] };
     expect(evaluatePlans(roomy).map(f => f.verdict)).toEqual(['tooSmall', 'fits', 'tooBig']);
     expect(best(roomy)).toBe('max5');
@@ -159,7 +159,7 @@ describe('bestPlan', () => {
   });
 
   it('settles a tie on fewer weeks over, then on price', () => {
-    // On Max 20× 400 is exactly 100%, but 100 is only 25%: fewer weeks over than the plans below.
+    // On Ultra 400 is exactly 100%, but 100 is only 25%: fewer weeks over than the plans below.
     expect(best({ plan: 'max5', sessions: [], weeks: [400, 400, 400, 400, 100, 100].map((d, i) => week(i, d)) })).toBe('max20');
     expect(best({ plan: 'max5', sessions: [], weeks: [400, 400, 400, 400].map((d, i) => week(i, d)) })).toBe('pro');
   });
@@ -359,7 +359,7 @@ describe('buildPlanFitInput', () => {
         window(START + 4 * DAY_MS, { peak: 50 }),
       ],
     });
-    // 50% on Pro is 10% on Max 5×.
+    // 50% on Pro is 10% on Max.
     expect(input.sessions.map(s => s.demand)).toEqual([10, 50]);
   });
 
@@ -368,12 +368,12 @@ describe('buildPlanFitInput', () => {
     const sessions = (windows: FiveHourWindow[]) => buildPlanFitInput({ ...base, planHistory, sessionWindows: windows, weekHistory: history([row(0)]) }).sessions;
 
     it('takes the plan the window ended on, although it started before the change', () => {
-      // Starts 10 minutes before the upgrade: the usage it read is on Max 5×.
+      // Starts 10 minutes before the upgrade: the usage it read is on Max.
       expect(sessions([window(START + 3 * DAY_MS - 10 * 60_000, { peak: 50 })]).map(s => s.demand)).toEqual([50]);
     });
 
     it('converts the peak of an estimated window like a read one, from the plan it ran on', () => {
-      // 50% of Pro is 10% of Max 5×.
+      // 50% of Pro is 10% of Max.
       expect(sessions([window(START + DAY_MS, { peak: 50, peakEstimated: true })]).map(s => s.demand)).toEqual([10]);
     });
   });

@@ -95,13 +95,13 @@ describe('final percent', () => {
 
   it('takes a completed window\'s final reading, converted to the current plan', () => {
     const { weeks: rows } = weeks({ plan: 'max20', shares: [share(1, 80)], snapshots: [snap(1)] });
-    // Max 20× is 4 times Max 5×.
+    // Ultra is 4 times Max.
     expect(rows[0]).toMatchObject({ percent: 20, source: 'reading' });
     expect(rows[0]!.percentEstimated).toBeUndefined();
   });
 
   it('keeps the % on the plan the week was read on, for the Weeks tab to show', () => {
-    // A Pro week at its limit is 20% of Max 5×; the window in progress is read on the current plan.
+    // A Pro week at its limit is 20% of Max; the window in progress is read on the current plan.
     const { weeks: rows } = weeks({ current: { resetsAt: iso(START + WEEK_MS), weekly: 38 }, shares: [share(1, 100, { plan: 'pro' })], snapshots: [snap(1, 100)] });
     expect(rows[1]).toMatchObject({ percent: 20, plan: 'pro', planPercent: 100 });
     expect(rows[0]).toMatchObject({ percent: 38, plan: 'max5', planPercent: 38 });
@@ -162,13 +162,13 @@ describe('pressure point', () => {
   });
 
   it('converts the reading from the plan of the window to the current plan', () => {
-    // The window was read on Pro, where 92% crossed the point; it is 18.4% of Max 5×.
+    // The window was read on Pro, where 92% crossed the point; it is 18.4% of Max.
     const snapshots = [reading(92, 3)];
     expect(weeks({ plan: 'max5', shares: [share(92, 'pro')], snapshots }).weeks[0]).toMatchObject({ pressurePercent: 92 / 5 });
   });
 
   it('reads the reading on its own plan when a plan change in the window did not restart the usage', () => {
-    // A downgrade from Max 5× to Pro on day 4 shows as no drop: 92% of Max 5× on day 3 is 460% of Pro.
+    // A downgrade from Max to Pro on day 4 shows as no drop: 92% of Max on day 3 is 460% of Pro.
     const planHistory = [{ from: iso(weekStart(5)), plan: 'max5' as const, source: 'manual' as const }, { from: iso(weekStart(1) + 4 * DAY_MS), plan: 'pro' as const, source: 'manual' as const }];
     const snapshots = [reading(92, 3), reading(100, 5)];
     expect(weeks({ plan: 'pro', planHistory, shares: [share(100, 'pro')], snapshots }).weeks[0]).toMatchObject({ pressureAt: iso(weekStart(1) + 3 * DAY_MS), pressurePercent: 460 });
@@ -193,7 +193,7 @@ describe('pressure point', () => {
   });
 
   it('reads an estimated week on its own plan: its limit and its 90%', () => {
-    // 0.5 % of Max 5× per dollar is 2.5 % of Pro: the $20 messages of a Pro week are 50% of Pro each.
+    // 0.5 % of Max per dollar is 2.5 % of Pro: the $20 messages of a Pro week are 50% of Pro each.
     const planHistory = [{ from: iso(weekStart(5)), plan: 'pro' as const, source: 'manual' as const }, { from: iso(START), plan: 'max5' as const, source: 'manual' as const }];
     const records = [rec(weekStart(1) + DAY_MS), rec(weekStart(1) + 2 * DAY_MS), rec(weekStart(1) + 3 * DAY_MS)];
     const row = weeks({ calibrationK: 0.5, planHistory, records }).weeks.find(w => w.start === iso(weekStart(1)))!;
@@ -213,7 +213,7 @@ describe('hit', () => {
   });
 
   it('reads the threshold on the plan of the week, not on the current plan', () => {
-    // A Pro week at its limit reads 20% of Max 5×; a Max 20× week at 30% reads 600% of Pro.
+    // A Pro week at its limit reads 20% of Max; an Ultra week at 30% reads 600% of Pro.
     const pro = weeks({ shares: [{ ...share(100), plan: 'pro' }], snapshots: [snap(1, 100)] }).weeks[0]!;
     expect(pro).toMatchObject({ hit: true, percent: 20 });
     const max20 = weeks({ plan: 'pro', shares: [{ ...share(30), plan: 'max20' }], snapshots: [snap(1, 30)] }).weeks[0]!;
@@ -305,7 +305,7 @@ describe('plan change', () => {
     { from: iso(weekStart(5)), plan: 'pro' as const, source: 'detected' as const },
     { from: iso(weekStart(2) + 3 * DAY_MS), plan: 'max5' as const, source: 'manual' as const },
   ];
-  /** Week 2: Pro to 100%, then Max 5× from day 3 to 20%: 40% of Max 5× in all. */
+  /** Week 2: Pro to 100%, then Max from day 3 to 20%: 40% of Max in all. */
   const restartedShare = {
     ...share(2, 40),
     planChange: true as const,
@@ -353,7 +353,7 @@ describe('plan change', () => {
 
   it('counts a week as having hit the limit when a part ended at the threshold of its own plan', () => {
     const { stats, weeks: rows } = weeks({ planHistory, shares: [restartedShare], snapshots: [snap(2)] });
-    // The Max 5× part ended at 20%, the Pro part at 100% of Pro.
+    // The Max part ended at 20%, the Pro part at 100% of Pro.
     expect(rows[0]!.hit).toBe(true);
     expect(stats.hit).toBe(1);
     const estimated = { ...restartedShare, estimated: true, parts: [{ ...restartedShare.parts[0], estimated: true as const }, restartedShare.parts[1]!] };
@@ -370,7 +370,7 @@ describe('plan change', () => {
   });
 
   it('reads a part\'s pressure point on the plan of its reading, not the part\'s last one', () => {
-    // Max 5× from day 3 restarts the usage; back to Pro on day 5 does not: the last part holds readings of both plans.
+    // Max from day 3 restarts the usage; back to Pro on day 5 does not: the last part holds readings of both plans.
     const history = [...planHistory, { from: iso(weekStart(2) + 5 * DAY_MS), plan: 'pro' as const, source: 'manual' as const }];
     const share = {
       ...restartedShare,
@@ -380,7 +380,7 @@ describe('plan change', () => {
     };
     const readings = [reading(weekStart(2) + DAY_MS, 50), reading(weekStart(2) + 4 * DAY_MS, 92), reading(weekStart(2) + 6 * DAY_MS, 100)];
     const { weeks: rows } = weeks({ plan: 'pro', planHistory: history, shares: [share], snapshots: readings });
-    // 92% of Max 5× is 460% of Pro.
+    // 92% of Max is 460% of Pro.
     expect(rows[0]!.parts![1]).toMatchObject({ pressureAt: iso(weekStart(2) + 4 * DAY_MS), pressurePercent: 460 });
     expect(rows[0]).toMatchObject({ pressureAt: iso(weekStart(2) + 4 * DAY_MS), pressurePercent: 460 });
   });

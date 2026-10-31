@@ -52,13 +52,13 @@ describe('heldBackText', () => {
 
   it('warns that weeks used on a cheaper plan are a minimum when one of them went over its limit', () => {
     expect(heldBackText(fits.max5, on(['pro']), 0)).toBe(note);
-    // Only the third week, 118% of Max 5×, went over it.
+    // Only the third week, 118% of Max, went over it.
     expect(heldBackText(fits.max20, on(['max5', 'max20']), 0)).toBe(note);
   });
 
   it('says nothing when the weeks were used on the best plan, or the weeks on a smaller plan stayed under its limit', () => {
     expect(heldBackText(fits.max5, on(['max5']), 0)).toBeUndefined();
-    // Only the 41% week was on Max 5×; the 118% one was on Max 20×.
+    // Only the 41% week was on Max; the 118% one was on Ultra.
     const mixed = { ...input, weeks: input.weeks.map((w, i) => ({ ...w, plans: [i === 0 ? 'max5' as const : 'max20' as const] })) };
     expect(heldBackText(fits.max20, mixed, 0)).toBeUndefined();
   });
@@ -77,8 +77,8 @@ describe('switchText', () => {
   });
 
   it('says what switching does to the monthly bill', () => {
-    expect(switchText(fits.pro, fits.max5)).toEqual({ action: 'Saves $80 / month', tag: 'switch from Max 5×' });
-    expect(switchText(fits.max20, fits.max5)).toEqual({ action: 'Costs $100 more / month', tag: 'switch from Max 5×' });
+    expect(switchText(fits.pro, fits.max5)).toEqual({ action: 'Saves $80 / month', tag: 'switch from Max' });
+    expect(switchText(fits.max20, fits.max5)).toEqual({ action: 'Costs $100 more / month', tag: 'switch from Max' });
   });
 });
 

@@ -34,7 +34,7 @@ function multipliers(snapshots: Snapshot[], planHistory: PlanPeriod[] = history)
 }
 
 describe('buildMultipliers', () => {
-  // Pro: 60 to 100 % per $100; Max 5×: 12 to 20.
+  // Pro: 60 to 100 % per $100; Max: 12 to 20.
   const pro = [60, 70, 80, 90, 100].map((weekly, i) => reading(i, weekly));
   const max5 = [12, 14, 16, 18, 20].map((weekly, i) => reading(i + 5, weekly));
 
@@ -45,7 +45,7 @@ describe('buildMultipliers', () => {
   it('measures the ratio of the median drift ratios, with its likely range', () => {
     const [proToMax5] = multipliers([...pro, ...max5]);
     expect(proToMax5!.measured).toMatchObject({ fromWeeks: 5, toWeeks: 5, value: 5 });
-    // Quartiles: 70 to 90 on Pro, 14 to 18 on Max 5×.
+    // Quartiles: 70 to 90 on Pro, 14 to 18 on Max.
     expect(proToMax5!.measured!.low).toBeCloseTo(70 / 18);
     expect(proToMax5!.measured!.high).toBeCloseTo(90 / 14);
   });
@@ -56,7 +56,7 @@ describe('buildMultipliers', () => {
   });
 
   it('counts the window holding the switch on both plans, each from its own part', () => {
-    // Week 5: Pro to 50% at day 3, the switch at day 5, then 12% on Max 5× at day 6.
+    // Week 5: Pro to 50% at day 3, the switch at day 5, then 12% on Max at day 6.
     const start = FIRST_RESET + 5 * WEEK_MS - WEEK_MS;
     const onPro: Snapshot = { source: 'endpoint', ts: new Date(start + 3 * DAY_MS).toISOString(), weekly: 50, weeklyResetsAt: reset(5) };
     const [proToMax5] = multipliers([...pro, onPro, ...max5], switchTo(switchedAt(5, 2 * DAY_MS)));

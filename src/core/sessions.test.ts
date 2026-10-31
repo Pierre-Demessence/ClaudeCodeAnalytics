@@ -161,10 +161,10 @@ describe('estimated windows', () => {
   });
 
   it('puts the estimate on the plan the window ran on, as a reading is', () => {
-    // `k` is a % of the current plan's limit (Max 5×) per dollar; the first window ran on Pro, a fifth of it.
+    // `k` is a % of the current plan's limit (Max) per dollar; the first window ran on Pro, a fifth of it.
     const planHistory: PlanPeriod[] = [{ from: '2026-09-01T00:00:00.000Z', plan: 'pro', source: 'manual' }, { from: '2026-10-02T00:00:00.000Z', plan: 'max5', source: 'manual' }];
     const { windows } = sessions([rec('2026-10-01T09:00:00Z'), rec('2026-10-02T09:00:00Z')], [], { k: 0.5, planHistory });
-    // $20 × 0.5 = 10% of Max 5×, which is 50% of Pro.
+    // $20 × 0.5 = 10% of Max, which is 50% of Pro.
     expect(windows.map(w => [w.start, w.peak])).toEqual([['2026-10-02T09:00:00.000Z', 10], ['2026-10-01T09:00:00.000Z', 50]]);
   });
 });

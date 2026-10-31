@@ -19,7 +19,7 @@ limits, and shows where the usage goes. Nothing leaves your machine.
 - **Subscription vs API prices**: what your plan saved you this billing cycle.
 - **Breakdowns**: by model, project, conversation, skill, subagent, tool and effort level.
 - **History**: past 5-hour sessions and weeks, the ones that hit the limit or got rate-limited.
-- **Plan fit**: whether Pro, Max 5× or Max 20× would have fit your last weeks.
+- **Plan fit**: whether Pro, Max or Ultra would have fit your last weeks.
 - **Taskbar widget** (Windows): both limits at a glance, always visible.
 - **Costs no usage**: it never calls Claude, so it uses no tokens and doesn't count toward your limits.
 - **Private by design**: never stores message content; anonymize mode for screenshots.
@@ -128,8 +128,8 @@ conversation titles, for sharing screenshots like the ones above.
 - Only this machine's transcripts are counted. claude.ai chat usage counts
   toward the same limits: the endpoint separates it, and a manual reading can
   too; otherwise it is counted as Claude Code.
-- Other plans' figures are approximate, from Anthropic's advertised 5× and 20×
-  multipliers; the Plans tab shows how well your own weeks match them.
+- Other plans' figures are approximate, from Anthropic's advertised
+  multipliers over Pro; the Plans tab shows how well your own weeks match them.
 - When your usage restarts inside a week (an upgrade, a free reset), the week is
   split there: the projection and the pacing start again from the restart, and the
   week's peak adds the parts up.

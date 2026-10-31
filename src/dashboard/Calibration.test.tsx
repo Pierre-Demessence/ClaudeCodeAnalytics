@@ -88,7 +88,7 @@ describe('calibration tab', () => {
 
     it('says where a borrowed fit comes from, and keeps quiet about an own one', () => {
       renderTab(summary({ calibration: { ...fit, borrowedFrom: 'pro' }, fiveHourCalibration: { ...fit, borrowedFrom: 'pro' }, plan: 'max5' }));
-      expect(screen.getByText(/Borrowed from your Pro readings.*\(Max 5× is 5× Pro\).*until Max 5× has 3 readings of 5% or more, so the projections are rough/)).toBeTruthy();
+      expect(screen.getByText(/Borrowed from your Pro readings.*\(Max is 5× Pro\).*until Max has 3 readings of 5% or more, so the projections are rough/)).toBeTruthy();
       expect(screen.getByText(/per \$100, ±1\.0 pts \(from Pro\)/)).toBeTruthy();
       cleanup();
       renderTab(summary({ calibration: fit, fiveHourCalibration: fit }));
@@ -248,7 +248,7 @@ describe('calibration tab', () => {
     it('keeps the settings editable while a request runs, so the auto-reload does not take the focus away', () => {
       renderTab(summary({ detectedPlan: 'max20' }), true);
       fireEvent.change(screen.getByLabelText('5-hour window'), { target: { value: '90' } });
-      for (const control of [screen.getByLabelText('Plan', { selector: '#plan-select' }), screen.getByRole('switch', { name: 'Usage endpoint' }), screen.getByLabelText('Check every'), screen.getByLabelText('5-hour window'), screen.getByLabelText('Week'), screen.getByRole('button', { name: 'Switch to Max 20×' })])
+      for (const control of [screen.getByLabelText('Plan', { selector: '#plan-select' }), screen.getByRole('switch', { name: 'Usage endpoint' }), screen.getByLabelText('Check every'), screen.getByLabelText('5-hour window'), screen.getByLabelText('Week'), screen.getByRole('button', { name: 'Switch to Ultra' })])
         expect((control as HTMLInputElement).disabled).toBe(false);
       expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
       expect((screen.getByRole('button', { name: 'Discard' }) as HTMLButtonElement).disabled).toBe(true);
@@ -346,7 +346,7 @@ describe('calibration tab', () => {
       const { onSaveSettings } = renderTab({ ...data, plan: 'max5' });
       const select = screen.getByLabelText('Plan', { selector: '#plan-select' }) as HTMLSelectElement;
       expect(select.value).toBe('max5');
-      expect(within(select).getByRole('option', { name: 'Detected: Max 5×' })).toBeTruthy();
+      expect(within(select).getByRole('option', { name: 'Detected: Max' })).toBeTruthy();
       fireEvent.change(select, { target: { value: 'detected' } });
       expect(onSaveSettings).not.toHaveBeenCalled();
       save();
@@ -380,7 +380,7 @@ describe('calibration tab', () => {
         detectedPlan: 'max20',
         planHistory: [{ from: '2026-01-01T00:00:00.000Z', plan: 'pro', source: 'manual' }],
       }));
-      fireEvent.click(screen.getByRole('button', { name: 'Switch to Max 20×' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to Ultra' }));
       expect(onSaveSettings).not.toHaveBeenCalled();
       expect((screen.getByLabelText('Plan', { selector: '#plan-select' }) as HTMLSelectElement).value).toBe('max20');
       save();
@@ -417,7 +417,7 @@ describe('calibration tab', () => {
       const rows = within(screen.getAllByRole('table').at(-1)!).getAllByRole('row').slice(1);
       expect(rows).toHaveLength(2);
       expect(within(rows[0]!).getByText('current')).toBeTruthy();
-      expect(rows[0]!.textContent).toContain('Max 5×');
+      expect(rows[0]!.textContent).toContain('Max');
       expect(rows[0]!.textContent).toContain('now');
       expect(rows[0]!.textContent).toContain('1,486');
       expect(rows[1]!.textContent).toContain('the start');
@@ -432,11 +432,11 @@ describe('calibration tab', () => {
 
     it('edits the start of a period, which becomes manual, and keeps the history in order', () => {
       const { onSaveSettings } = renderTab(withHistory());
-      const edit = screen.getByRole('button', { name: /^Edit the start of Max 5×/ });
+      const edit = screen.getByRole('button', { name: /^Edit the start of Max/ });
       fireEvent.click(edit);
       // A browser runs the click's default action after React renders: the Edit button must not have become Save.
       expect(edit.isConnected).toBe(false);
-      const input = screen.getByLabelText('Start of Max 5×') as HTMLInputElement;
+      const input = screen.getByLabelText('Start of Max') as HTMLInputElement;
       expect(input.value).toBe(toLocalInput(history[1]!.from));
       fireEvent.change(input, { target: { value: '2025-12-20T09:30' } });
       fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
@@ -446,23 +446,23 @@ describe('calibration tab', () => {
     it('keeps the edit open when the save fails, and closes it once saved', async () => {
       const props = renderTab(withHistory());
       props.onSaveSettings.mockResolvedValueOnce(false);
-      fireEvent.click(screen.getByRole('button', { name: /^Edit the start of Max 5×/ }));
-      fireEvent.change(screen.getByLabelText('Start of Max 5×'), { target: { value: '2025-12-20T09:30' } });
+      fireEvent.click(screen.getByRole('button', { name: /^Edit the start of Max/ }));
+      fireEvent.change(screen.getByLabelText('Start of Max'), { target: { value: '2025-12-20T09:30' } });
       fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
       await act(async () => {});
-      expect((screen.getByLabelText('Start of Max 5×') as HTMLInputElement).value).toBe('2025-12-20T09:30');
+      expect((screen.getByLabelText('Start of Max') as HTMLInputElement).value).toBe('2025-12-20T09:30');
       fireEvent.click(within(planTable()).getByRole('button', { name: 'Save' }));
       await act(async () => {});
-      expect(screen.queryByLabelText('Start of Max 5×')).toBeNull();
+      expect(screen.queryByLabelText('Start of Max')).toBeNull();
     });
 
     it('refuses a start another period already has, and cancels the edit', () => {
       renderTab(withHistory());
-      fireEvent.click(screen.getByRole('button', { name: /^Edit the start of Max 5×/ }));
-      fireEvent.change(screen.getByLabelText('Start of Max 5×'), { target: { value: toLocalInput(history[0]!.from) } });
+      fireEvent.click(screen.getByRole('button', { name: /^Edit the start of Max/ }));
+      fireEvent.change(screen.getByLabelText('Start of Max'), { target: { value: toLocalInput(history[0]!.from) } });
       expect((within(planTable()).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(screen.queryByLabelText('Start of Max 5×')).toBeNull();
+      expect(screen.queryByLabelText('Start of Max')).toBeNull();
     });
 
     it('shows the assumed plan as one row without Remove when there is no history', () => {

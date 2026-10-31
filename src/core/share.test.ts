@@ -27,7 +27,7 @@ describe('weeklyShares', () => {
   });
 
   it('converts the extension when the ratio was fitted on another plan, and caps at 100%', () => {
-    // k fitted on Max 5×: $20 → 2% of Max 5× = 10% of Pro.
+    // k fitted on Max: $20 → 2% of Max = 10% of Pro.
     const shares = weeklyShares([snap('2026-10-14T00:00:00Z', 50, '2026-10-14T20:00:00Z')], () => 20, { k: 0.1, plan: 'max5' }, history, now);
     expect(shares[0]?.percent).toBeCloseTo(60);
     const capped = weeklyShares([snap('2026-10-14T00:00:00Z', 95, '2026-10-14T20:00:00Z')], () => 20, { k: 0.5, plan: 'pro' }, history, now);
@@ -43,7 +43,7 @@ describe('weeklyShares', () => {
       snap('2026-10-18T19:00:00Z', 30, '2026-10-19T20:00:00Z'),
     ], () => 0, undefined, upgraded, now);
     expect(shares.map(share => share.planChange)).toEqual([undefined, true, undefined]);
-    // Pro's 100% is 20% of Max 5×, and the Max 5× part reached 20% on top.
+    // Pro's 100% is 20% of Max, and the Max part reached 20% on top.
     expect(shares[1]).toMatchObject({ estimated: false, percent: 40, plan: 'max5' });
     expect(shares[1]!.parts).toEqual([
       { percent: 100, plan: 'pro', start: '2026-10-07T20:00:00.000Z' },
@@ -67,7 +67,7 @@ describe('weeklyShares', () => {
     const upgraded: PlanPeriod[] = [...history, { from: '2026-10-10T00:00:00Z', plan: 'max5', source: 'manual' }];
     // The only reading comes after the upgrade and a day early: the Pro part has none.
     const shares = weeklyShares([snap('2026-10-13T20:00:00Z', 10, '2026-10-14T20:00:00Z')], (from, to) => (to - from) / 3_600_000, { k: 0.1, plan: 'max5' }, upgraded, now);
-    // Max 5× part: 10% + 24 h at $1 an hour × 0.1 %/$ = 12.4%. The Pro part comes from its cost (0.1 %/$ of Max 5× is 0.5 %/$ of Pro).
+    // Max part: 10% + 24 h at $1 an hour × 0.1 %/$ = 12.4%. The Pro part comes from its cost (0.1 %/$ of Max is 0.5 %/$ of Pro).
     const [ended, running] = shares[0]!.parts!;
     expect(ended).toMatchObject({ estimated: true, plan: 'pro' });
     expect(running).toMatchObject({ estimated: true, plan: 'max5' });

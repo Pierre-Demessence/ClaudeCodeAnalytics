@@ -11,7 +11,7 @@ import { TipProvider } from '@/dashboard/Tip';
 
 const NOW = Date.parse('2026-10-03T12:00:00Z');
 
-/** The design's sample: Max 5× with one week (7 Aug) and two sessions over the limit. */
+/** The design's sample: Max with one week (7 Aug) and two sessions over the limit. */
 const percents = [41, 55, 63, 47, 118, 72, 58, 66, 49, 84, 62, 77];
 const peaks = [12, 35, 48, 22, 64, 71, 18, 55, 112, 41, 29, 66, 38, 52, 24, 77, 45, 33, 60, 19, 88, 43, 27, 104, 58, 36, 50, 31, 69, 40];
 const planFit: PlanFitInput = {
@@ -55,19 +55,19 @@ describe('plans tab', () => {
   it('names the best plan with its verdict, and only that plan', () => {
     renderTab(full());
     const best = card('Best plan for your last 12 weeks');
-    expect(within(best).getByText('Max 5×')).toBeTruthy();
+    expect(within(best).getByText('Max')).toBeTruthy();
     expect(within(best).getByText('your current plan')).toBeTruthy();
     expect(within(best).getByText('Close.')).toBeTruthy();
     expect(best.textContent).toContain('Over the limit in 1 of 12 weeks (');
     expect(best.textContent).toContain('2 of 30 sessions');
-    expect(best.textContent).not.toMatch(/Pro|Max 20×/);
+    expect(best.textContent).not.toMatch(/Pro|Ultra/);
   });
 
   it('warns on the best plan that weeks used on a smaller plan that held them are a minimum, naming no plan', () => {
     renderTab(summary({ multipliers, plan: 'max5', planFit: { ...planFit, weeks: planFit.weeks.map(w => ({ ...w, plans: ['pro' as const] })) } }));
     const best = card('Best plan for your last 12 weeks');
     expect(best.textContent).toContain('Measured on a smaller plan whose limits you ran into');
-    expect(best.textContent).not.toMatch(/Pro|Max 20×/);
+    expect(best.textContent).not.toMatch(/Pro|Ultra/);
   });
 
   it('says nothing of a smaller plan when the weeks were used on the best one', () => {
@@ -78,10 +78,10 @@ describe('plans tab', () => {
   it('gives each plan a verdict with its own title', () => {
     renderTab(full());
     expect(within(card('Pro')).getByText('Too small.')).toBeTruthy();
-    expect(within(card('Max 5×')).getByText('Close.')).toBeTruthy();
-    expect(within(card('Max 20×')).getByText('Too big.')).toBeTruthy();
-    expect(within(card('Max 5×')).getByText('current')).toBeTruthy();
-    expect(within(card('Max 20×')).getByText('$200 / month')).toBeTruthy();
+    expect(within(card('Max')).getByText('Close.')).toBeTruthy();
+    expect(within(card('Ultra')).getByText('Too big.')).toBeTruthy();
+    expect(within(card('Max')).getByText('current')).toBeTruthy();
+    expect(within(card('Ultra')).getByText('$200 / month')).toBeTruthy();
   });
 
   it('recommends the smallest plan that holds the weeks with room to grow, not as too big', () => {
@@ -93,9 +93,9 @@ describe('plans tab', () => {
     };
     renderTab(summary({ multipliers, plan: 'max5', planFit: light }));
     expect(within(card('Best plan for your last 12 weeks')).getByText('Fits, with room to grow.')).toBeTruthy();
-    expect(within(card('Max 5×')).getByText('Fits, with room to grow.')).toBeTruthy();
+    expect(within(card('Max')).getByText('Fits, with room to grow.')).toBeTruthy();
     expect(within(card('Pro')).getByText('Too small.')).toBeTruthy();
-    expect(within(card('Max 20×')).getByText('Too big.')).toBeTruthy();
+    expect(within(card('Ultra')).getByText('Too big.')).toBeTruthy();
   });
 
   it('re-prices the whole tab when Opus work moves to Sonnet', () => {
@@ -104,16 +104,16 @@ describe('plans tab', () => {
     const best = card('Best plan for your last 12 weeks');
     expect(within(best).getByText('All Opus work on Sonnet')).toBeTruthy();
     expect(within(best).getByText('Fits every week and session.')).toBeTruthy();
-    expect(within(card('Max 5×')).getByText('Fits every week and session.')).toBeTruthy();
-    expect(within(card('Max 5×')).getByText('0 of 12')).toBeTruthy();
+    expect(within(card('Max')).getByText('Fits every week and session.')).toBeTruthy();
+    expect(within(card('Max')).getByText('0 of 12')).toBeTruthy();
   });
 
   it('suggests a cheaper plan with what switching saves', () => {
     const light: PlanFitInput = { ...planFit, plan: 'max20', sessions: [], weeks: planFit.weeks.map(w => ({ ...w, demand: w.demand / 4, floor: w.demand / 4 })) };
     renderTab(summary({ multipliers, plan: 'max20', planFit: light }));
     const best = card('Best plan for your last 12 weeks');
-    expect(within(best).getByText('Max 5×')).toBeTruthy();
-    expect(within(best).getByText('switch from Max 20×')).toBeTruthy();
+    expect(within(best).getByText('Max')).toBeTruthy();
+    expect(within(best).getByText('switch from Ultra')).toBeTruthy();
     expect(within(best).getByText('Saves $100 / month')).toBeTruthy();
   });
 
@@ -124,7 +124,7 @@ describe('plans tab', () => {
     fireEvent.click(within(chart).getByRole('button', { name: 'Pro' }));
     expect(within(chart).getByText('590%')).toBeTruthy();
     expect(chart.querySelectorAll('.fit-bar.over')).toHaveLength(12);
-    fireEvent.click(within(chart).getByRole('button', { name: 'Max 20×' }));
+    fireEvent.click(within(chart).getByRole('button', { name: 'Ultra' }));
     expect(chart.querySelectorAll('.fit-bar.over')).toHaveLength(0);
   });
 
@@ -132,7 +132,7 @@ describe('plans tab', () => {
     // One capped week read 80%, and its 3.5 hidden days fill it to 160%.
     const weeks = planFit.weeks.map((w, i) => (i === 4 ? { ...w, demand: 160, estimated: true, floor: 80, hiddenHours: 84 } : w));
     renderTab(summary({ multipliers, plan: 'max5', planFit: { ...planFit, weeks } }));
-    const max5 = card('Max 5×');
+    const max5 = card('Max');
     expect(within(max5).getByText('≈ 160%')).toBeTruthy();
     // The busiest week took at least as much as the highest minimum (84%, the 10th week).
     expect(within(max5).getByText('(at least 84%)')).toBeTruthy();

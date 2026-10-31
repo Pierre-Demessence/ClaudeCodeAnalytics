@@ -8,6 +8,8 @@ Noteworthy changes for users. The format follows
 
 ### Changed
 
+- Anthropic's renamed plans: Max 5× is now "Max" and Max 20× is "Ultra" in the
+  header, the Plans tab, the plan history and the settings.
 - The dashboard server collects every minute on its own, so the usage readings
   continue after a reboot with no dashboard tab or taskbar widget open.
 

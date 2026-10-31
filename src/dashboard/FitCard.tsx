@@ -9,7 +9,7 @@ import { InfoTip } from '@/dashboard/Tip';
 
 const per100 = (k: number) => `${(k * 100).toFixed(1)}%`;
 
-/** "Max 5× is 5× Pro", or "Pro is 1/5 of Max 5×". */
+/** "Max is 5× Pro", or "Pro is 1/5 of Max". */
 function multiplierSentence(plan: Plan, from: Plan): string {
   const ratio = PLAN_MULTIPLIERS[plan] / PLAN_MULTIPLIERS[from];
   return ratio >= 1

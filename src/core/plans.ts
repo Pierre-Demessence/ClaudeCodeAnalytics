@@ -2,7 +2,7 @@ import type { Plan, PlanPeriod } from './types.ts';
 
 export const PLANS: readonly Plan[] = ['pro', 'max5', 'max20'];
 
-export const PLAN_LABELS: Record<Plan, string> = { max20: 'Max 20×', max5: 'Max 5×', pro: 'Pro' };
+export const PLAN_LABELS: Record<Plan, string> = { max20: 'Ultra', max5: 'Max', pro: 'Pro' };
 
 /** Advertised usage relative to Pro. Approximate: Anthropic does not publish exact limits. */
 export const PLAN_MULTIPLIERS: Record<Plan, number> = { max20: 20, max5: 5, pro: 1 };

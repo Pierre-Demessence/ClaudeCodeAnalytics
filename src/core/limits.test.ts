@@ -46,7 +46,7 @@ describe('buildLimits drift', () => {
       ],
       costBetween: (from, to) => (from === windowStartOfWeek(4) ? 0 : costBetween(from, to)),
     });
-    // Week 0: 9%. Weeks 1–2: before the data. Week 4: no cost. Week 5: Max 5×.
+    // Week 0: 9%. Weeks 1–2: before the data. Week 4: no cost. Week 5: Max.
     expect(drift.map(w => w.resetsAt)).toEqual([reset(3), reset(6)]);
   });
 
@@ -59,10 +59,10 @@ describe('buildLimits drift', () => {
     const at = (i: number, days: number, weekly: number) => reading(i, weekly, { ts: new Date(windowStartOfWeek(i) + days * DAY_MS).toISOString() });
 
     it('counts each part on its own plan, from its own start', () => {
-      // Week 5: Pro to 50% at day 1.5, then Max 5× from day 2: 30% by day 6.
+      // Week 5: Pro to 50% at day 1.5, then Max from day 2: 30% by day 6.
       const snapshots = [at(3, 6, 30), at(4, 6, 30), at(5, 1.5, 50), at(5, 6, 30), at(6, 6, 30)];
       const onMax5 = driftWindows({ costBetween, dataStart: 0, now: NOW, plan: 'max5', planHistory, snapshots });
-      // The Max 5× part: 30 points over the 4 days since the upgrade ($66.67).
+      // The Max part: 30 points over the 4 days since the upgrade ($66.67).
       expect(onMax5.map(w => w.resetsAt)).toEqual([reset(5), reset(6)]);
       expect(onMax5[0]).toMatchObject({ from: upgrade });
       expect(onMax5[0]!.ratio).toBeCloseTo(45);

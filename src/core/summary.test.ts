@@ -63,7 +63,7 @@ describe('buildSummary', () => {
       expect(summary.weekHistory.weeks.filter(w => w.planChange).map(w => w.end)).toEqual(['2026-10-14T20:00:00.000Z']);
       expect(summary.planFit.weeks.map(w => w.start)).toEqual(['2026-09-30T20:00:00.000Z', '2026-10-07T20:00:00.000Z']);
       expect(summary.weekHistory.weeks.find(w => w.planChange)?.parts?.map(part => part.plan)).toEqual(['pro', 'max5']);
-      // The restarted week: no Pro reading (an estimated 0) and 5% on Max 5×.
+      // The restarted week: no Pro reading (an estimated 0) and 5% on Max.
       expect(summary.weeks.map(w => w.percent)).toEqual([40, 5]);
     });
   });
@@ -247,7 +247,7 @@ describe('buildSummary', () => {
     });
 
     it('uses the own ratio and pace of the week from the restart', () => {
-      // Last week ran whole on Max 5× at 1 %/$; this week starts on Pro and goes back to Max 5× a day in.
+      // Last week ran whole on Max at 1 %/$; this week starts on Pro and goes back to Max a day in.
       const planHistory: PlanPeriod[] = [
         { from: '2026-09-01T00:00:00.000Z', plan: 'max5', source: 'manual' },
         { from: new Date(windowStart).toISOString(), plan: 'pro', source: 'manual' },
@@ -320,7 +320,7 @@ describe('buildSummary', () => {
     const windowStart = Date.parse(RESET) - 7 * DAY_MS;
     const snapshots = [1, 2, 3].map(d => snap(windowStart + d * DAY_MS, d * 6, RESET));
     const summaryWith = (planHistory: PlanPeriod[]) => buildSummary({ endpointEnabled: true, now: NOW, planHistory, records: pooled, snapshots, timeZone: 'UTC' });
-    // A change to Max 5× at `from` (from Max 20×: a downgrade keeps the week whole); none without it.
+    // A change to Max at `from` (from Ultra: a downgrade keeps the week whole); none without it.
     const summaryFrom = (from?: string) => summaryWith(from ? [{ from: '2026-01-01T00:00:00.000Z', plan: 'max20', source: 'manual' }, { from, plan: 'max5', source: 'manual' }] : []);
 
     it('starts at the latest plan change', () => {

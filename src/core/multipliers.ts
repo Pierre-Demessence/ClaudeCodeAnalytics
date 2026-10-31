@@ -29,7 +29,7 @@ const NEIGHBOURS: readonly (readonly [Plan, Plan])[] = [['pro', 'max5'], ['max5'
 /**
  * How much more usage a bigger plan gave, measured: the limit used per $100 of
  * Claude Code usage (the drift ratio) on the smaller plan over that on the
- * bigger one. The same work uses 5 times less of Max 5× than of Pro if it gives 5× the usage.
+ * bigger one. The same work uses 5 times less of Max than of Pro if it gives 5× the usage.
  */
 export function buildMultipliers(input: LimitsInput): MultiplierCheck[] {
   const ratios = (plan: Plan) => driftWindows(input, plan).filter(w => !w.current).map(w => w.ratio);

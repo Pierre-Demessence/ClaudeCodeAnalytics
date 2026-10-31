@@ -330,7 +330,7 @@ touched.
 The Weeks tab lists the last 12 weekly windows, cut where `weekStartFor` cuts
 them (the first reset after a message), so its weeks match the Usage tab's
 weekly chart. A week's peak % is its last reading, shown on the plan of that week
-(`planPercent`): a Pro week at its limit reads 100% on a full bar beside the Max 5×
+(`planPercent`): a Pro week at its limit reads 100% on a full bar beside the Max
 weeks, its estimate without the limit is on Pro too, and the typical-week tick sits
 where the median falls on Pro. No row names its plan, since a label on every row is
 too much: the plan-change mark flags the week of the change, and the tooltips of the
@@ -351,7 +351,7 @@ parts' % added up on the current plan, flagged with a tooltip listing each part
 ## A weekly window splits where its usage restarts, and its parts add up
 
 Anthropic restarts the weekly usage before the reset time: on an upgrade (the Pro to
-Max 5× switch read 100% then 0%, with the same reset time, and restarted the 5-hour
+Max switch read 100% then 0%, with the same reset time, and restarted the 5-hour
 window too) and, as the backlog notes, perhaps as a free reset. Read as one block, the
 window's final % covers the new part only while its cost includes the old part's, so
 such a week misleads every statistic read as one block. `windowParts` (`restarts.ts`)
@@ -563,3 +563,10 @@ the build for one request); a hosts-file entry, which lives outside the repo.
 The widget polls a dedicated route that runs the collector rather than reading
 the data dir itself, so its answer is as fresh as its poll and the token stays in
 the collector.
+
+## Plan ids `max5` and `max20` stay under the labels Max and Ultra
+
+The ids are stored in `settings.json` plan histories, snapshots and backups, and
+Max and Ultra are the labels of the plans advertised as Max 5× and Max 20×, at
+the same prices. Only `PLAN_LABELS` carries them. Rejected: renaming the ids to `max` and `ultra`, which needs
+a migration of the stored data for no visible change.

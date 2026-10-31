@@ -55,7 +55,7 @@ export function MultipliersCard({ multipliers }: { multipliers: readonly Multipl
     <section className="card">
       <div className="card-head">
         <h2>How far to trust the conversions</h2>
-        <span className="card-subtitle">{`Anthropic advertises ${PLAN_MULTIPLIERS.max5}× and ${PLAN_MULTIPLIERS.max20}× Pro's usage; your own readings show what you actually got.`}</span>
+        <span className="card-subtitle">{`Anthropic advertises ${PLAN_MULTIPLIERS.max5}× and ${PLAN_MULTIPLIERS.max20}× Pro's weekly usage; your own readings show what you actually got.`}</span>
       </div>
       <div className="mult-grid">
         {multipliers.map(check => <Row check={check} key={check.from} scale={scale} />)}

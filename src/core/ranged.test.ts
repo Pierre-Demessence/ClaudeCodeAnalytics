@@ -113,7 +113,7 @@ describe('buildRanged over a past range', () => {
 
 describe('buildRanged with a plan change', () => {
   it('flags the week the new plan started in, with its parts, as the summary does', () => {
-    // The Max 5× reading two days before the reset is 10%: the window's usage restarted at the upgrade.
+    // The Max reading two days before the reset is 10%: the window's usage restarted at the upgrade.
     const restartedReading = snap(WEEK_START - 2 * DAY_MS, 10, new Date(WEEK_START).toISOString());
     const upgraded: SummaryInput = { ...input, planHistory: [{ from: new Date(WEEK_START - 20 * DAY_MS).toISOString(), plan: 'pro', source: 'detected' }, { from: new Date(WEEK_START - 3 * DAY_MS).toISOString(), plan: 'max5', source: 'manual' }], snapshots: [...input.snapshots, restartedReading] };
     const flagged = buildSummary(upgraded).weekHistory.weeks.find(w => w.planChange)!;

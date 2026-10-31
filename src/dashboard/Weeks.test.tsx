@@ -110,10 +110,10 @@ describe('weeks tab', () => {
     const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
     const mark = lines[0]!.querySelector('.wk-plan-change')!;
     const text = tipOf(mark);
-    expect(text).toContain('Usage restarted with the change to Max 5× on Fri 2 Oct 00:00.');
+    expect(text).toContain('Usage restarted with the change to Max on Fri 2 Oct 00:00.');
     expect(text).toContain('Pro until Fri 2 Oct 00:00: ~0% of Pro');
-    expect(text).toContain('Max 5× from Fri 2 Oct 00:00: 40% of Max 5×');
-    expect(text).toContain('The peak adds the parts up, on Max 5×.');
+    expect(text).toContain('Max from Fri 2 Oct 00:00: 40% of Max');
+    expect(text).toContain('The peak adds the parts up, on Max.');
     expect(lines[1]!.querySelector('.wk-plan-change')).toBeNull();
     const rows = within(card('Week list')).getAllByRole('row').slice(1);
     expect(rows[0]!.textContent).toContain('plan change');
@@ -126,7 +126,7 @@ describe('weeks tab', () => {
       { from: '2026-10-02T00:00:00Z', plan: 'max5', source: 'manual' },
     ] as const;
     const data: Summary = { ...buildSummary({ endpointEnabled: true, events: [], now: NOW, planHistory, records, snapshots, timeZone: 'UTC' }), status: {} };
-    // The week before the upgrade read 100% of Pro: 20% of Max 5×, and 42% of Max 5× without the limit.
+    // The week before the upgrade read 100% of Pro: 20% of Max, and 42% of Max without the limit.
     const pro = data.weekHistory.weeks[1]!;
     renderTab({ ...data, planFit: { ...data.planFit, weeks: [{ cost: 40, demand: 42, estimated: true, floor: 20, hiddenHours: 86.4, plans: ['pro'], shift: 0, start: pro.start }] } });
     const lines = card('Weekly usage, last 12 weeks').querySelectorAll('.wk-row:not(.wk-head)');
@@ -135,13 +135,13 @@ describe('weeks tab', () => {
     expect(lines[1]!.querySelector('.wk-peak')!.textContent).toBe('100%');
     expect(lines[1]!.querySelector('.wk-uncapped')!.textContent).toBe('≈ 210%');
     expect(tipOf(lines[1]!.querySelector('.wk-uncapped')!)).toContain('At least 100% of Pro: 3.6 days were hidden');
-    // The median peak, 20% of Max 5×, is the Pro limit.
+    // The median peak, 20% of Max, is the Pro limit.
     expect(lines[1]!.querySelector<HTMLElement>('.week-typical')!.style.left).toBe('100%');
     // The legend leaves the median to the median peak card.
     const legend = card('Weekly usage, last 12 weeks').querySelector('.session-legend')!.textContent;
     expect(legend).toContain('typical week');
     expect(legend).not.toContain('median');
-    // The week in progress restarted with the upgrade: its parts add up on Max 5×.
+    // The week in progress restarted with the upgrade: its parts add up on Max.
     expect(lines[0]!.querySelector('.wk-peak')!.textContent).not.toContain('Pro');
     expect(lines[0]!.querySelector<HTMLElement>('.week-typical')!.style.left).toBe('20%');
     const rows = within(card('Week list')).getAllByRole('row').slice(1);
